@@ -11,13 +11,12 @@ public class CallReceiver extends BroadcastReceiver {
         if (intent.getAction() != null && intent.getAction().equals(TelephonyManager.ACTION_PHONE_STATE_CHANGED)) {
             String state = intent.getStringExtra(TelephonyManager.EXTRA_STATE);
             
-            // Khi có cuộc gọi đến (RINGING) hoặc đang gọi đi (OFFHOOK)
+            // Chỉ kích hoạt giao diện ảo khi có cuộc gọi đi (OFFHOOK) hoặc cuộc gọi đến (RINGING)
             if (TelephonyManager.EXTRA_STATE_RINGING.equals(state) || 
                 TelephonyManager.EXTRA_STATE_OFFHOOK.equals(state)) {
                 
-                // Tự động bật màn hình CallActivity đè lên các ứng dụng khác
                 Intent callIntent = new Intent(context, CallActivity.class);
-                callIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                callIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
                 context.startActivity(callIntent);
             }
         }
