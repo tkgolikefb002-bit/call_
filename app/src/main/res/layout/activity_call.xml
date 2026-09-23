@@ -17,7 +17,7 @@
         android:textColor="#FFFFFF"
         android:textSize="48sp"
         android:textStyle="bold"
-        android:background="@drawable/circle_background"
+        android:background="#303f9f"
         android:layout_marginBottom="32dp"/>
 
     <!-- Số điện thoại -->
