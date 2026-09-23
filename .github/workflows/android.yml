@@ -26,4 +26,6 @@ jobs:
         gradle-version: '8.5'
 
     - name: Build with Gradle
-      run: gradle assembleDebug --warning-mode all
+      uses: gradle/actions/setup-gradle@v3
+      with:
+        arguments: assembleDebug --stacktrace --info
