@@ -26,4 +26,4 @@ jobs:
         gradle-version: '8.5'
 
     - name: Build with Gradle
-      run: gradle assembleDebug
+      run: gradle assembleDebug --warning-mode all
