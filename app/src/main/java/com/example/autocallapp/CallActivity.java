@@ -1,15 +1,20 @@
 package com.example.autocallapp;
 
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.telecom.Call;
 import android.widget.Button;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 
 public class CallActivity extends AppCompatActivity {
-    private TextView txtPhoneNumber;
+    private TextView txtPhoneNumber, txtTimer;
     private Button btnEndCall;
     private Call call;
+    private int secondsElapsed = 0;
+    private Handler timerHandler = new Handler(Looper.getMainLooper());
+    private Runnable timerRunnable;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -17,21 +22,18 @@ public class CallActivity extends AppCompatActivity {
         setContentView(R.layout.activity_call);
 
         txtPhoneNumber = findViewById(R.id.txtPhoneNumber);
+        txtTimer = findViewById(R.id.txtTimer);
         btnEndCall = findViewById(R.id.btnEndCall);
 
-        // Lấy thông tin cuộc gọi hiện tại từ InCallService
         call = MyInCallService.activeCall;
 
         if (call != null) {
-            // Lấy số điện thoại
             if (call.getDetails().getHandle() != null) {
                 String phoneNumber = call.getDetails().getHandle().getSchemeSpecificPart();
                 txtPhoneNumber.setText(phoneNumber);
-            } else {
-                txtPhoneNumber.setText("Cuộc gọi riêng tư");
             }
-
-            // Lắng nghe trạng thái cuộc gọi (nếu cuộc gọi kết thúc thì tự đóng màn hình)
+            
+            // Lắng nghe sự kiện ngắt từ hệ thống
             call.registerCallback(new Call.Callback() {
                 @Override
                 public void onStateChanged(Call call, int state) {
@@ -43,7 +45,18 @@ public class CallActivity extends AppCompatActivity {
             });
         }
 
-        // Sự kiện bấm nút kết thúc cuộc gọi
+        // Bắt đầu chạy bộ đếm giây trên màn hình ảo
+        timerRunnable = new Runnable() {
+            @Override
+            public void run() {
+                secondsElapsed++;
+                txtTimer.setText(String.valueOf(secondsElapsed));
+                timerHandler.postDelayed(this, 1000);
+            }
+        };
+        timerHandler.postDelayed(timerRunnable, 1000);
+
+        // Nút bấm kết thúc thủ công
         btnEndCall.setOnClickListener(v -> {
             if (call != null) {
                 call.disconnect();
@@ -53,8 +66,8 @@ public class CallActivity extends AppCompatActivity {
     }
 
     @Override
-    public void onBackPressed() {
-        // Chặn nút back để không làm ẩn màn hình cuộc gọi khi đang gọi
-        // super.onBackPressed(); 
+    protected void onDestroy() {
+        super.onDestroy();
+        timerHandler.removeCallbacks(timerRunnable);
     }
 }
