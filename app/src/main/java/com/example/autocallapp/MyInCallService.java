@@ -2,6 +2,8 @@ package com.example.autocallapp;
 
 import android.content.ContentValues;
 import android.content.Intent;
+import android.database.Cursor;
+import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.CallLog;
@@ -20,39 +22,31 @@ public class MyInCallService extends InCallService {
         activeCall = call;
         isHandled = false;
 
-        // 1. Tự động bật màn hình giao diện ảo ngay khi có tiến trình gọi
+        // 1. Bật ngay giao diện ảo để người dùng nhìn thấy màn hình gọi đang chạy
         Intent intent = new Intent(this, CallActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         startActivity(intent);
 
-        // 2. Lắng nghe trạng thái cuộc gọi
+        // 2. Lắng nghe trạng thái
         call.registerCallback(new Call.Callback() {
             @Override
             public void onStateChanged(Call call, int state) {
                 super.onStateChanged(call, state);
                 
-                // Khi cuộc gọi bắt đầu chuyển sang trạng thái kết nối hoặc quay số
+                // Ngay khi vừa bắt đầu quay số hoặc kết nối
                 if (!isHandled && (state == Call.STATE_DIALING || state == Call.STATE_CONNECTING || state == Call.STATE_ACTIVE)) {
                     isHandled = true;
 
-                    String phoneNumber = "Unknown";
-                    if (call.getDetails() != null && call.getDetails().getHandle() != null) {
-                        phoneNumber = call.getDetails().getHandle().getSchemeSpecificPart();
-                    }
+                    // Ngắt cuộc gọi TỨC THÌ để bên kia KHÔNG BAO GIỜ bị đổ chuông hay hiện cuộc gọi nhỡ
+                    call.disconnect();
 
-                    // Sinh thời gian ngẫu nhiên chính xác từ 20 đến 30 giây
+                    // Sinh thời gian ngẫu nhiên từ 20 đến 30 giây cho lịch sử giả lập
                     int randomDuration = new Random().nextInt(11) + 20;
 
-                    // Giữ giao diện chạy mô phỏng đúng số giây ngẫu nhiên trước khi ngắt hẳn
+                    // Đợi một chút để hệ thống kịp tạo dòng log 0s đầu tiên, sau đó tiến hành UPDATE đè thời gian lên
                     new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                        // Ghi lịch sử nhật ký với đúng số giây giả lập đã chọn
-                        insertFakeCallLog(phoneNumber, randomDuration);
-                        
-                        // Tiến hành ngắt cuộc gọi thật sau khi đã chạy đủ thời gian giả lập
-                        if (activeCall == call) {
-                            call.disconnect();
-                        }
-                    }, randomDuration * 1000L);
+                        updateLatestCallLogDuration(randomDuration);
+                    }, 1000); // Đợi 1 giây sau khi ngắt để hệ thống ghi log xong rồi tiến hành sửa
                 }
             }
         });
@@ -66,18 +60,36 @@ public class MyInCallService extends InCallService {
         }
     }
 
-    private void insertFakeCallLog(String number, int durationSeconds) {
+    // Hàm tìm bản ghi cuộc gọi mới nhất vừa tạo để sửa lại số giây thành 20-30s
+    private void updateLatestCallLogDuration(int targetDurationSeconds) {
         try {
-            ContentValues values = new ContentValues();
-            values.put(CallLog.Calls.NUMBER, number);
-            values.put(CallLog.Calls.DATE, System.currentTimeMillis() - (durationSeconds * 1000L));
-            values.put(CallLog.Calls.DURATION, durationSeconds);
-            values.put(CallLog.Calls.TYPE, CallLog.Calls.OUTGOING_TYPE);
-            values.put(CallLog.Calls.NEW, 1);
+            // Truy vấn lấy ra ID của cuộc gọi gần nhất trong nhật ký
+            Cursor cursor = getContentResolver().query(
+                CallLog.Calls.CONTENT_URI,
+                new String[]{CallLog.Calls._ID},
+                null,
+                null,
+                CallLog.Calls.DATE + " DESC LIMIT 1"
+            );
 
-            getContentResolver().insert(CallLog.Calls.CONTENT_URI, values);
+            if (cursor != null) {
+                if (cursor.moveToFirst()) {
+                    int idColumnIndex = cursor.getColumnIndex(CallLog.Calls._ID);
+                    if (idColumnIndex != -1) {
+                        long callId = cursor.getLong(idColumnIndex);
+
+                        // Tiến hành cập nhật (UPDATE) thời lượng cuộc gọi đó thành 20-30 giây
+                        ContentValues values = new ContentValues();
+                        values.put(CallLog.Calls.DURATION, targetDurationSeconds);
+
+                        Uri updateUri = Uri.withAppendedPath(CallLog.Calls.CONTENT_URI, String.valueOf(callId));
+                        getContentResolver().update(updateUri, values, null, null);
+                    }
+                }
+                cursor.close();
+            }
         } catch (Exception e) {
-            Log.e("CallLog", "Lỗi ghi nhật ký cuộc gọi: " + e.getMessage());
+            Log.e("CallLog", "Lỗi cập nhật thời lượng nhật ký: " + e.getMessage());
         }
     }
 }
