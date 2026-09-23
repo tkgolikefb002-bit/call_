@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Khai báo các quyền cần thiết -->
+    <!-- Khai báo các quyền gọi điện và nhật ký -->
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.READ_CALL_LOG" />
     <uses-permission android:name="android.permission.WRITE_CALL_LOG" />
@@ -16,7 +16,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar">
 
-        <!-- Màn hình chính của app -->
+        <!-- Màn hình chính -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -26,14 +26,14 @@
             </intent-filter>
         </activity>
 
-        <!-- Màn hình hiển thị cuộc gọi (Thêm mới để hiển thị số & nút kết thúc) -->
+        <!-- Màn hình gọi điện (hiển thị số & nút kết thúc) -->
         <activity
             android:name=".CallActivity"
             android:exported="false"
             android:showWhenLocked="true"
             android:turnScreenOn="true" />
 
-        <!-- Dịch vụ xử lý cuộc gọi (InCallService) BẮT BUỘC PHẢI CÓ ĐỦ CÁC THẺ NÀY -->
+        <!-- DỊCH VỤ QUAN TRỌNG NHẤT ĐỂ HIỆN TRONG DANH SÁCH MẶC ĐỊNH -->
         <service
             android:name=".MyInCallService"
             android:permission="android.permission.BIND_INCALL_SERVICE"
