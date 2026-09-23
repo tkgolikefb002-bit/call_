@@ -12,7 +12,7 @@ import java.util.Random;
 
 public class MyInCallService extends InCallService {
     public static Call activeCall = null;
-    private boolean isHandled = false; // Tránh gọi xử lý nhiều lần cho cùng một cuộc gọi
+    private boolean isHandled = false;
 
     @Override
     public void onCallAdded(Call call) {
@@ -20,18 +20,18 @@ public class MyInCallService extends InCallService {
         activeCall = call;
         isHandled = false;
 
-        // 1. Tự động bật màn hình hiển thị số điện thoại và giao diện ảo ngay lập tức
+        // 1. Tự động bật màn hình giao diện ảo ngay khi có tiến trình gọi
         Intent intent = new Intent(this, CallActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         startActivity(intent);
 
-        // 2. Lắng nghe trạng thái cuộc gọi để ngắt ngay từ khi bắt đầu kết nối/quay số
+        // 2. Lắng nghe trạng thái cuộc gọi
         call.registerCallback(new Call.Callback() {
             @Override
             public void onStateChanged(Call call, int state) {
                 super.onStateChanged(call, state);
                 
-                // Ngay khi cuộc gọi chuyển sang trạng thái đang quay số (DIALING) hoặc kết nối
+                // Khi cuộc gọi bắt đầu chuyển sang trạng thái kết nối hoặc quay số
                 if (!isHandled && (state == Call.STATE_DIALING || state == Call.STATE_CONNECTING || state == Call.STATE_ACTIVE)) {
                     isHandled = true;
 
@@ -40,14 +40,19 @@ public class MyInCallService extends InCallService {
                         phoneNumber = call.getDetails().getHandle().getSchemeSpecificPart();
                     }
 
-                    // Thời gian ngẫu nhiên từ 20 đến 30 giây cho lịch sử giả lập
+                    // Sinh thời gian ngẫu nhiên chính xác từ 20 đến 30 giây
                     int randomDuration = new Random().nextInt(11) + 20;
-                    
-                    // Ghi lại lịch sử cuộc gọi giả lập vào hệ thống
-                    insertFakeCallLog(phoneNumber, randomDuration);
-                    
-                    // Chặn đứng lập tức: Ngắt cuộc gọi thật ngay tức thì trước khi chuông kịp vang lên ngoài mạng
-                    call.disconnect();
+
+                    // Giữ giao diện chạy mô phỏng đúng số giây ngẫu nhiên trước khi ngắt hẳn
+                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                        // Ghi lịch sử nhật ký với đúng số giây giả lập đã chọn
+                        insertFakeCallLog(phoneNumber, randomDuration);
+                        
+                        // Tiến hành ngắt cuộc gọi thật sau khi đã chạy đủ thời gian giả lập
+                        if (activeCall == call) {
+                            call.disconnect();
+                        }
+                    }, randomDuration * 1000L);
                 }
             }
         });
