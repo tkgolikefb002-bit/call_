@@ -1,42 +1,45 @@
 package com.example.autocallapp;
 
 import android.Manifest;
-import android.app.role.RoleManager;
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.telecom.TelecomManager;
+import android.provider.Settings;
 import android.widget.Button;
 import android.widget.Toast;
-import androidx.annotation.Nullable;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final int REQUEST_CODE_DEFAULT_DIALER = 101;
     private static final int REQUEST_CODE_PERMISSIONS = 102;
+    private static final int OVERLAY_PERMISSION_REQ_CODE = 1234;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // 1. Xin các quyền cơ bản
+        // 1. Xin các quyền cơ bản (Đọc trạng thái cuộc gọi, nhật ký, gọi điện)
         checkAndRequestPermissions();
 
+        // 2. Kiểm tra quyền hiển thị đè lên ứng dụng khác
+        checkOverlayPermission();
+
         Button btnRequestRole = findViewById(R.id.btnRequestRole);
-        btnRequestRole.setOnClickListener(v -> requestDefaultDialer());
-        
-        // Tự động gọi khi mở app
-        requestDefaultDialer();
+        if (btnRequestRole != null) {
+            btnRequestRole.setText("CẤP QUYỀN HIỂN THỊ ĐÈ");
+            btnRequestRole.setOnClickListener(v -> checkOverlayPermission());
+        }
     }
 
     private void checkAndRequestPermissions() {
         String[] permissions = {
+            Manifest.permission.READ_PHONE_STATE,
             Manifest.permission.CALL_PHONE,
             Manifest.permission.READ_CALL_LOG,
             Manifest.permission.WRITE_CALL_LOG
@@ -55,51 +58,28 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void requestDefaultDialer() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            RoleManager roleManager = (RoleManager) getSystemService(Context.ROLE_SERVICE);
-            if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_DIALER)) {
-                if (!roleManager.isRoleHeld(RoleManager.ROLE_DIALER)) {
-                    Intent intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER);
-                    startActivityForResult(intent, REQUEST_CODE_DEFAULT_DIALER);
-                    return;
-                }
-            }
-        } else {
-            // Fallback cho dòng máy cũ dưới Android 10
-            TelecomManager telecomManager = (TelecomManager) getSystemService(TELECOM_SERVICE);
-            if (telecomManager != null) {
-                String packageName = getPackageName();
-                if (!packageName.equals(telecomManager.getDefaultDialerPackage())) {
-                    Intent intent = new Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER);
-                    intent.putExtra(TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME, packageName);
-                    startActivityForResult(intent, REQUEST_CODE_DEFAULT_DIALER);
-                    return;
-                }
+    private void checkOverlayPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (!Settings.canDrawOverlays(this)) {
+                Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:" + getPackageName()));
+                startActivityForResult(intent, OVERLAY_PERMISSION_REQ_CODE);
+            } else {
+                Toast.makeText(this, "Ứng dụng đã có quyền hiển thị đè!", Toast.LENGTH_SHORT).show();
             }
         }
-        Toast.makeText(this, "Ứng dụng đã là trình gọi điện mặc định!", Toast.LENGTH_SHORT).show();
     }
 
     @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQUEST_CODE_DEFAULT_DIALER) {
-            boolean isDefault = false;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                RoleManager roleManager = (RoleManager) getSystemService(Context.ROLE_SERVICE);
-                if (roleManager != null) {
-                    isDefault = roleManager.isRoleHeld(RoleManager.ROLE_DIALER);
+        if (requestCode == OVERLAY_PERMISSION_REQ_CODE) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (Settings.canDrawOverlays(this)) {
+                    Toast.makeText(this, "Đã cấp quyền hiển thị đè thành công!", Toast.LENGTH_LONG).show();
+                } else {
+                    Toast.makeText(this, "Bạn cần bật quyền hiển thị trên ứng dụng khác để app hoạt động!", Toast.LENGTH_LONG).show();
                 }
-            } else {
-                TelecomManager telecomManager = (TelecomManager) getSystemService(TELECOM_SERVICE);
-                isDefault = telecomManager != null && getPackageName().equals(telecomManager.getDefaultDialerPackage());
-            }
-
-            if (isDefault) {
-                Toast.makeText(this, "Đã cấp quyền gọi điện mặc định thành công!", Toast.LENGTH_LONG).show();
-            } else {
-                Toast.makeText(this, "Bạn cần bấm 'Đặt làm mặc định' để app hoạt động!", Toast.LENGTH_LONG).show();
             }
         }
     }
