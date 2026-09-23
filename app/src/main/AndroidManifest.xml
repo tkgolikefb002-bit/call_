@@ -26,6 +26,13 @@
             </intent-filter>
         </activity>
 
+        <!-- Màn hình hiển thị cuộc gọi (Thêm mới để hiển thị số & nút kết thúc) -->
+        <activity
+            android:name=".CallActivity"
+            android:exported="false"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true" />
+
         <!-- Dịch vụ xử lý cuộc gọi (InCallService) BẮT BUỘC PHẢI CÓ ĐỦ CÁC THẺ NÀY -->
         <service
             android:name=".MyInCallService"
