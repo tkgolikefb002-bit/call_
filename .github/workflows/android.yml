@@ -26,4 +26,11 @@ jobs:
         gradle-version: '8.5'
 
     - name: Build with Gradle
-      run: gradle assembleDebug --continue
+      run: gradle assembleDebug --stacktrace
+
+    - name: Upload build reports
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: error-logs
+        path: app/build/reports/
