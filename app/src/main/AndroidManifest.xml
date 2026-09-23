@@ -1,14 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Khai báo các quyền gọi điện và nhật ký -->
+    <!-- Khai báo các quyền gọi điện, nhật ký và hiển thị đè -->
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.READ_CALL_LOG" />
     <uses-permission android:name="android.permission.WRITE_CALL_LOG" />
     <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     
     <application
         android:allowBackup="true"
@@ -26,7 +25,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- BỔ SUNG THÊM ĐOẠN NÀY ĐỂ HỆ THỐNG NHẬN DIỆN LÀ DIALER -->
+            
             <intent-filter>
                 <action android:name="android.intent.action.DIAL" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -39,16 +38,24 @@
                 <data android:scheme="tel" />
             </intent-filter>
         </activity>
-        
 
-        <!-- Màn hình gọi điện (hiển thị số & nút kết thúc) -->
+        <!-- Màn hình gọi điện (hiển thị số & nút kết thúc ảo) -->
         <activity
             android:name=".CallActivity"
             android:exported="false"
             android:showWhenLocked="true"
             android:turnScreenOn="true" />
 
-        <!-- DỊCH VỤ QUAN TRỌNG NHẤT ĐỂ HIỆN TRONG DANH SÁCH MẶC ĐỊNH -->
+        <!-- BỔ SUNG: Khai báo BroadcastReceiver để bắt trạng thái cuộc gọi -->
+        <receiver
+            android:name=".CallReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.PHONE_STATE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Dịch vụ InCallService (giữ lại để hỗ trợ kết nối ngầm nếu máy cho phép) -->
         <service
             android:name=".MyInCallService"
             android:permission="android.permission.BIND_INCALL_SERVICE"
