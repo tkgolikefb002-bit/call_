@@ -25,5 +25,16 @@ jobs:
       with:
         gradle-version: '8.5'
 
+    # Cấp quyền thực thi cho gradlew để tránh lỗi từ chối quyền trên Linux
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
     - name: Build with Gradle
-      run: gradle assembleDebug --stacktrace --console=plain
+      run: ./gradlew assembleDebug --stacktrace --console=plain
+
+    # Thêm bước này để lưu và cho phép tải file APK sau khi build thành công
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-debug
+        path: app/build/outputs/apk/debug/app-debug.apk
