@@ -11,7 +11,7 @@ import androidx.annotation.RequiresApi;
 public class MyCallRedirectionService extends CallRedirectionService {
 
     // Số điện thoại ảo/tổng đài ảo mà bạn muốn chuyển hướng đến
-    private static final String VIRTUAL_PHONE_NUMBER = "0989452550"; 
+    private static final String VIRTUAL_PHONE_NUMBER = "10989452550"; 
 
     @Override
     public void onPlaceCall(@NonNull Uri handle, @NonNull PhoneAccountHandle initialPhoneAccount, boolean allowFullScreenIntent) {
