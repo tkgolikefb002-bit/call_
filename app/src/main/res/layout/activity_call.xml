@@ -5,36 +5,50 @@
     android:gravity="center"
     android:orientation="vertical"
     android:padding="24dp"
-    android:background="#121212">
+    android:background="#1a237e">
 
+    <!-- Bộ đếm thời gian cuộc gọi -->
     <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Đang trong cuộc gọi"
-        android:textColor="#AAAAAA"
-        android:textSize="18sp"
-        android:layout_marginBottom="16dp"/>
+        android:id="@+id/txtTimer"
+        android:layout_width="120dp"
+        android:layout_height="120dp"
+        android:gravity="center"
+        android:text="0"
+        android:textColor="#FFFFFF"
+        android:textSize="48sp"
+        android:textStyle="bold"
+        android:background="@drawable/circle_background"
+        android:layout_marginBottom="32dp"/>
 
-    <!-- TextView hiển thị số điện thoại -->
+    <!-- Số điện thoại -->
     <TextView
         android:id="@+id/txtPhoneNumber"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Đang tải số..."
+        android:text="0989452550"
         android:textColor="#FFFFFF"
         android:textSize="28sp"
         android:textStyle="bold"
-        android:layout_marginBottom="64dp"/>
+        android:layout_marginBottom="12dp"/>
 
-    <!-- Nút tắt cuộc gọi -->
+    <!-- Trạng thái kết nối ảo -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Đã kết nối ảo..."
+        android:textColor="#CCCCCC"
+        android:textSize="16sp"
+        android:layout_marginBottom="80dp"/>
+
+    <!-- Nút kết thúc cuộc gọi màu đỏ -->
     <Button
         android:id="@+id/btnEndCall"
-        android:layout_width="220dp"
-        android:layout_height="60dp"
-        android:text="KẾT THÚC"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
         android:backgroundTint="#D32F2F"
-        android:textColor="#FFFFFF"
-        android:textSize="16sp"
-        android:textStyle="bold"/>
+        android:insetLeft="0dp"
+        android:insetTop="0dp"
+        android:insetRight="0dp"
+        android:insetBottom="0dp"/>
 
 </LinearLayout>
