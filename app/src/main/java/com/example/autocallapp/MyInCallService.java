@@ -2,6 +2,8 @@ package com.example.autocallapp;
 
 import android.content.ContentValues;
 import android.content.Intent;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.CallLog;
 import android.telecom.Call;
 import android.telecom.InCallService;
@@ -16,7 +18,7 @@ public class MyInCallService extends InCallService {
         super.onCallAdded(call);
         activeCall = call;
 
-        // 1. Tự động bật màn hình hiển thị số điện thoại và nút tắt cuộc gọi lên
+        // 1. Tự động bật màn hình hiển thị số điện thoại và nút tắt cuộc gọi
         Intent intent = new Intent(this, CallActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         startActivity(intent);
@@ -27,21 +29,25 @@ public class MyInCallService extends InCallService {
             public void onStateChanged(Call call, int state) {
                 super.onStateChanged(call, state);
                 
-                // Nếu bạn muốn giữ logic tự động ghi log và ngắt cuộc gọi sau một khoảng thời gian:
+                // Khi cuộc gọi được nhất máy / kết nối thành công (ACTIVE)
                 if (state == Call.STATE_ACTIVE) {
                     String phoneNumber = "Unknown";
                     if (call.getDetails() != null && call.getDetails().getHandle() != null) {
                         phoneNumber = call.getDetails().getHandle().getSchemeSpecificPart();
                     }
 
-                    // Thời gian ngẫu nhiên từ 20 đến 30 giây (nếu muốn giữ tính năng cũ)
+                    // Thời gian ngẫu nhiên từ 20 đến 30 giây
                     int randomDuration = new Random().nextInt(11) + 20;
                     
-                    // Ghi lại lịch sử cuộc gọi
+                    // Ghi lại lịch sử cuộc gọi giả lập
                     insertFakeCallLog(phoneNumber, randomDuration);
                     
-                    // Nếu bạn muốn tự động ngắt sau thời gian đó, có thể dùng Handler, 
-                    // còn hiện tại để người dùng bấm nút kết thúc thủ công trên màn hình CallActivity.
+                    // Tự động ngắt cuộc gọi sau khoảng thời gian ngẫu nhiên đã tính toán
+                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                        if (activeCall == call) {
+                            call.disconnect();
+                        }
+                    }, randomDuration * 1000L);
                 }
             }
         });
