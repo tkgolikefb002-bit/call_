@@ -24,18 +24,25 @@
             android:textSize="16sp"
             android:textStyle="bold" />
 
-        <ImageView
+        <!-- Đổi ImageView thành Button chữ để không bị lỗi icon hệ thống -->
+        <Button
             android:id="@+id/btnSettings"
-            android:layout_width="26dp"
-            android:layout_height="26dp"
-            android:layout_marginEnd="10dp"
-            android:src="@android:ic_menu_manage" />
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginEnd="6dp"
+            android:backgroundTint="#555555"
+            android:text="⚙"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp" />
 
-        <ImageView
+        <Button
             android:id="@+id/btnClose"
-            android:layout_width="26dp"
-            android:layout_height="26dp"
-            android:src="@android:ic_menu_close_clear_cancel" />
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:backgroundTint="#D32F2F"
+            android:text="✕"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp" />
     </LinearLayout>
 
     <!-- Hàng 3 nút bấm chính -->
@@ -46,7 +53,6 @@
         android:gravity="center"
         android:orientation="horizontal">
 
-        <!-- Nút Tìm kiếm (Cam) -->
         <Button
             android:id="@+id/btnSearch"
             android:layout_width="50dp"
@@ -56,7 +62,6 @@
             android:text="🔍"
             android:textSize="16sp" />
 
-        <!-- Nút Chạy / Dừng (Xanh dương - Tự động đổi icon) -->
         <Button
             android:id="@+id/btnPlayPause"
             android:layout_width="50dp"
@@ -68,7 +73,6 @@
             android:textSize="18sp"
             android:textStyle="bold" />
 
-        <!-- Nút Xóa / Thùng rác (Đỏ) -->
         <Button
             android:id="@+id/btnDelete"
             android:layout_width="50dp"
