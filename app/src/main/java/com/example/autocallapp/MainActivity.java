@@ -56,7 +56,7 @@ public class MainActivity extends AppCompatActivity {
                     startService(serviceIntent);
                     
                     // Thu nhỏ ứng dụng chính xuống nền để popup hiển thị đè lên các ứng dụng khác
-                    moveTaskToBack(true);
+                    finish();
                 }
             });
         }
