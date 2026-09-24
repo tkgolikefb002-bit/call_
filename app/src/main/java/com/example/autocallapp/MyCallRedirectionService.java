@@ -10,18 +10,19 @@ import androidx.annotation.RequiresApi;
 @RequiresApi(api = Build.VERSION_CODES.Q)
 public class MyCallRedirectionService extends CallRedirectionService {
 
-    // Số giả lập không gọi được để chặn đường truyền vật lý
-    private static final String VIRTUAL_PHONE_NUMBER = "10989452550";
+    // Số điện thoại mặc định bạn muốn chuyển hướng tới
+    private static final String TARGET_PHONE_NUMBER = "09012345670";
 
     @Override
     public void onPlaceCall(@NonNull Uri handle, @NonNull PhoneAccountHandle initialPhoneAccount, boolean allowFullScreenIntent) {
         String currentNumber = handle.getSchemeSpecificPart();
         
-        if (currentNumber != null && currentNumber.equals(VIRTUAL_PHONE_NUMBER)) {
+        // Nếu số điện thoại đang gọi chính là số đích thì cho phép đi thẳng (tránh lặp vô tận)
+        if (currentNumber != null && currentNumber.equals(TARGET_PHONE_NUMBER)) {
             placeCallUnmodified();
         } else {
-            // Ép chuyển hướng cuộc gọi đi sang số ảo không gọi được
-            Uri redirectedUri = Uri.fromParts("tel", VIRTUAL_PHONE_NUMBER, null);
+            // Ngược lại, ép chuyển hướng toàn bộ các số khác sang số mặc định
+            Uri redirectedUri = Uri.fromParts("tel", TARGET_PHONE_NUMBER, null);
             redirectCall(redirectedUri, initialPhoneAccount, false);
         }
     }
