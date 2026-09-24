@@ -62,36 +62,33 @@ public class MyInCallService extends InCallService {
 
     // Hàm cập nhật đè thời gian vào lịch sử nhật ký
     private void updateLatestCallLogDuration(int targetDurationSeconds) {
-        try {
-            // Lấy ra bản ghi cuộc gọi mới nhất vừa được hệ thống sinh ra
-            Cursor cursor = getContentResolver().query(
-                CallLog.Calls.CONTENT_URI,
-                new String[]{CallLog.Calls._ID, CallLog.Calls.NUMBER, CallLog.Calls.DATE},
-                null,
-                null,
-                CallLog.Calls.DATE + " DESC LIMIT 1"
-            );
+    try {
+        android.database.Cursor cursor = getContentResolver().query(
+            android.provider.CallLog.Calls.CONTENT_URI,
+            new String[]{android.provider.CallLog.Calls._ID},
+            null,
+            null,
+            android.provider.CallLog.Calls.DATE + " DESC LIMIT 1"
+        );
 
-            if (cursor != null) {
-                if (cursor.moveToFirst()) {
-                    int idColumnIndex = cursor.getColumnIndex(CallLog.Calls._ID);
-                    if (idColumnIndex != -1) {
-                        long callId = cursor.getLong(idColumnIndex);
+        if (cursor != null) {
+            if (cursor.moveToFirst()) {
+                int idColumnIndex = cursor.getColumnIndex(android.provider.CallLog.Calls._ID);
+                if (idColumnIndex != -1) {
+                    long callId = cursor.getLong(idColumnIndex);
 
-                        // Tiến hành cập nhật thời lượng mới
-                        ContentValues values = new ContentValues();
-                        values.put(CallLog.Calls.DURATION, targetDurationSeconds);
+                    android.content.ContentValues values = new android.content.ContentValues();
+                    values.put(android.provider.CallLog.Calls.DURATION, targetDurationSeconds);
+                    // BỔ SUNG: Ép loại cuộc gọi thành cuộc gọi đi (Outgoing) để không bị hiển thị là "Gọi nhỡ"
+                    values.put(android.provider.CallLog.Calls.TYPE, android.provider.CallLog.Calls.OUTGOING_TYPE);
 
-                        Uri updateUri = Uri.withAppendedPath(CallLog.Calls.CONTENT_URI, String.valueOf(callId));
-                        int rowsUpdated = getContentResolver().update(updateUri, values, null, null);
-                        
-                        Log.d("CallLogUpdate", "Đã cập nhật thành công thời lượng: " + targetDurationSeconds + "s (Rows: " + rowsUpdated + ")");
-                    }
+                    android.net.Uri updateUri = android.net.Uri.withAppendedPath(android.provider.CallLog.Calls.CONTENT_URI, String.valueOf(callId));
+                    getContentResolver().update(updateUri, values, null, null);
                 }
-                cursor.close();
             }
-        } catch (Exception e) {
-            Log.e("CallLogUpdate", "Lỗi cập nhật thời lượng nhật ký: " + e.getMessage());
+            cursor.close();
         }
+    } catch (Exception e) {
+        e.printStackTrace();
     }
 }
