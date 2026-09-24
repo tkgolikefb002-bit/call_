@@ -34,11 +34,31 @@ public class MainActivity extends AppCompatActivity {
         Button btnGrant = findViewById(R.id.btnGrantPermissions);
         btnGrant.setOnClickListener(v -> requestAllRequiredPermissions());
 
-        // BỔ SUNG: Thêm nút bấm mở trực tiếp màn hình "Default Apps" (Ứng dụng mặc định) hệ thống
-        // Lưu ý: Bạn cần nhớ khai báo id `btnOpenDefaultSettings` trong file `activity_main.xml`
+        // Nút bấm mở trực tiếp màn hình "Default Apps" (Ứng dụng mặc định) hệ thống
         Button btnOpenDefaultSettings = findViewById(R.id.btnOpenDefaultSettings);
         if (btnOpenDefaultSettings != null) {
             btnOpenDefaultSettings.setOnClickListener(v -> openDefaultAppsSettings());
+        }
+
+        // BỔ SUNG: Nút mở bảng điều khiển popup nổi Auto
+        Button btnStartPopup = findViewById(R.id.btnStartPopup);
+        if (btnStartPopup != null) {
+            btnStartPopup.setOnClickListener(v -> {
+                // Kiểm tra xem đã được cấp quyền hiển thị đè màn hình chưa
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+                    Toast.makeText(this, "Vui lòng cấp quyền hiển thị trên ứng dụng khác trước!", Toast.LENGTH_SHORT).show();
+                    Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:" + getPackageName()));
+                    startActivity(intent);
+                } else {
+                    // Khởi chạy Service hiển thị popup nổi lên màn hình
+                    Intent serviceIntent = new Intent(MainActivity.this, FloatingWidgetService.class);
+                    startService(serviceIntent);
+                    
+                    // Thu nhỏ ứng dụng chính xuống nền để popup hiển thị đè lên các ứng dụng khác
+                    moveTaskToBack(true);
+                }
+            });
         }
     }
 
@@ -89,14 +109,12 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // BỔ SUNG: Hàm mở thẳng vào phần cài đặt Quản lý ứng dụng mặc định của máy
+    // Hàm mở thẳng vào phần cài đặt Quản lý ứng dụng mặc định của máy
     private void openDefaultAppsSettings() {
         try {
-            // Mở màn hình danh sách ứng dụng mặc định (Mục Điện thoại / Default Phone App)
             Intent intent = new Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS);
             startActivity(intent);
         } catch (Exception e) {
-            // Phòng hờ các dòng máy cũ không hỗ trợ, chuyển hướng về trang chi tiết của app
             try {
                 Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                         Uri.parse("package:" + getPackageName()));
