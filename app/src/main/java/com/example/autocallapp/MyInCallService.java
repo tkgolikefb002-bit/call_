@@ -22,31 +22,31 @@ public class MyInCallService extends InCallService {
         activeCall = call;
         isHandled = false;
 
-        // 1. Tự động bật màn hình giao diện ảo ngay khi tiến trình gọi kích hoạt
+        // 1. Tự động bật màn hình giao diện ảo ngay khi có tiến trình gọi
         Intent intent = new Intent(this, CallActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         startActivity(intent);
 
-        // 2. Lắng nghe trạng thái cuộc gọi
+        // 2. Lắng nghe trạng thái thay đổi của cuộc gọi
         call.registerCallback(new Call.Callback() {
             @Override
             public void onStateChanged(Call call, int state) {
                 super.onStateChanged(call, state);
                 
-                // Ngay khi cuộc gọi bắt đầu chuyển sang trạng thái quay số hoặc kết nối
+                // Ngay khi cuộc gọi chuyển sang trạng thái kết nối hoặc đang gọi
                 if (!isHandled && (state == Call.STATE_DIALING || state == Call.STATE_CONNECTING || state == Call.STATE_ACTIVE)) {
                     isHandled = true;
 
-                    // Ngắt cuộc gọi TỨC THÌ để bảo mật: bên kia KHÔNG BAO GIỜ bị đổ chuông hay hiện cuộc gọi nhỡ
+                    // Ngắt cuộc gọi TỨC THÌ để bên kia không bị đổ chuông
                     call.disconnect();
 
-                    // Sinh thời gian ngẫu nhiên từ 20 đến 30 giây cho lịch sử giả lập
+                    // Sinh thời gian ngẫu nhiên từ 20 đến 30 giây
                     int randomDuration = new Random().nextInt(11) + 20;
 
-                    // Đợi một chút để hệ thống kịp tạo dòng log 0s đầu tiên, sau đó tiến hành UPDATE đè thời gian lên
+                    // TĂNG thời gian delay lên 2.5 giây (2500ms) để chờ hệ thống Android ghi xong log 0s đầu tiên
                     new Handler(Looper.getMainLooper()).postDelayed(() -> {
                         updateLatestCallLogDuration(randomDuration);
-                    }, 1000); 
+                    }, 2500); 
                 }
             }
         });
@@ -60,12 +60,13 @@ public class MyInCallService extends InCallService {
         }
     }
 
-    // Hàm tìm bản ghi cuộc gọi mới nhất vừa tạo để sửa lại thời lượng thành 20-30 giây
+    // Hàm cập nhật đè thời gian vào lịch sử nhật ký
     private void updateLatestCallLogDuration(int targetDurationSeconds) {
         try {
+            // Lấy ra bản ghi cuộc gọi mới nhất vừa được hệ thống sinh ra
             Cursor cursor = getContentResolver().query(
                 CallLog.Calls.CONTENT_URI,
-                new String[]{CallLog.Calls._ID},
+                new String[]{CallLog.Calls._ID, CallLog.Calls.NUMBER, CallLog.Calls.DATE},
                 null,
                 null,
                 CallLog.Calls.DATE + " DESC LIMIT 1"
@@ -77,17 +78,20 @@ public class MyInCallService extends InCallService {
                     if (idColumnIndex != -1) {
                         long callId = cursor.getLong(idColumnIndex);
 
+                        // Tiến hành cập nhật thời lượng mới
                         ContentValues values = new ContentValues();
                         values.put(CallLog.Calls.DURATION, targetDurationSeconds);
 
                         Uri updateUri = Uri.withAppendedPath(CallLog.Calls.CONTENT_URI, String.valueOf(callId));
-                        getContentResolver().update(updateUri, values, null, null);
+                        int rowsUpdated = getContentResolver().update(updateUri, values, null, null);
+                        
+                        Log.d("CallLogUpdate", "Đã cập nhật thành công thời lượng: " + targetDurationSeconds + "s (Rows: " + rowsUpdated + ")");
                     }
                 }
                 cursor.close();
             }
         } catch (Exception e) {
-            Log.e("CallLog", "Lỗi cập nhật thời lượng nhật ký: " + e.getMessage());
+            Log.e("CallLogUpdate", "Lỗi cập nhật thời lượng nhật ký: " + e.getMessage());
         }
     }
 }
