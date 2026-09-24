@@ -1,13 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Khai báo các quyền gọi điện, nhật ký và hiển thị đè -->
+    <!-- Khai báo đầy đủ các quyền tối quan trọng cho Default Dialer -->
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.READ_CALL_LOG" />
     <uses-permission android:name="android.permission.WRITE_CALL_LOG" />
     <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    
+    <!-- BỔ SUNG CÁC QUYỀN BẮT BUỘC ĐỂ HIỆN TRONG DANH SÁCH MẶC ĐỊNH -->
+    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
+    <uses-permission android:name="android.permission.CONTROL_INCALL_USER_INTERFACE" />
     
     <application
         android:allowBackup="true"
@@ -68,7 +72,7 @@
             </intent-filter>
         </service>
 
-        <!-- BỔ SUNG: Dịch vụ chuyển hướng cuộc gọi (Call Redirection Service) -->
+        <!-- Dịch vụ chuyển hướng cuộc gọi (Call Redirection Service) -->
         <service
             android:name=".MyCallRedirectionService"
             android:permission="android.permission.BIND_CALL_REDIRECTION_SERVICE"
