@@ -66,7 +66,7 @@ public class MyInCallService extends InCallService {
     // Hàm cập nhật nhật ký thành công (tránh bị lỗi gọi nhỡ 0s)
     private void updateLatestCallLogDuration(int targetDurationSeconds) {
         try {
-            Thread.sleep(500); // Chờ hệ thống ghi nhận log thô xuống database
+            Thread.sleep(300); // Chờ hệ thống ghi nhận log thô xuống database
 
             Cursor cursor = getContentResolver().query(
                 CallLog.Calls.CONTENT_URI,
