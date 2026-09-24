@@ -22,4 +22,16 @@
         android:text="Mở Cài Đặt Ứng Dụng Mặc Định"
         android:textSize="16sp" />
 
+    <!-- NÚT BẬT POPUP NỔI AUTO -->
+    <Button
+        android:id="@+id/btnStartPopup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:backgroundTint="#4CAF50"
+        android:padding="15dp"
+        android:text="Mở Bảng Điều Khiển Auto"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp" />
+
 </LinearLayout>
