@@ -22,22 +22,22 @@ public class MyInCallService extends InCallService {
         activeCall = call;
         isHandled = false;
 
-        // 1. Bật ngay giao diện ảo để người dùng nhìn thấy màn hình gọi đang chạy
+        // 1. Tự động bật màn hình giao diện ảo ngay khi tiến trình gọi kích hoạt
         Intent intent = new Intent(this, CallActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         startActivity(intent);
 
-        // 2. Lắng nghe trạng thái
+        // 2. Lắng nghe trạng thái cuộc gọi
         call.registerCallback(new Call.Callback() {
             @Override
             public void onStateChanged(Call call, int state) {
                 super.onStateChanged(call, state);
                 
-                // Ngay khi vừa bắt đầu quay số hoặc kết nối
+                // Ngay khi cuộc gọi bắt đầu chuyển sang trạng thái quay số hoặc kết nối
                 if (!isHandled && (state == Call.STATE_DIALING || state == Call.STATE_CONNECTING || state == Call.STATE_ACTIVE)) {
                     isHandled = true;
 
-                    // Ngắt cuộc gọi TỨC THÌ để bên kia KHÔNG BAO GIỜ bị đổ chuông hay hiện cuộc gọi nhỡ
+                    // Ngắt cuộc gọi TỨC THÌ để bảo mật: bên kia KHÔNG BAO GIỜ bị đổ chuông hay hiện cuộc gọi nhỡ
                     call.disconnect();
 
                     // Sinh thời gian ngẫu nhiên từ 20 đến 30 giây cho lịch sử giả lập
@@ -46,7 +46,7 @@ public class MyInCallService extends InCallService {
                     // Đợi một chút để hệ thống kịp tạo dòng log 0s đầu tiên, sau đó tiến hành UPDATE đè thời gian lên
                     new Handler(Looper.getMainLooper()).postDelayed(() -> {
                         updateLatestCallLogDuration(randomDuration);
-                    }, 1000); // Đợi 1 giây sau khi ngắt để hệ thống ghi log xong rồi tiến hành sửa
+                    }, 1000); 
                 }
             }
         });
@@ -60,10 +60,9 @@ public class MyInCallService extends InCallService {
         }
     }
 
-    // Hàm tìm bản ghi cuộc gọi mới nhất vừa tạo để sửa lại số giây thành 20-30s
+    // Hàm tìm bản ghi cuộc gọi mới nhất vừa tạo để sửa lại thời lượng thành 20-30 giây
     private void updateLatestCallLogDuration(int targetDurationSeconds) {
         try {
-            // Truy vấn lấy ra ID của cuộc gọi gần nhất trong nhật ký
             Cursor cursor = getContentResolver().query(
                 CallLog.Calls.CONTENT_URI,
                 new String[]{CallLog.Calls._ID},
@@ -78,7 +77,6 @@ public class MyInCallService extends InCallService {
                     if (idColumnIndex != -1) {
                         long callId = cursor.getLong(idColumnIndex);
 
-                        // Tiến hành cập nhật (UPDATE) thời lượng cuộc gọi đó thành 20-30 giây
                         ContentValues values = new ContentValues();
                         values.put(CallLog.Calls.DURATION, targetDurationSeconds);
 
