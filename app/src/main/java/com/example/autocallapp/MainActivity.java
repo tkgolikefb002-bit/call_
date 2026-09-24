@@ -30,8 +30,16 @@ public class MainActivity extends AppCompatActivity {
         // Đăng ký PhoneAccount ngầm
         registerPhoneAccount();
 
+        // Nút cấp tất cả quyền và đặt làm mặc định
         Button btnGrant = findViewById(R.id.btnGrantPermissions);
         btnGrant.setOnClickListener(v -> requestAllRequiredPermissions());
+
+        // BỔ SUNG: Thêm nút bấm mở trực tiếp màn hình "Default Apps" (Ứng dụng mặc định) hệ thống
+        // Lưu ý: Bạn cần nhớ khai báo id `btnOpenDefaultSettings` trong file `activity_main.xml`
+        Button btnOpenDefaultSettings = findViewById(R.id.btnOpenDefaultSettings);
+        if (btnOpenDefaultSettings != null) {
+            btnOpenDefaultSettings.setOnClickListener(v -> openDefaultAppsSettings());
+        }
     }
 
     private void requestAllRequiredPermissions() {
@@ -81,11 +89,29 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // BỔ SUNG: Hàm mở thẳng vào phần cài đặt Quản lý ứng dụng mặc định của máy
+    private void openDefaultAppsSettings() {
+        try {
+            // Mở màn hình danh sách ứng dụng mặc định (Mục Điện thoại / Default Phone App)
+            Intent intent = new Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS);
+            startActivity(intent);
+        } catch (Exception e) {
+            // Phòng hờ các dòng máy cũ không hỗ trợ, chuyển hướng về trang chi tiết của app
+            try {
+                Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:" + getPackageName()));
+                startActivity(intent);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                Toast.makeText(this, "Không thể mở cài đặt hệ thống!", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == REQUEST_CODE_PERMISSIONS) {
-            // Kiểm tra xem tất cả các quyền cơ bản đã được cấp chưa
             boolean allGranted = true;
             for (int result : grantResults) {
                 if (result != PackageManager.PERMISSION_GRANTED) {
@@ -95,7 +121,6 @@ public class MainActivity extends AppCompatActivity {
             }
 
             if (allGranted) {
-                // Nếu cấp đủ thì chuyển sang xin quyền đặc biệt tiếp theo
                 checkSpecialPermissions();
             } else {
                 Toast.makeText(this, "Bạn cần cấp đủ quyền gọi điện để ứng dụng hoạt động!", Toast.LENGTH_SHORT).show();
