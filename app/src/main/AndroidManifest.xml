@@ -78,6 +78,7 @@
                 <action android:name="android.telecom.CallRedirectionService" />
             </intent-filter>
         </service>
-
+        <service android:name=".FloatingWidgetService" android:exported="false" />
+        
     </application>
 </manifest>
