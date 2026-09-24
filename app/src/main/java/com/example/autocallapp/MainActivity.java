@@ -17,8 +17,11 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Đăng ký PhoneAccount để hệ thống nhận diện app là một trình quản lý cuộc gọi hợp lệ
+        // 1. Đăng ký PhoneAccount để hệ thống nhận diện app là một trình quản lý cuộc gọi hợp lệ
         registerPhoneAccount();
+
+        // 2. Tự động bật popup hệ thống yêu cầu đặt làm ứng dụng gọi điện mặc định
+        requestDefaultDialer();
     }
 
     private void registerPhoneAccount() {
@@ -40,6 +43,17 @@ public class MainActivity extends AppCompatActivity {
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
+            }
+        }
+    }
+
+    private void requestDefaultDialer() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            TelecomManager telecomManager = (TelecomManager) getSystemService(TELECOM_SERVICE);
+            if (telecomManager != null && !getPackageName().equals(telecomManager.getDefaultDialerPackage())) {
+                Intent intent = new Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER);
+                intent.putExtra(TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME, getPackageName());
+                startActivity(intent);
             }
         }
     }
