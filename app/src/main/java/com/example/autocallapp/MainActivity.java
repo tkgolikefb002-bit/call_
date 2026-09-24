@@ -1,10 +1,13 @@
+package com.example.autocallapp;
+
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
 import android.os.Bundle;
 import android.telecom.PhoneAccount;
 import android.telecom.PhoneAccountHandle;
 import android.telecom.TelecomManager;
-import android.os.Build;
 import androidx.appcompat.app.AppCompatActivity;
 
 public class MainActivity extends AppCompatActivity {
@@ -14,14 +17,16 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Đăng ký PhoneAccount để hệ thống công nhận app là một trình quản lý cuộc gọi hợp lệ
+        // Đăng ký PhoneAccount để hệ thống nhận diện app là một trình quản lý cuộc gọi hợp lệ
         registerPhoneAccount();
     }
 
     private void registerPhoneAccount() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             TelecomManager telecomManager = (TelecomManager) getSystemService(Context.TELECOM_SERVICE);
-            ComponentName componentName = new ComponentName(this, MyConnectionService.class); // Hoặc liên kết với service xử lý
+            
+            // Trỏ trực tiếp tới MyInCallService của dự án
+            ComponentName componentName = new ComponentName(this, MyInCallService.class);
             
             PhoneAccountHandle handle = new PhoneAccountHandle(componentName, "MyCustomDialerId");
             
