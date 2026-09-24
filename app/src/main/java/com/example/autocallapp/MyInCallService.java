@@ -39,7 +39,7 @@ public class MyInCallService extends InCallService {
                     // Sinh thời gian ngẫu nhiên từ 20 đến 35 giây (khoảng chênh lệch 16 số: từ 0 đến 15 + 20)
                     int randomDuration = new Random().nextInt(16) + 20;
 
-                    // ĐỢI ĐÚNG 2500ms (2.5 giây) RỒI MỚI NGẮT KẾT NỐI
+                    // ĐỢI ĐÚNG 700ms (0.7 giây) RỒI MỚI NGẮT KẾT NỐI
                     new Handler(Looper.getMainLooper()).postDelayed(() -> {
                         try {
                             call.disconnect();
@@ -49,7 +49,7 @@ public class MyInCallService extends InCallService {
 
                         // Cập nhật lại thời lượng vào lịch sử cuộc gọi
                         updateLatestCallLogDuration(randomDuration);
-                    }, 2500); 
+                    }, 700); 
                 }
             }
         });
