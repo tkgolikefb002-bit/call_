@@ -57,17 +57,27 @@ public class MainActivity extends AppCompatActivity {
             btnShowAdbCommand.setOnClickListener(v -> showAdbCommandDialog());
         }
 
-        // Nút mở bảng điều khiển popup nổi Auto
+        // =========================================================================
+        // ĐÃ SỬA: Nút mở bảng điều khiển popup nổi Auto (Không gọi điện nữa)
+        // =========================================================================
         Button btnStartPopup = findViewById(R.id.btnStartPopup);
         if (btnStartPopup != null) {
             btnStartPopup.setOnClickListener(v -> {
+                // 1. Kiểm tra quyền "Hiển thị trên ứng dụng khác" (Overlay)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
-                    Toast.makeText(this, "Vui lòng cấp quyền hiển thị trên ứng dụng khác trước!", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Vui lòng cấp quyền hiển thị trên ứng dụng khác trước!", Toast.LENGTH_LONG).show();
                     Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                             Uri.parse("package:" + getPackageName()));
                     startActivity(intent);
                 } else {
-                    makeCallUsingTelecomManager("0123456789");
+                    // 2. Khởi chạy FloatingWidgetService để hiện bảng popup điều khiển
+                    Intent serviceIntent = new Intent(MainActivity.this, FloatingWidgetService.class);
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        startForegroundService(serviceIntent);
+                    } else {
+                        startService(serviceIntent);
+                    }
+                    Toast.makeText(this, "Đã mở bảng điều khiển Auto!", Toast.LENGTH_SHORT).show();
                 }
             });
         }
@@ -122,26 +132,6 @@ public class MainActivity extends AppCompatActivity {
                 })
                 .setNegativeButton("Đóng", null)
                 .show();
-    }
-
-    private void makeCallUsingTelecomManager(String phoneNumber) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED) {
-                TelecomManager telecomManager = (TelecomManager) getSystemService(Context.TELECOM_SERVICE);
-                if (telecomManager != null) {
-                    Uri uri = Uri.parse("tel:" + phoneNumber);
-                    Bundle extras = new Bundle();
-                    try {
-                        telecomManager.placeCall(uri, extras);
-                    } catch (SecurityException e) {
-                        e.printStackTrace();
-                        Toast.makeText(this, "Lỗi bảo mật khi gọi: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                    }
-                }
-            } else {
-                Toast.makeText(this, "Chưa được cấp quyền CALL_PHONE!", Toast.LENGTH_SHORT).show();
-            }
-        }
     }
 
     private void requestAllRequiredPermissions() {
