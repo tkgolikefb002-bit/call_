@@ -113,12 +113,13 @@ public class AutoScrapeService extends AccessibilityService {
 
         if (callQueueList.isEmpty()) {
             Toast.makeText(this, "Không có mã nào trong danh sách để gọi!", Toast.LENGTH_LONG).show();
+            // Đưa trạng thái nút play về lại ban đầu nếu cần
             return;
         }
 
         isCallingProcessActive = true;
         currentCallIndex = 0;
-        Toast.makeText(this, "Bắt đầu tiến trình tự động gọi " + callQueueList.size() + " đơn hàng...", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Bắt đầu tự động gọi " + callQueueList.size() + " đơn hàng...", Toast.LENGTH_SHORT).show();
         executeNextCallStep();
     }
 
@@ -157,7 +158,7 @@ public class AutoScrapeService extends AccessibilityService {
         if (!isCallingProcessActive) return;
 
         if (currentCallIndex >= callQueueList.size()) {
-            Toast.makeText(this, "Đã gọi xong toàn bộ danh sách đơn hàng!", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Đã hoàn thành toàn bộ danh sách đơn hàng!", Toast.LENGTH_LONG).show();
             isCallingProcessActive = false;
             return;
         }
@@ -165,25 +166,30 @@ public class AutoScrapeService extends AccessibilityService {
         String targetCode = callQueueList.get(currentCallIndex);
         currentCallIndex++;
 
-        // Bước 1: Tự động điền mã vận đơn vào khung tìm kiếm
+        // Cập nhật trạng thái lên giao diện nếu muốn (hiển thị đơn thứ mấy)
+        if (FloatingWidgetService.instance != null) {
+            handler.post(() -> FloatingWidgetService.instance.updateProgress(currentCallIndex));
+        }
+
+        // Bước 1: Dán mã vận đơn vào khung tìm kiếm
         boolean pasted = pasteCodeIntoSearchBox(targetCode);
 
-        // Bước 2: Chờ ứng dụng load kết quả tìm kiếm đơn hàng (2 giây)
+        // Bước 2: Chờ app logistics load kết quả (1.5 giây)
         handler.postDelayed(() -> {
             if (!isCallingProcessActive) return;
 
-            // Bước 3: Lấy số điện thoại tương ứng từ màn hình (id: tvPhoneNub)
+            // Bước 3: Quét số điện thoại trên màn hình (id: tvPhoneNub)
             String phoneNumber = findPhoneNumberOnScreen();
 
             if (phoneNumber != null && !phoneNumber.isEmpty()) {
-                // Bước 4: Thực hiện cuộc gọi tới số điện thoại tìm được
+                // Bước 4: Gọi điện (Sẽ kích hoạt InCallService ngắt 700ms và nhảy giây)
                 makePhoneCall(phoneNumber);
             } else {
                 Toast.makeText(this, "Không tìm thấy SĐT cho mã: " + targetCode, Toast.LENGTH_SHORT).show();
-                // Tự động chuyển sang mã tiếp theo nếu không thấy số
-                onCallFinished();
+                // Không có số thì tự động nhảy sang mã kế tiếp sau 1.5 giây
+                handler.postDelayed(this::executeNextCallStep, 1500);
             }
-        }, 2000);
+        }, 1500);
     }
 
     private boolean pasteCodeIntoSearchBox(String code) {
@@ -216,7 +222,6 @@ public class AutoScrapeService extends AccessibilityService {
         return null;
     }
 
-    // Hàm quét tìm số điện thoại hiển thị trên màn hình dựa theo resource-id 'tvPhoneNub'
     private String findPhoneNumberOnScreen() {
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
         if (rootNode == null) return null;
@@ -250,15 +255,17 @@ public class AutoScrapeService extends AccessibilityService {
         }
     }
 
+    // ĐƯỢC GỌI TỪ MyInCallService NGAY SAU KHI CUỘC GỌI KẾT THÚC (700ms)
     public void onCallFinished() {
         if (!isCallingProcessActive) return;
 
+        // Nghỉ ngơi 2 giây sau mỗi cuộc gọi xong rồi chuyển sang mã đơn tiếp theo trong danh sách
         handler.postDelayed(new Runnable() {
             @Override
             public void run() {
                 executeNextCallStep();
             }
-        }, 3000);
+        }, 2000);
     }
 
     // =========================================================================
