@@ -9,6 +9,7 @@ import android.view.accessibility.AccessibilityNodeInfo;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.Toast;
 import java.io.BufferedReader;
 import java.io.File;
@@ -21,6 +22,7 @@ import java.util.List;
 import java.util.Set;
 
 public class AutoScrapeService extends AccessibilityService {
+    private static final String TAG = "AutoScrapeService";
     public static AutoScrapeService instance;
     private boolean isScraping = false;
     private boolean isCallingProcessActive = false; 
@@ -33,6 +35,7 @@ public class AutoScrapeService extends AccessibilityService {
     public void onServiceConnected() {
         super.onServiceConnected();
         instance = this;
+        Log.d(TAG, "Accessibility Service đã kết nối thành công!");
     }
 
     @Override
@@ -43,6 +46,33 @@ public class AutoScrapeService extends AccessibilityService {
     public void onInterrupt() {
         isScraping = false;
         isCallingProcessActive = false;
+        Log.w(TAG, "Service bị gián đoạn (onInterrupt)!");
+    }
+
+    // =========================================================================
+    // HÀM HỖ TRỢ GỠ LỖI: IN TOÀN BỘ CẤU TRÚC GIAO DIỆN MÀN HÌNH RA LOGCAT
+    // =========================================================================
+    private void inspectAndLogNodeTree(AccessibilityNodeInfo node, int depth) {
+        if (node == null) return;
+        
+        StringBuilder indent = new StringBuilder();
+        for (int i = 0; i < depth; i++) {
+            indent.append("  │");
+        }
+
+        String viewId = node.getViewIdResourceName() != null ? node.getViewIdResourceName() : "No-ID";
+        String className = node.getClassName() != null ? node.getClassName().toString() : "UnknownClass";
+        CharSequence text = node.getText();
+        
+        Log.d(TAG, String.format("%s─ [Class: %s] [ID: %s] [Text: %s] [Editable: %b] [Clickable: %b]",
+                indent.toString(), className, viewId, text, node.isEditable(), node.isClickable()));
+
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo child = node.getChild(i);
+            if (child != null) {
+                inspectAndLogNodeTree(child, depth + 1);
+            }
+        }
     }
 
     // =========================================================================
@@ -91,11 +121,9 @@ public class AutoScrapeService extends AccessibilityService {
                             saveCodesToFile();
                             updatePopupProgress(collectedCodes.size());
                             Toast.makeText(getApplicationContext(), "Đã quét xong! Tổng: " + collectedCodes.size() + " mã.", Toast.LENGTH_LONG).show();
-                            rootNode.recycle();
                             return;
                         }
                     }
-                    rootNode.recycle();
                 }
                 performFastScrollDownAndContinue(handler, this);
             }
@@ -105,7 +133,7 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // PHẦN 2: TIẾN TRÌNH TỰ ĐỘNG GỌI
+    // PHẦN 2: TIẾN TRÌNH TỰ ĐỘNG GỌI (ĐÃ SỬA LỖI VĂNG APP & TỐI ƯU DÁN MÃ)
     // =========================================================================
     public void startAutoCallingSequence() {
         if (isCallingProcessActive) return;
@@ -170,52 +198,67 @@ public class AutoScrapeService extends AccessibilityService {
     private void searchAndCallForCode(String targetCode) {
         if (!isCallingProcessActive) return;
 
+        Log.d(TAG, "==================================================");
+        Log.d(TAG, "BẮT ĐẦU XỬ LÝ MÃ ĐƠN: " + targetCode);
+
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
         if (rootNode == null) {
+            Log.e(TAG, "Màn hình chưa sẵn sàng (rootNode = null)");
             moveToNextCodeAfterDelay();
             return;
         }
 
+        // IN CẤU TRÚC GIAO DIỆN RA LOGCAT ĐỂ KIỂM TRA MÀN HÌNH
+        Log.d(TAG, "--- KIỂM TRA CẤU TRÚC MÀN HÌNH HIỆN TẠI ---");
+        inspectAndLogNodeTree(rootNode, 0);
+
+        // 1. Tìm ô tìm kiếm theo ID
         List<AccessibilityNodeInfo> searchNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/search_src_text");
         
+        // 2. Nếu không thấy theo ID, tìm bất kỳ ô EditText nào
         if (searchNodes == null || searchNodes.isEmpty()) {
+            Log.w(TAG, "Không tìm thấy ô theo ID search_src_text. Đang tìm ô dạng EditText...");
             searchNodes = new ArrayList<>();
             findEditTextNodes(rootNode, searchNodes);
         }
 
         if (searchNodes != null && !searchNodes.isEmpty()) {
             AccessibilityNodeInfo searchBox = searchNodes.get(0);
-            
-            searchBox.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-            
-            handler.postDelayed(() -> {
-                Bundle arguments = new Bundle();
-                // Sửa lại dùng đúng tên hằng số chuẩn trong Android SDK
-                arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, targetCode);
-                searchBox.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
-                
-                handler.postDelayed(() -> {
-                    findAndCallFilteredPhoneNumber();
-                }, 600);
+            Log.d(TAG, "Đã tìm thấy khung nhập liệu! Class: " + searchBox.getClassName() + " | ID: " + searchBox.getViewIdResourceName());
 
-            }, 300);
-            
+            // Thực hiện Focus & Click
+            searchBox.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
+            searchBox.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+
+            // Dán nội dung mã đơn trực tiếp (không dùng Runnable async để tránh văng app)
+            Bundle arguments = new Bundle();
+            arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, targetCode);
+            boolean isSetTextSuccess = searchBox.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
+
+            Log.d(TAG, "Trạng thái dán văn bản [" + targetCode + "]: " + (isSetTextSuccess ? "THÀNH CÔNG" : "THẤT BẠI"));
+
+            // Sau khi dán, chờ 800ms để app lọc kết quả rồi tiến hành lấy số gọi
+            handler.postDelayed(this::findAndCallFilteredPhoneNumber, 800);
+
         } else {
-            rootNode.recycle();
-            Toast.makeText(this, "Không tìm thấy ô tìm kiếm!", Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "KHÔNG TÌM THẤY BẤT KỲ Ô NHẬP TÌM KIẾM NÀO TRÊN MÀN HÌNH!");
+            Toast.makeText(this, "Không tìm thấy ô tìm kiếm trên màn hình!", Toast.LENGTH_SHORT).show();
             moveToNextCodeAfterDelay();
         }
-        
-        rootNode.recycle();
     }
 
     private void findEditTextNodes(AccessibilityNodeInfo node, List<AccessibilityNodeInfo> results) {
         if (node == null) return;
-        if ("android.widget.EditText".equals(node.getClassName())) {
+        
+        if (node.isEditable() || "android.widget.EditText".equals(node.getClassName())) {
             results.add(node);
         }
+        
         for (int i = 0; i < node.getChildCount(); i++) {
-            findEditTextNodes(node.getChild(i), results);
+            AccessibilityNodeInfo child = node.getChild(i);
+            if (child != null) {
+                findEditTextNodes(child, results);
+            }
         }
     }
 
@@ -224,6 +267,7 @@ public class AutoScrapeService extends AccessibilityService {
 
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
         if (rootNode == null) {
+            Log.e(TAG, "RootNode null khi chuẩn bị đọc SĐT!");
             moveToNextCodeAfterDelay();
             return;
         }
@@ -237,12 +281,12 @@ public class AutoScrapeService extends AccessibilityService {
                     String phone = pNode.getText().toString().trim();
                     if (phone.startsWith("0") && phone.length() >= 9) {
                         phoneNumber = phone;
+                        Log.d(TAG, "Đã tìm thấy SĐT sau khi lọc: " + phoneNumber);
                         break;
                     }
                 }
             }
         }
-        rootNode.recycle();
 
         if (phoneNumber != null && !phoneNumber.isEmpty()) {
             currentCallIndex++;
@@ -251,6 +295,7 @@ public class AutoScrapeService extends AccessibilityService {
             }
             makePhoneCall(phoneNumber);
         } else {
+            Log.w(TAG, "Không tìm thấy SĐT hợp lệ cho mã đơn hàng này!");
             Toast.makeText(this, "Không tìm thấy SĐT cho mã: " + callQueueList.get(currentCallIndex), Toast.LENGTH_SHORT).show();
             moveToNextCodeAfterDelay();
         }
@@ -258,12 +303,13 @@ public class AutoScrapeService extends AccessibilityService {
 
     private void makePhoneCall(String phoneNumber) {
         try {
+            Log.d(TAG, "Đang khởi chạy cuộc gọi tới SĐT: " + phoneNumber);
             Intent intent = new Intent(Intent.ACTION_CALL);
             intent.setData(Uri.parse("tel:" + phoneNumber));
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(intent);
         } catch (SecurityException e) {
-            e.printStackTrace();
+            Log.e(TAG, "Chưa cấp quyền CALL_PHONE!", e);
             Toast.makeText(this, "Thiếu quyền gọi điện thoại!", Toast.LENGTH_SHORT).show();
         }
     }
@@ -271,12 +317,8 @@ public class AutoScrapeService extends AccessibilityService {
     public void onCallFinished() {
         if (!isCallingProcessActive) return;
 
-        handler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                executeNextCallStep();
-            }
-        }, 1500);
+        Log.d(TAG, "Cuộc gọi kết thúc, chuyển sang mã tiếp theo...");
+        handler.postDelayed(this::executeNextCallStep, 1500);
     }
 
     private void loadExistingCodes() {
