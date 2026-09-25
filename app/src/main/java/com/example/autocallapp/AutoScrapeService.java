@@ -180,13 +180,8 @@ public class AutoScrapeService extends AccessibilityService {
             return;
         }
 
-        // 1. Đưa mã đơn hàng vào Clipboard hệ thống trước tiên
-        android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-        android.content.ClipData clip = android.content.ClipData.newPlainText("TargetCode", targetCode);
-        clipboard.setPrimaryClip(clip);
-
+        // 1. Tìm node tìm kiếm lần đầu để focus
         List<AccessibilityNodeInfo> searchNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/etSearch");
-        
         if (searchNodes == null || searchNodes.isEmpty()) {
             searchNodes = new ArrayList<>();
             findEditTextNodes(rootNode, searchNodes);
@@ -195,30 +190,39 @@ public class AutoScrapeService extends AccessibilityService {
         if (searchNodes != null && !searchNodes.isEmpty()) {
             AccessibilityNodeInfo searchBox = searchNodes.get(0);
             
-            // 2. Thực hiện Focus và Click qua Accessibility Node
+            // Focus và Click vào ô để app kích hoạt bàn phím / input connection
             searchBox.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
             searchBox.performAction(AccessibilityNodeInfo.ACTION_CLICK);
 
-            // 3. Chạm bằng tọa độ vật lý (Gesture click) chính xác vào giữa khung etSearch [0,505][632,577]
-            clickAtCoordinates(316, 541);
-
-            // 4. Sau 300ms, tiến hành gán text và thực hiện lệnh PASTE từ Clipboard để ép ứng dụng nhận mã
+            // 2. Đợi 300ms cho app sẵn sàng, sau đó lấy node TƯƠI MỚI (Fresh Node) để set text, 
+            // tránh tình trạng node cũ bị stale/mất hiệu lực.
             handler.postDelayed(() -> {
-                Bundle arguments = new Bundle();
-                arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, targetCode);
-                searchBox.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
-                
-                // Kích hoạt thêm lệnh Dán (Paste) để bắt buộc ứng dụng nhận nội dung từ bộ nhớ tạm
-                boolean pasteResult = searchBox.performAction(AccessibilityNodeInfo.ACTION_PASTE);
-                Log.d(TAG, "Dán mã " + targetCode + " bằng lệnh Paste: " + (pasteResult ? "THÀNH CÔNG" : "THẤT BẠI"));
+                AccessibilityNodeInfo freshRoot = getRootInActiveWindow();
+                if (freshRoot == null) {
+                    moveToNextCodeAfterDelay();
+                    return;
+                }
 
-                // 5. Đợi 1000ms (1 giây) để app kịp lọc danh sách kết quả tìm kiếm theo mã vừa dán
+                List<AccessibilityNodeInfo> freshSearchNodes = freshRoot.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/etSearch");
+                if (freshSearchNodes != null && !freshSearchNodes.isEmpty()) {
+                    AccessibilityNodeInfo freshSearchBox = freshSearchNodes.get(0);
+
+                    // Đưa trực tiếp chuỗi mã đơn vào ô thông qua Accessibility Bundle chuẩn API
+                    Bundle arguments = new Bundle();
+                    arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, targetCode);
+                    boolean success = freshSearchBox.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
+
+                    Log.d(TAG, "Set text mã " + targetCode + ": " + (success ? "THÀNH CÔNG" : "THẤT BẠI"));
+                } else {
+                    Log.e(TAG, "Không tìm thấy lại ô tìm kiếm sau khi delay!");
+                }
+
+                // 3. Đợi 1000ms (1 giây) để ứng dụng tự động lọc kết quả tìm kiếm theo mã vừa điền
                 handler.postDelayed(this::findAndCallFilteredPhoneNumber, 1000);
             }, 300);
 
         } else {
             Log.e(TAG, "Không tìm thấy ô tìm kiếm etSearch!");
-            Toast.makeText(this, "Không tìm thấy ô tìm kiếm trên màn hình!", Toast.LENGTH_SHORT).show();
             moveToNextCodeAfterDelay();
         }
     }
