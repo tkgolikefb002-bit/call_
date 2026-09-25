@@ -86,7 +86,6 @@ public class AutoScrapeService extends AccessibilityService {
                         updatePopupProgress(collectedCodes.size());
                     } else {
                         scrollAttempts++;
-                        // Cuộn 1 lần không thấy mã mới là dừng
                         if (scrollAttempts >= 1) {
                             isScraping = false;
                             saveCodesToFile();
@@ -106,7 +105,7 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // PHẦN 2: TIẾN TRÌNH TỰ ĐỘNG GỌI (Dán mã vào ô tìm kiếm)
+    // PHẦN 2: TIẾN TRÌNH TỰ ĐỘNG GỌI
     // =========================================================================
     public void startAutoCallingSequence() {
         if (isCallingProcessActive) return;
@@ -191,7 +190,8 @@ public class AutoScrapeService extends AccessibilityService {
             
             handler.postDelayed(() -> {
                 Bundle arguments = new Bundle();
-                arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_VALUE, targetCode);
+                // Sửa lại dùng đúng tên hằng số chuẩn trong Android SDK
+                arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, targetCode);
                 searchBox.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
                 
                 handler.postDelayed(() -> {
@@ -215,7 +215,6 @@ public class AutoScrapeService extends AccessibilityService {
             results.add(node);
         }
         for (int i = 0; i < node.getChildCount(); i++) {
-            // Sửa lại thành getChild(i) thay vì getChildAt(i)
             findEditTextNodes(node.getChild(i), results);
         }
     }
