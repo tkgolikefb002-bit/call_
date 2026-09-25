@@ -8,6 +8,7 @@ import android.net.Uri;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.Bundle;
 import android.widget.Toast;
 import java.io.BufferedReader;
 import java.io.File;
@@ -22,7 +23,7 @@ import java.util.Set;
 public class AutoScrapeService extends AccessibilityService {
     public static AutoScrapeService instance;
     private boolean isScraping = false;
-    private boolean isCallingProcessActive = false; // Trạng thái tiến trình gọi tự động
+    private boolean isCallingProcessActive = false; 
     private final Set<String> collectedCodes = new HashSet<>();
     private final List<String> callQueueList = new ArrayList<>();
     private int currentCallIndex = 0;
@@ -45,7 +46,7 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // PHẦN 1: TIẾN TRÌNH QUÉT MÃ (Sau khi bấm kính lúp)
+    // PHẦN 1: TIẾN TRÌNH QUÉT MÃ (Cuộn và thu thập mã - Đã giảm số lần thử còn 1 và tăng tốc độ)
     // =========================================================================
     public void startScraping() {
         if (isScraping) {
@@ -57,7 +58,7 @@ public class AutoScrapeService extends AccessibilityService {
         loadExistingCodes();
         updatePopupProgress(collectedCodes.size());
         
-        Toast.makeText(this, "Bắt đầu quét và cuộn mã đơn hàng...", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Bắt đầu quét nhanh mã đơn hàng...", Toast.LENGTH_SHORT).show();
 
         Runnable scrapeRunnable = new Runnable() {
             int scrollAttempts = 0;
@@ -81,11 +82,12 @@ public class AutoScrapeService extends AccessibilityService {
                     }
 
                     if (collectedCodes.size() > previousSize) {
-                        scrollAttempts = 0;
+                        scrollAttempts = 0; // Reset lại nếu vẫn thu thập thêm được mã mới
                         updatePopupProgress(collectedCodes.size());
                     } else {
                         scrollAttempts++;
-                        if (scrollAttempts >= 3) {
+                        // Thay vì 3 lần, giờ chỉ cần cuộn 1 lần mà không thấy mã mới tăng thêm là kết thúc luôn
+                        if (scrollAttempts >= 1) {
                             isScraping = false;
                             saveCodesToFile();
                             updatePopupProgress(collectedCodes.size());
@@ -96,7 +98,8 @@ public class AutoScrapeService extends AccessibilityService {
                     }
                     rootNode.recycle();
                 }
-                performScrollDownAndContinue(handler, this);
+                // Tốc độ cuộn nhanh hơn (giảm thời gian chờ)
+                performFastScrollDownAndContinue(handler, this);
             }
         };
 
@@ -104,7 +107,7 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // PHẦN 2: TIẾN TRÌNH TỰ ĐỘNG GỌI (Bấm khởi động để gọi theo danh sách)
+    // PHẦN 2: TIẾN TRÌNH TỰ ĐỘNG GỌI (Dán mã vào khung tìm kiếm để gọi chính xác)
     // =========================================================================
     public void startAutoCallingSequence() {
         if (isCallingProcessActive) return;
@@ -164,11 +167,67 @@ public class AutoScrapeService extends AccessibilityService {
 
         String targetCode = callQueueList.get(currentCallIndex);
         
-        // Tiến hành tìm và gọi cho mã hiện tại (có hỗ trợ cuộn thông minh nếu mã đang khuất)
-        findAndCallWithScrollRetry(targetCode, 0);
+        // Dán mã vào ô tìm kiếm để app tự động lọc ra đơn chính xác
+        searchAndCallForCode(targetCode);
     }
 
-    private void findAndCallWithScrollRetry(String targetCode, int scrollAttemptCount) {
+    private void searchAndCallForCode(String targetCode) {
+        if (!isCallingProcessActive) return;
+
+        AccessibilityNodeInfo rootNode = getRootInActiveWindow();
+        if (rootNode == null) {
+            moveToNextCodeAfterDelay();
+            return;
+        }
+
+        // Tìm ô nhập tìm kiếm theo ID chuẩn của ứng dụng
+        List<AccessibilityNodeInfo> searchNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/search_src_text");
+        
+        // Nếu không thấy bằng ID, quét tìm bất kỳ ô EditText nào
+        if (searchNodes == null || searchNodes.isEmpty()) {
+            searchNodes = new ArrayList<>();
+            findEditTextNodes(rootNode, searchNodes);
+        }
+
+        if (searchNodes != null && !searchNodes.isEmpty()) {
+            AccessibilityNodeInfo searchBox = searchNodes.get(0);
+            
+            // 1. Click vào ô tìm kiếm
+            searchBox.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+            
+            // 2. Dán mã đơn hàng vào
+            handler.postDelayed(() -> {
+                Bundle arguments = new Bundle();
+                arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_VALUE, targetCode);
+                searchBox.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
+                
+                // 3. Chờ 600ms cho app lọc kết quả rồi lấy số điện thoại gọi luôn
+                handler.postDelayed(() -> {
+                    findAndCallFilteredPhoneNumber();
+                }, 600);
+
+            }, 300);
+            
+        } else {
+            rootNode.recycle();
+            Toast.makeText(this, "Không tìm thấy ô tìm kiếm!", Toast.LENGTH_SHORT).show();
+            moveToNextCodeAfterDelay();
+        }
+        
+        rootNode.recycle();
+    }
+
+    private void findEditTextNodes(AccessibilityNodeInfo node, List<AccessibilityNodeInfo> results) {
+        if (node == null) return;
+        if ("android.widget.EditText".equals(node.getClassName())) {
+            results.add(node);
+        }
+        for (int i = 0; i < node.getChildCount(); i++) {
+            findEditTextNodes(node.getChildAt(i), results);
+        }
+    }
+
+    private void findAndCallFilteredPhoneNumber() {
         if (!isCallingProcessActive) return;
 
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
@@ -178,16 +237,15 @@ public class AutoScrapeService extends AccessibilityService {
         }
 
         String phoneNumber = null;
-        List<AccessibilityNodeInfo> billNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvBillCode");
+        // Lấy số điện thoại từ kết quả đã được lọc chuẩn xác sau khi dán mã
+        List<AccessibilityNodeInfo> phoneNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
 
-        if (billNodes != null) {
-            for (AccessibilityNodeInfo billNode : billNodes) {
-                if (billNode.getText() != null) {
-                    String codeOnScreen = billNode.getText().toString().trim();
-                    // So khớp chính xác mã cần tìm với mã đang hiển thị trên màn hình
-                    if (targetCode.equals(codeOnScreen)) {
-                        // Tìm thấy đúng dòng chứa mã! Trích xuất số điện thoại nằm trong cùng khung thẻ đơn hàng đó
-                        phoneNumber = findPhoneNumberInSameRow(billNode);
+        if (phoneNodes != null && !phoneNodes.isEmpty()) {
+            for (AccessibilityNodeInfo pNode : phoneNodes) {
+                if (pNode.getText() != null) {
+                    String phone = pNode.getText().toString().trim();
+                    if (phone.startsWith("0") && phone.length() >= 9) {
+                        phoneNumber = phone;
                         break;
                     }
                 }
@@ -196,52 +254,15 @@ public class AutoScrapeService extends AccessibilityService {
         rootNode.recycle();
 
         if (phoneNumber != null && !phoneNumber.isEmpty()) {
-            // Đã tìm thấy SĐT chính xác của đơn này -> Tiến hành gọi điện
             currentCallIndex++;
             if (FloatingWidgetService.instance != null) {
                 handler.post(() -> FloatingWidgetService.instance.updateProgress(currentCallIndex));
             }
             makePhoneCall(phoneNumber);
         } else {
-            // Nếu màn hình hiện tại chưa thấy mã này, tiến hành cuộn xuống để tìm tiếp (tối đa 3 lần cuộn cho mỗi mã)
-            if (scrollAttemptCount < 3) {
-                performScrollDownForCalling(() -> {
-                    findAndCallWithScrollRetry(targetCode, scrollAttemptCount + 1);
-                });
-            } else {
-                // Quá 3 lần cuộn không thấy mã -> Bỏ qua và chuyển sang mã tiếp theo
-                Toast.makeText(this, "Không tìm thấy mã trên màn hình: " + targetCode, Toast.LENGTH_SHORT).show();
-                currentCallIndex++;
-                if (FloatingWidgetService.instance != null) {
-                    handler.post(() -> FloatingWidgetService.instance.updateProgress(currentCallIndex));
-                }
-                handler.postDelayed(this::executeNextCallStep, 1000);
-            }
+            Toast.makeText(this, "Không tìm thấy SĐT cho mã: " + callQueueList.get(currentCallIndex), Toast.LENGTH_SHORT).show();
+            moveToNextCodeAfterDelay();
         }
-    }
-
-    private String findPhoneNumberInSameRow(AccessibilityNodeInfo node) {
-        // Duyệt ngược lên các node cha để gom gọn phạm vi vào đúng thẻ (card) của đơn hàng đó, 
-        // tránh lấy nhầm số điện thoại của các đơn hàng khác hiển thị bên trên hoặc bên dưới.
-        AccessibilityNodeInfo parent = node.getParent();
-        int depth = 0;
-        while (parent != null && depth < 6) {
-            List<AccessibilityNodeInfo> phoneNodes = parent.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
-            if (phoneNodes != null && !phoneNodes.isEmpty()) {
-                for (AccessibilityNodeInfo pNode : phoneNodes) {
-                    if (pNode.getText() != null) {
-                        String phone = pNode.getText().toString().trim();
-                        // Chỉ nhận số điện thoại hợp lệ
-                        if (phone.startsWith("0") && phone.length() >= 9) {
-                            return phone;
-                        }
-                    }
-                }
-            }
-            parent = parent.getParent();
-            depth++;
-        }
-        return null;
     }
 
     private void makePhoneCall(String phoneNumber) {
@@ -256,21 +277,18 @@ public class AutoScrapeService extends AccessibilityService {
         }
     }
 
-    // ĐƯỢC GỌI TỪ MyInCallService NGAY SAU KHI CUỘC GỌI KẾT THÚC
     public void onCallFinished() {
         if (!isCallingProcessActive) return;
 
+        // Sau khi kết thúc cuộc gọi, chờ 1.5 giây để chuyển sang mã tiếp theo (nhanh hơn)
         handler.postDelayed(new Runnable() {
             @Override
             public void run() {
                 executeNextCallStep();
             }
-        }, 2000);
+        }, 1500);
     }
 
-    // =========================================================================
-    // CÁC HÀM HỖ TRỢ KHÁC
-    // =========================================================================
     private void loadExistingCodes() {
         collectedCodes.clear();
         try {
@@ -297,57 +315,31 @@ public class AutoScrapeService extends AccessibilityService {
         }
     }
 
-    private void performScrollDownAndContinue(Handler handler, Runnable nextRunnable) {
+    // Tốc độ cuộn và thời gian chờ đã được tối ưu nhanh hơn
+    private void performFastScrollDownAndContinue(Handler handler, Runnable nextRunnable) {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
             Path path = new Path();
-            path.moveTo(500, 1200);
+            path.moveTo(500, 1100);
             path.lineTo(500, 500);
             
             GestureDescription.Builder builder = new GestureDescription.Builder();
-            builder.addStroke(new GestureDescription.StrokeDescription(path, 0, 400));
+            builder.addStroke(new GestureDescription.StrokeDescription(path, 0, 250)); // Vuốt nhanh hơn (250ms)
             
             dispatchGesture(builder.build(), new GestureResultCallback() {
                 @Override
                 public void onCompleted(GestureDescription gestureDescription) {
                     super.onCompleted(gestureDescription);
-                    handler.postDelayed(nextRunnable, 1800);
+                    handler.postDelayed(nextRunnable, 1000); // Chờ ngắn hơn (1 giây) để load trang tiếp theo
                 }
 
                 @Override
                 public void onCancelled(GestureDescription gestureDescription) {
                     super.onCancelled(gestureDescription);
-                    handler.postDelayed(nextRunnable, 1800);
+                    handler.postDelayed(nextRunnable, 1000);
                 }
             }, null);
         } else {
-            handler.postDelayed(nextRunnable, 2000);
-        }
-    }
-
-    private void performScrollDownForCalling(Runnable onScrolled) {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
-            Path path = new Path();
-            path.moveTo(500, 1000);
-            path.lineTo(500, 400);
-            
-            GestureDescription.Builder builder = new GestureDescription.Builder();
-            builder.addStroke(new GestureDescription.StrokeDescription(path, 0, 300));
-            
-            dispatchGesture(builder.build(), new GestureResultCallback() {
-                @Override
-                public void onCompleted(GestureDescription gestureDescription) {
-                    super.onCompleted(gestureDescription);
-                    handler.postDelayed(onScrolled, 1000);
-                }
-
-                @Override
-                public void onCancelled(GestureDescription gestureDescription) {
-                    super.onCancelled(gestureDescription);
-                    handler.postDelayed(onScrolled, 1000);
-                }
-            }, null);
-        } else {
-            handler.postDelayed(onScrolled, 1200);
+            handler.postDelayed(nextRunnable, 1200);
         }
     }
 
@@ -356,7 +348,7 @@ public class AutoScrapeService extends AccessibilityService {
         if (FloatingWidgetService.instance != null) {
             handler.post(() -> FloatingWidgetService.instance.updateProgress(currentCallIndex));
         }
-        handler.postDelayed(this::executeNextCallStep, 1000);
+        handler.postDelayed(this::executeNextCallStep, 800);
     }
 
     private void saveCodesToFile() {
