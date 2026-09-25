@@ -38,134 +38,133 @@ public class FloatingWidgetService extends Service {
         super.onCreate();
         instance = this; 
 
-        // 1. Đưa Service lên Foreground để Android KHÔNG BAO GIỜ kill ngầm popup
-        createNotificationChannel();
-        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Bảng điều khiển Auto đang chạy")
-                .setContentText("Đang hiển thị dạng nổi trên màn hình")
-                .setSmallIcon(android.R.drawable.ic_menu_compass) // Dùng icon hệ thống sẵn có tránh lỗi thiếu icon
-                .setPriority(NotificationCompat.PRIORITY_LOW)
-                .build();
-        startForeground(NOTIFICATION_ID, notification);
+        try {
+            // 1. Đưa Service lên Foreground an toàn tuyệt đối
+            createNotificationChannel();
+            Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
+                    .setContentTitle("Bảng điều khiển Auto đang chạy")
+                    .setContentText("Đang hiển thị dạng nổi trên màn hình")
+                    .setSmallIcon(android.R.drawable.ic_menu_compass)
+                    .setPriority(NotificationCompat.PRIORITY_LOW)
+                    .build();
+            startForeground(NOTIFICATION_ID, notification);
 
-        // 2. Khởi tạo giao diện popup nổi
-        floatingView = LayoutInflater.from(this).inflate(R.layout.layout_floating_popup, null);
+            // 2. Khởi tạo giao diện popup nổi từ XML
+            floatingView = LayoutInflater.from(this).inflate(R.layout.layout_floating_popup, null);
+            tvProgress = floatingView.findViewById(R.id.tvProgress);
 
-        tvProgress = floatingView.findViewById(R.id.tvProgress);
-
-        int LAYOUT_FLAG;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            LAYOUT_FLAG = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
-        } else {
-            LAYOUT_FLAG = WindowManager.LayoutParams.TYPE_PHONE;
-        }
-
-        final WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                LAYOUT_FLAG,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-                PixelFormat.TRANSLUCENT);
-
-        params.gravity = Gravity.TOP | Gravity.START;
-        params.x = 100;
-        params.y = 200;
-
-        windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
-        windowManager.addView(floatingView, params);
-
-        // Cho phép chạm và kéo thả bảng popup đi quanh màn hình
-        floatingView.setOnTouchListener(new View.OnTouchListener() {
-            private int initialX, initialY;
-            private float initialTouchX, initialTouchY;
-
-            @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                switch (event.getAction()) {
-                    case MotionEvent.ACTION_DOWN:
-                        initialX = params.x;
-                        initialY = params.y;
-                        initialTouchX = event.getRawX();
-                        initialTouchY = event.getRawY();
-                        return true;
-                    case MotionEvent.ACTION_MOVE:
-                        params.x = initialX + (int) (event.getRawX() - initialTouchX);
-                        params.y = initialY + (int) (event.getRawY() - initialTouchY);
-                        windowManager.updateViewLayout(floatingView, params);
-                        return true;
-                }
-                return false;
+            int LAYOUT_FLAG;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                LAYOUT_FLAG = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
+            } else {
+                LAYOUT_FLAG = WindowManager.LayoutParams.TYPE_PHONE;
             }
-        });
 
-        // =========================================================================
-        // NÚT ĐÓNG (✕) - DUY NHẤT NÚT NÀY MỚI TẮT POPUP
-        // =========================================================================
-        Button btnClose = floatingView.findViewById(R.id.btnClose);
-        if (btnClose != null) {
-            btnClose.setOnClickListener(v -> {
-                stopSelf(); // Gọi hủy service thủ công khi người dùng bấm vào dấu X
-            });
-        }
+            final WindowManager.LayoutParams params = new WindowManager.LayoutParams(
+                    WindowManager.LayoutParams.WRAP_CONTENT,
+                    WindowManager.LayoutParams.WRAP_CONTENT,
+                    LAYOUT_FLAG,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                    PixelFormat.TRANSLUCENT);
 
-        // Xử lý nút Chạy / Dừng (Nút Play/Pause ở giữa)
-        Button btnPlayPause = floatingView.findViewById(R.id.btnPlayPause);
-        if (btnPlayPause != null) {
-            btnPlayPause.setOnClickListener(v -> {
-                isRunning = !isRunning;
-                if (isRunning) {
-                    btnPlayPause.setText("⏸");
-                    Toast.makeText(this, "Đã bắt đầu Auto chạy ngầm!", Toast.LENGTH_SHORT).show();
-                } else {
-                    btnPlayPause.setText("▶");
-                    Toast.makeText(this, "Đã tạm dừng Auto!", Toast.LENGTH_SHORT).show();
+            params.gravity = Gravity.TOP | Gravity.START;
+            params.x = 100;
+            params.y = 200;
+
+            windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
+            if (windowManager != null) {
+                windowManager.addView(floatingView, params);
+            }
+
+            // Cho phép chạm và kéo thả bảng popup đi quanh màn hình
+            floatingView.setOnTouchListener(new View.OnTouchListener() {
+                private int initialX, initialY;
+                private float initialTouchX, initialTouchY;
+
+                @Override
+                public boolean onTouch(View v, MotionEvent event) {
+                    switch (event.getAction()) {
+                        case MotionEvent.ACTION_DOWN:
+                            initialX = params.x;
+                            initialY = params.y;
+                            initialTouchX = event.getRawX();
+                            initialTouchY = event.getRawY();
+                            return true;
+                        case MotionEvent.ACTION_MOVE:
+                            params.x = initialX + (int) (event.getRawX() - initialTouchX);
+                            params.y = initialY + (int) (event.getRawY() - initialTouchY);
+                            windowManager.updateViewLayout(floatingView, params);
+                            return true;
+                    }
+                    return false;
                 }
             });
-        }
 
-        // =========================================================================
-        // SỰ KIỆN CHO NÚT KÍNH LÚP (btnSearch) - Bắt đầu quét mã
-        // =========================================================================
-        Button btnSearch = floatingView.findViewById(R.id.btnSearch);
-        if (btnSearch != null) {
-            btnSearch.setOnClickListener(v -> {
-                if (AutoScrapeService.instance != null) {
-                    updateProgress(0);
-                    AutoScrapeService.instance.startScraping();
-                } else {
-                    Toast.makeText(this, "Vui lòng bật Quyền Trợ năng (Accessibility) cho ứng dụng trước!", Toast.LENGTH_LONG).show();
-                }
-            });
-        }
+            // NÚT ĐÓNG (✕) - DUY NHẤT NÚT NÀY MỚI TẮT POPUP
+            Button btnClose = floatingView.findViewById(R.id.btnClose);
+            if (btnClose != null) {
+                btnClose.setOnClickListener(v -> stopSelf());
+            }
 
-        // =========================================================================
-        // SỰ KIỆN CHO NÚT THÙNG RÁC (btnDelete) - Xóa dữ liệu đã lưu
-        // =========================================================================
-        Button btnDelete = floatingView.findViewById(R.id.btnDelete);
-        if (btnDelete != null) {
-            btnDelete.setOnClickListener(v -> {
-                if (AutoScrapeService.instance != null) {
-                    boolean cleared = AutoScrapeService.instance.clearSavedData();
-                    if (cleared) {
-                        updateProgress(0);
-                        Toast.makeText(this, "Đã xóa toàn bộ dữ liệu đơn hàng đã lưu!", Toast.LENGTH_SHORT).show();
+            // Xử lý nút Chạy / Dừng (Nút Play/Pause ở giữa)
+            Button btnPlayPause = floatingView.findViewById(R.id.btnPlayPause);
+            if (btnPlayPause != null) {
+                btnPlayPause.setOnClickListener(v -> {
+                    isRunning = !isRunning;
+                    if (isRunning) {
+                        btnPlayPause.setText("⏸");
+                        Toast.makeText(this, "Đã bắt đầu Auto chạy ngầm!", Toast.LENGTH_SHORT).show();
                     } else {
-                        Toast.makeText(this, "Không có dữ liệu hoặc file chưa tồn tại.", Toast.LENGTH_SHORT).show();
+                        btnPlayPause.setText("▶");
+                        Toast.makeText(this, "Đã tạm dừng Auto!", Toast.LENGTH_SHORT).show();
                     }
-                } else {
-                    try {
-                        java.io.File file = new java.io.File(getExternalFilesDir(null), "DanhSachMaDon.txt");
-                        if (file.exists() && file.delete()) {
+                });
+            }
+
+            // NÚT KÍNH LÚP (btnSearch) - Bắt đầu quét mã
+            Button btnSearch = floatingView.findViewById(R.id.btnSearch);
+            if (btnSearch != null) {
+                btnSearch.setOnClickListener(v -> {
+                    if (AutoScrapeService.instance != null) {
+                        updateProgress(0);
+                        AutoScrapeService.instance.startScraping();
+                    } else {
+                        Toast.makeText(this, "Vui lòng bật Quyền Trợ năng (Accessibility) cho ứng dụng trước!", Toast.LENGTH_LONG).show();
+                    }
+                });
+            }
+
+            // NÚT THÙNG RÁC (btnDelete) - Xóa dữ liệu đã lưu
+            Button btnDelete = floatingView.findViewById(R.id.btnDelete);
+            if (btnDelete != null) {
+                btnDelete.setOnClickListener(v -> {
+                    if (AutoScrapeService.instance != null) {
+                        boolean cleared = AutoScrapeService.instance.clearSavedData();
+                        if (cleared) {
                             updateProgress(0);
-                            Toast.makeText(this, "Đã xóa file dữ liệu thành công!", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(this, "Đã xóa toàn bộ dữ liệu đơn hàng đã lưu!", Toast.LENGTH_SHORT).show();
                         } else {
-                            Toast.makeText(this, "Không tìm thấy file dữ liệu để xóa.", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(this, "Không có dữ liệu hoặc file chưa tồn tại.", Toast.LENGTH_SHORT).show();
                         }
-                    } catch (Exception e) {
-                        Toast.makeText(this, "Lỗi khi xóa: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    } else {
+                        try {
+                            java.io.File file = new java.io.File(getExternalFilesDir(null), "DanhSachMaDon.txt");
+                            if (file.exists() && file.delete()) {
+                                updateProgress(0);
+                                Toast.makeText(this, "Đã xóa file dữ liệu thành công!", Toast.LENGTH_SHORT).show();
+                            } else {
+                                Toast.makeText(this, "Không tìm thấy file dữ liệu để xóa.", Toast.LENGTH_SHORT).show();
+                            }
+                        } catch (Exception e) {
+                            Toast.makeText(this, "Lỗi khi xóa: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        }
                     }
-                }
-            });
+                });
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            Toast.makeText(this, "Lỗi khởi tạo popup: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
     }
 
@@ -184,7 +183,7 @@ public class FloatingWidgetService extends Service {
     }
 
     /**
-     * Hàm cập nhật tiến độ lên giao diện popup
+     * Hàm cập nhật tiến độ lên giao diện popup khớp định dạng yêu cầu
      */
     public void updateProgress(int count) {
         if (tvProgress != null) {
