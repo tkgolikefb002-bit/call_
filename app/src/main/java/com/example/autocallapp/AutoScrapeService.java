@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
 import android.content.Intent;
 import android.graphics.Path;
+import android.graphics.Rect;
 import android.net.Uri;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.os.Handler;
@@ -106,7 +107,7 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // PHẦN 2: TIẾN TRÌNH TỰ ĐỘNG GỌI (ĐÃ CẬP NHẬT ID etSearch CHÍNH XÁC)
+    // PHẦN 2: TIẾN TRÌNH TỰ ĐỘNG GỌI (CHỌN KỸ Ô RỒI MỚI DÁN)
     // =========================================================================
     public void startAutoCallingSequence() {
         if (isCallingProcessActive) return;
@@ -179,10 +180,8 @@ public class AutoScrapeService extends AccessibilityService {
             return;
         }
 
-        // Tìm kiếm chính xác theo ID etSearch vừa phát hiện trong XML
         List<AccessibilityNodeInfo> searchNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/etSearch");
         
-        // Dự phòng nếu không tìm thấy bằng ID thì quét các ô nhập liệu chung
         if (searchNodes == null || searchNodes.isEmpty()) {
             searchNodes = new ArrayList<>();
             findEditTextNodes(rootNode, searchNodes);
@@ -191,22 +190,39 @@ public class AutoScrapeService extends AccessibilityService {
         if (searchNodes != null && !searchNodes.isEmpty()) {
             AccessibilityNodeInfo searchBox = searchNodes.get(0);
             
-            // Focus và Click vào ô tìm kiếm
+            // 1. Thực hiện Focus và Click qua Accessibility Node trước
             searchBox.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
             searchBox.performAction(AccessibilityNodeInfo.ACTION_CLICK);
 
-            // Dán trực tiếp mã đơn hàng vào ô tìm kiếm
-            Bundle arguments = new Bundle();
-            arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, targetCode);
-            searchBox.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
+            // 2. Chạm bằng tọa độ vật lý (Gesture click) chính xác vào giữa khung etSearch [0,505][632,577] để ép app nhận chọn ô
+            clickAtCoordinates(316, 541);
 
-            // Chờ 800ms để app lọc kết quả rồi tiến hành lấy số điện thoại gọi
-            handler.postDelayed(this::findAndCallFilteredPhoneNumber, 800);
+            // 3. Sau khi chắc chắn ô đã được chọn/focus, đợi 300ms rồi thực hiện dán mã vào
+            handler.postDelayed(() -> {
+                Bundle arguments = new Bundle();
+                arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, targetCode);
+                boolean success = searchBox.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
+                Log.d(TAG, "Dán mã " + targetCode + " vào ô tìm kiếm: " + (success ? "THÀNH CÔNG" : "THẤT BẠI"));
+
+                // 4. Đợi thêm 800ms để app lọc kết quả đơn hàng rồi tiến hành lấy số điện thoại gọi
+                handler.postDelayed(this::findAndCallFilteredPhoneNumber, 800);
+            }, 300);
 
         } else {
             Log.e(TAG, "Không tìm thấy ô tìm kiếm etSearch!");
             Toast.makeText(this, "Không tìm thấy ô tìm kiếm trên màn hình!", Toast.LENGTH_SHORT).show();
             moveToNextCodeAfterDelay();
+        }
+    }
+
+    // Hàm mô phỏng chạm vào tọa độ màn hình bằng Gesture
+    private void clickAtCoordinates(int x, int y) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+            Path path = new Path();
+            path.moveTo(x, y);
+            GestureDescription.Builder builder = new GestureDescription.Builder();
+            builder.addStroke(new GestureDescription.StrokeDescription(path, 0, 100));
+            dispatchGesture(builder.build(), null, null);
         }
     }
 
@@ -277,7 +293,12 @@ public class AutoScrapeService extends AccessibilityService {
     public void onCallFinished() {
         if (!isCallingProcessActive) return;
 
-        handler.postDelayed(this::executeNextCallStep, 1500);
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                executeNextCallStep();
+            }
+        }, 1500);
     }
 
     private void loadExistingCodes() {
