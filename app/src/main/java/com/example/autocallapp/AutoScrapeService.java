@@ -7,7 +7,9 @@ import android.view.accessibility.AccessibilityNodeInfo;
 import android.os.Handler;
 import android.os.Looper;
 import android.widget.Toast;
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
@@ -40,10 +42,10 @@ public class AutoScrapeService extends AccessibilityService {
             return;
         }
         isScraping = true;
-        collectedCodes.clear();
         
-        // Reset tiến độ trên popup về 0 khi bắt đầu quét mới
-        updatePopupProgress(0);
+        // 1. Tải các mã đã lưu từ file trước đó vào bộ nhớ để tiếp tục quét và đối chiếu
+        loadExistingCodes();
+        updatePopupProgress(collectedCodes.size());
         
         Toast.makeText(this, "Bắt đầu quét và cuộn mã đơn hàng...", Toast.LENGTH_SHORT).show();
 
@@ -65,40 +67,60 @@ public class AutoScrapeService extends AccessibilityService {
                         if (node.getText() != null) {
                             String code = node.getText().toString().trim();
                             if (!code.isEmpty()) {
-                                collectedCodes.add(code);
+                                collectedCodes.add(code); // Set tự động loại bỏ mã trùng lặp
                             }
                         }
                     }
 
-                    // Nếu số lượng mã thay đổi (tìm thấy mã mới), cập nhật ngay lên giao diện popup
+                    // Kiểm tra xem có tìm thấy mã mới hay không
                     if (collectedCodes.size() > previousSize) {
-                        scrollAttempts = 0; // Reset lại số lần thử cuộn
+                        scrollAttempts = 0; // Reset lại số lần thử nếu có mã mới
                         updatePopupProgress(collectedCodes.size());
                     } else {
                         scrollAttempts++;
-                        // Khi đã thử cuộn 4 lần mà không thấy mã mới xuất hiện thêm -> Đã đến cuối trang
-                        if (scrollAttempts >= 4) {
+                        // Tăng ngưỡng thử lên 5 lần để chờ ứng dụng load dữ liệu chậm
+                        if (scrollAttempts >= 5) {
                             isScraping = false; // Dừng trạng thái quét
-                            saveCodesToFile();   // Lưu file
+                            saveCodesToFile();   // Lưu toàn bộ vào file
                             
-                            // Cập nhật lần cuối và giữ nguyên popup, hiển thị Toast thông báo thành công
+                            // Cập nhật giao diện lần cuối, thông báo thành công và GIỮ NGUYÊN POPUP
                             updatePopupProgress(collectedCodes.size());
                             Toast.makeText(getApplicationContext(), "Đã quét xong! Tổng: " + collectedCodes.size() + " mã.", Toast.LENGTH_LONG).show();
                             
                             rootNode.recycle();
-                            return; // Dừng vòng lặp tại đây, tuyệt đối KHÔNG gọi tắt service/popup
+                            return; // Dừng vòng lặp, tuyệt đối không tắt popup
                         }
                     }
 
                     rootNode.recycle();
                 }
 
-                // Tiếp tục cuộn trang kế tiếp nếu chưa hết
+                // Tiếp tục cuộn trang tiếp theo
                 performScrollDownAndContinue(handler, this);
             }
         };
 
         handler.post(scrapeRunnable);
+    }
+
+    private void loadExistingCodes() {
+        collectedCodes.clear();
+        try {
+            File file = new File(getExternalFilesDir(null), "DanhSachMaDon.txt");
+            if (file.exists()) {
+                BufferedReader reader = new BufferedReader(new FileReader(file));
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    String trimmed = line.trim();
+                    if (!trimmed.isEmpty()) {
+                        collectedCodes.add(trimmed);
+                    }
+                }
+                reader.close();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     private void updatePopupProgress(int count) {
@@ -121,18 +143,18 @@ public class AutoScrapeService extends AccessibilityService {
                 @Override
                 public void onCompleted(GestureDescription gestureDescription) {
                     super.onCompleted(gestureDescription);
-                    // Đợi 1.2 giây để app logistics kịp tải thêm dữ liệu sau khi vuốt
-                    handler.postDelayed(nextRunnable, 1200);
+                    // Tăng thời gian chờ lên 1.8 giây để ứng dụng Best Express kịp render dữ liệu mới
+                    handler.postDelayed(nextRunnable, 1800);
                 }
 
                 @Override
                 public void onCancelled(GestureDescription gestureDescription) {
                     super.onCancelled(gestureDescription);
-                    handler.postDelayed(nextRunnable, 1200);
+                    handler.postDelayed(nextRunnable, 1800);
                 }
             }, null);
         } else {
-            handler.postDelayed(nextRunnable, 1500);
+            handler.postDelayed(nextRunnable, 2000);
         }
     }
 
@@ -151,7 +173,7 @@ public class AutoScrapeService extends AccessibilityService {
 
     public boolean clearSavedData() {
         collectedCodes.clear();
-        updatePopupProgress(0); // Reset tiến độ về 0 khi xóa dữ liệu
+        updatePopupProgress(0); // Reset tiến độ về 0
         try {
             File file = new File(getExternalFilesDir(null), "DanhSachMaDon.txt");
             if (file.exists()) {
