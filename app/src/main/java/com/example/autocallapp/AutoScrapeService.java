@@ -113,7 +113,6 @@ public class AutoScrapeService extends AccessibilityService {
 
         if (callQueueList.isEmpty()) {
             Toast.makeText(this, "Không có mã nào trong danh sách để gọi!", Toast.LENGTH_LONG).show();
-            // Đưa trạng thái nút play về lại ban đầu nếu cần
             return;
         }
 
@@ -166,7 +165,6 @@ public class AutoScrapeService extends AccessibilityService {
         String targetCode = callQueueList.get(currentCallIndex);
         currentCallIndex++;
 
-        // Cập nhật trạng thái lên giao diện nếu muốn (hiển thị đơn thứ mấy)
         if (FloatingWidgetService.instance != null) {
             handler.post(() -> FloatingWidgetService.instance.updateProgress(currentCallIndex));
         }
@@ -186,7 +184,6 @@ public class AutoScrapeService extends AccessibilityService {
                 makePhoneCall(phoneNumber);
             } else {
                 Toast.makeText(this, "Không tìm thấy SĐT cho mã: " + targetCode, Toast.LENGTH_SHORT).show();
-                // Không có số thì tự động nhảy sang mã kế tiếp sau 1.5 giây
                 handler.postDelayed(this::executeNextCallStep, 1500);
             }
         }, 1500);
@@ -198,10 +195,8 @@ public class AutoScrapeService extends AccessibilityService {
 
         boolean foundAndFilled = false;
         
-        // Cách 1: Tìm node có thể chỉnh sửa trực tiếp (EditText) trên màn hình hiện tại
         AccessibilityNodeInfo editableBox = findFirstEditableNode(rootNode);
         
-        // Cách 2: Nếu không tìm thấy qua thuộc tính editable, thử tìm theo hint "Nhập mã vận đơn" hoặc id khung nhập
         if (editableBox == null) {
             List<AccessibilityNodeInfo> textNodes = rootNode.findAccessibilityNodeInfosByText("Nhập mã vận đơn");
             for (AccessibilityNodeInfo node : textNodes) {
@@ -210,14 +205,11 @@ public class AutoScrapeService extends AccessibilityService {
             }
         }
 
-        // Nếu đã tìm thấy ô nhập liệu, tiến hành điền mã và bấm focus
         if (editableBox != null) {
-            // Click vào ô nhập liệu để bật bàn phím / focus
             editableBox.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
             
-            // Gán giá trị mã đơn vào ô
             android.os.Bundle arguments = new android.os.Bundle();
-            arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_VALUE, code);
+            arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, code);
             foundAndFilled = editableBox.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
             
             editableBox.recycle();
@@ -227,7 +219,6 @@ public class AutoScrapeService extends AccessibilityService {
         return foundAndFilled;
     }
 
-    // Hàm phụ trợ tìm ô EditText đầu tiên xuất hiện trên màn hình
     private AccessibilityNodeInfo findFirstEditableNode(AccessibilityNodeInfo node) {
         if (node == null) return null;
         if (node.isEditable() && "android.widget.EditText".equals(node.getClassName())) {
@@ -235,6 +226,16 @@ public class AutoScrapeService extends AccessibilityService {
         }
         for (int i = 0; i < node.getChildCount(); i++) {
             AccessibilityNodeInfo result = findFirstEditableNode(node.getChild(i));
+            if (result != null) return result;
+        }
+        return null;
+    }
+
+    private AccessibilityNodeInfo findEditableNode(AccessibilityNodeInfo node) {
+        if (node == null) return null;
+        if (node.isEditable()) return node;
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo result = findEditableNode(node.getChild(i));
             if (result != null) return result;
         }
         return null;
@@ -277,7 +278,6 @@ public class AutoScrapeService extends AccessibilityService {
     public void onCallFinished() {
         if (!isCallingProcessActive) return;
 
-        // Nghỉ ngơi 2 giây sau mỗi cuộc gọi xong rồi chuyển sang mã đơn tiếp theo trong danh sách
         handler.postDelayed(new Runnable() {
             @Override
             public void run() {
