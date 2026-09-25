@@ -1,0 +1,14 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Hình nền vòng tròn màu xanh dương -->
+    <path
+        android:fillColor="#1976D2"
+        android:pathData="M54,54m-40,0a40,40 0,1 1,80 0a40,40 0,1 1,-80 0" />
+    <!-- Chữ A đại diện cho AutoCall -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,32L36,72h8l3.5,-9h13l3.5,9h8L54,32zM48.5,57L54,43l5.5,14h-11z" />
+</vector>
