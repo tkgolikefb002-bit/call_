@@ -45,7 +45,7 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // PHẦN 1: TIẾN TRÌNH QUÉT MÃ (Đã có sẵn, giữ nguyên ổn định)
+    // PHẦN 1: TIẾN TRÌNH QUÉT MÃ
     // =========================================================================
     public void startScraping() {
         if (isScraping) {
@@ -104,12 +104,14 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // PHẦN 2: TIẾN TRÌNH TỰ ĐỘNG GỌI ĐIỆN LẦN LƯỢT TỪNG MÃ (MỚI THÊM)
+    // PHẦN 2: TIẾN TRÌNH TỰ ĐỘNG GỌI ĐIỆN LẦN LƯỢT TỪNG MÃ
     // =========================================================================
     public void startAutoCallingSequence() {
         if (isCallingProcessActive) return;
 
+        // Đảm bảo nạp lại dữ liệu từ file hoặc đồng bộ trực tiếp từ collectedCodes
         loadExistingCodesForCalling();
+
         if (callQueueList.isEmpty()) {
             Toast.makeText(this, "Không có mã nào trong danh sách để gọi!", Toast.LENGTH_LONG).show();
             return;
@@ -117,7 +119,7 @@ public class AutoScrapeService extends AccessibilityService {
 
         isCallingProcessActive = true;
         currentCallIndex = 0;
-        Toast.makeText(this, "Bắt đầu tiến trình tự động gọi danh sách mã...", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Bắt đầu tiến trình tự động gọi " + callQueueList.size() + " đơn hàng...", Toast.LENGTH_SHORT).show();
         executeNextCallStep();
     }
 
@@ -129,6 +131,13 @@ public class AutoScrapeService extends AccessibilityService {
 
     private void loadExistingCodesForCalling() {
         callQueueList.clear();
+        
+        // Ưu tiên lấy trực tiếp từ bộ nhớ đang có sẵn (`collectedCodes`) nếu đã quét trước đó
+        if (!collectedCodes.isEmpty()) {
+            callQueueList.addAll(collectedCodes);
+        }
+
+        // Nếu bộ nhớ tạm trống, tiến hành đọc bổ sung từ file lưu trữ
         try {
             File file = new File(getExternalFilesDir(null), "DanhSachMaDon.txt");
             if (file.exists()) {
@@ -136,7 +145,7 @@ public class AutoScrapeService extends AccessibilityService {
                 String line;
                 while ((line = reader.readLine()) != null) {
                     String trimmed = line.trim();
-                    if (!trimmed.isEmpty()) {
+                    if (!trimmed.isEmpty() && !callQueueList.contains(trimmed)) {
                         callQueueList.add(trimmed);
                     }
                 }
@@ -162,7 +171,7 @@ public class AutoScrapeService extends AccessibilityService {
         // Bước 1: Tự động điền mã vào khung tìm kiếm trên màn hình ứng dụng
         boolean pasted = pasteCodeIntoSearchBox(targetCode);
 
-        // Bước 2 & 3: Thực hiện gọi điện sau khi đã điền (hoặc gọi trực tiếp mã/số điện thoại)
+        // Bước 2: Thực hiện gọi điện sau khi đã điền
         handler.postDelayed(() -> {
             if (!isCallingProcessActive) return;
             makePhoneCall(targetCode);
@@ -174,7 +183,6 @@ public class AutoScrapeService extends AccessibilityService {
         if (rootNode == null) return false;
 
         boolean foundAndFilled = false;
-        // Tìm ô nhập mã dựa trên gợi ý hoặc ID khung nhập trong ứng dụng Best Express
         List<AccessibilityNodeInfo> textNodes = rootNode.findAccessibilityNodeInfosByText("Nhập mã vận đơn");
         for (AccessibilityNodeInfo node : textNodes) {
             AccessibilityNodeInfo editableBox = findEditableNode(node);
@@ -212,10 +220,6 @@ public class AutoScrapeService extends AccessibilityService {
         }
     }
 
-    /**
-     * Gọi hàm này khi cuộc gọi kết thúc (từ CallReceiver hoặc MyInCallService) 
-     * để tự động chuyển sang mã tiếp theo sau 3 giây.
-     */
     public void onCallFinished() {
         if (!isCallingProcessActive) return;
 
@@ -298,6 +302,7 @@ public class AutoScrapeService extends AccessibilityService {
 
     public boolean clearSavedData() {
         collectedCodes.clear();
+        callQueueList.clear();
         updatePopupProgress(0);
         try {
             File file = new File(getExternalFilesDir(null), "DanhSachMaDon.txt");
