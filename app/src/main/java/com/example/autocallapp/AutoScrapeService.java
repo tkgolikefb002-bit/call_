@@ -45,7 +45,9 @@ public class AutoScrapeService extends AccessibilityService {
         Toast.makeText(this, "Bắt đầu quét và cuộn mã đơn hàng...", Toast.LENGTH_SHORT).show();
 
         Handler handler = new Handler(Looper.getMainLooper());
-        handler.post(new Runnable() {
+        
+        // Runnable thực hiện nhiệm vụ quét mã tại chỗ
+        Runnable scrapeRunnable = new Runnable() {
             int scrollAttempts = 0;
             
             @Override
@@ -68,7 +70,7 @@ public class AutoScrapeService extends AccessibilityService {
 
                     if (collectedCodes.size() == previousSize) {
                         scrollAttempts++;
-                        if (scrollAttempts >= 3) {
+                        if (scrollAttempts >= 4) { // Tăng nhẹ số lần thử để tránh dừng quá sớm khi mạng chậm
                             isScraping = false;
                             saveCodesToFile();
                             Toast.makeText(getApplicationContext(), "Đã quét xong! Tổng: " + collectedCodes.size() + " mã.", Toast.LENGTH_LONG).show();
@@ -76,27 +78,49 @@ public class AutoScrapeService extends AccessibilityService {
                             return;
                         }
                     } else {
-                        scrollAttempts = 0;
+                        scrollAttempts = 0; // Reset lại nếu quét thêm được mã mới
                     }
 
                     rootNode.recycle();
                 }
 
-                performScrollDown();
-                handler.postDelayed(this, 1500);
+                // Thực hiện vuốt màn hình để sang trang/danh sách tiếp theo
+                performScrollDownAndContinue(handler, this);
             }
-        });
+        };
+
+        // Bắt đầu vòng lặp quét ngay lập tức lần đầu tiên
+        handler.post(scrapeRunnable);
     }
 
-    private void performScrollDown() {
+    private void performScrollDownAndContinue(Handler handler, Runnable nextRunnable) {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
             Path path = new Path();
-            path.moveTo(500, 1500);
-            path.lineTo(500, 500);
+            // Tọa độ vuốt từ dưới lên trên (giữa màn hình)
+            path.moveTo(500, 1600);
+            path.lineTo(500, 400);
             
             GestureDescription.Builder builder = new GestureDescription.Builder();
             builder.addStroke(new GestureDescription.StrokeDescription(path, 0, 400));
-            dispatchGesture(builder.build(), null, null);
+            
+            dispatchGesture(builder.build(), new GestureResultCallback() {
+                @Override
+                public void onCompleted(GestureDescription gestureDescription) {
+                    super.onCompleted(gestureDescription);
+                    // Sau khi vuốt xong, đợi thêm 1 giây để app logistics render/tải dữ liệu rồi mới chạy tiếp
+                    handler.postDelayed(nextRunnable, 1000);
+                }
+
+                @Override
+                public void onCancelled(GestureDescription gestureDescription) {
+                    super.onCancelled(gestureDescription);
+                    // Nếu lỡ bị hủy cử chỉ, vẫn thử cho chạy tiếp sau 1 giây
+                    handler.postDelayed(nextRunnable, 1000);
+                }
+            }, null);
+        } else {
+            // Hỗ trợ dự phòng nếu máy Android quá cũ không hỗ trợ Gesture
+            handler.postDelayed(nextRunnable, 1500);
         }
     }
 
@@ -113,9 +137,6 @@ public class AutoScrapeService extends AccessibilityService {
         }
     }
 
-    // =========================================================================
-    // HÀM XÓA DỮ LIỆU ĐÃ LƯU (Dành cho nút Thùng rác 🗑)
-    // =========================================================================
     public boolean clearSavedData() {
         collectedCodes.clear();
         try {
