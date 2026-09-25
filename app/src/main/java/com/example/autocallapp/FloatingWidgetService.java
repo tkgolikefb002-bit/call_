@@ -82,17 +82,29 @@ public class FloatingWidgetService extends Service {
         btnPlayPause.setOnClickListener(v -> {
             isRunning = !isRunning;
             if (isRunning) {
-                // Chuyển sang nút dừng (2 vạch: ⏸)
                 btnPlayPause.setText("⏸");
                 Toast.makeText(this, "Đã bắt đầu Auto chạy ngầm!", Toast.LENGTH_SHORT).show();
-                // TODO: Thêm logic tiến trình chạy tự động của bạn vào đây
             } else {
-                // Chuyển lại nút chạy (▶)
                 btnPlayPause.setText("▶");
                 Toast.makeText(this, "Đã tạm dừng Auto!", Toast.LENGTH_SHORT).show();
-                // TODO: Thêm logic dừng tiến trình vào đây
             }
         });
+
+        // =========================================================================
+        // THÊM SỰ KIỆN CHO NÚT KÍNH LÚP (btnSearch) Ở ĐÂY
+        // =========================================================================
+        Button btnSearch = floatingView.findViewById(R.id.btnSearch);
+        if (btnSearch != null) {
+            btnSearch.setOnClickListener(v -> {
+                // Kiểm tra xem dịch vụ trợ năng (Accessibility Service) đã được bật chưa
+                if (AutoScrapeService.instance != null) {
+                    // Kích hoạt tiến trình tự động quét mã đơn hàng và cuộn màn hình
+                    AutoScrapeService.instance.startScraping();
+                } else {
+                    Toast.makeText(this, "Vui lòng bật Quyền Trợ năng (Accessibility) cho ứng dụng trước!", Toast.LENGTH_LONG).show();
+                }
+            });
+        }
     }
 
     @Override
