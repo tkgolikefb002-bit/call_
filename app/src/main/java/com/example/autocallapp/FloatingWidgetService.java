@@ -149,7 +149,7 @@ public class FloatingWidgetService extends Service {
      */
     public void updateProgress(int count) {
         if (tvProgress != null) {
-            tvProgress.post(() -> tvProgress.setText("Đã quét: " + count));
+            tvProgress.post(() -> tvProgress.setText("Tiến độ: " + count + " đơn"));
         }
     }
 
