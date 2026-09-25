@@ -45,7 +45,7 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // PHẦN 1: TIẾN TRÌNH QUÉT MÃ
+    // PHẦN 1: TIẾN TRÌNH QUÉT MÃ (Sau khi bấm kính lúp)
     // =========================================================================
     public void startScraping() {
         if (isScraping) {
@@ -104,7 +104,7 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // PHẦN 2: TIẾN TRÌNH TỰ ĐỘNG GỌI ĐIỆN LẦN LƯỢT TỪNG MÃ
+    // PHẦN 2: TIẾN TRÌNH TỰ ĐỘNG GỌI (Bấm khởi động để gọi theo danh sách)
     // =========================================================================
     public void startAutoCallingSequence() {
         if (isCallingProcessActive) return;
@@ -163,67 +163,75 @@ public class AutoScrapeService extends AccessibilityService {
         }
 
         String targetCode = callQueueList.get(currentCallIndex);
-        currentCallIndex++;
-
-        if (FloatingWidgetService.instance != null) {
-            handler.post(() -> FloatingWidgetService.instance.updateProgress(currentCallIndex));
-        }
-
-        // Quét trực tiếp trên màn hình, tìm đúng dòng có mã 'targetCode' và gọi số điện thoại tương ứng
-        boolean foundAndCalled = findAndCallForCode(targetCode);
-
-        if (!foundAndCalled) {
-            Toast.makeText(this, "Không thấy mã trên màn hình: " + targetCode, Toast.LENGTH_SHORT).show();
-            // Nếu không thấy mã này trên màn hình hiện tại, tự động chuyển sang mã tiếp theo sau 1.5 giây
-            handler.postDelayed(this::executeNextCallStep, 1500);
-        }
+        
+        // Tiến hành tìm và gọi cho mã hiện tại (có hỗ trợ cuộn thông minh nếu mã đang khuất)
+        findAndCallWithScrollRetry(targetCode, 0);
     }
 
-    private boolean findAndCallForCode(String targetCode) {
+    private void findAndCallWithScrollRetry(String targetCode, int scrollAttemptCount) {
+        if (!isCallingProcessActive) return;
+
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
-        if (rootNode == null) return false;
+        if (rootNode == null) {
+            moveToNextCodeAfterDelay();
+            return;
+        }
 
         String phoneNumber = null;
-
-        // Tìm tất cả các node hiển thị mã vận đơn đang có trên màn hình
-        List<AccessibilityNodeInfo> billNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvBillCard");
-        if (billNodes == null || billNodes.isEmpty()) {
-            billNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvBillCode");
-        }
+        List<AccessibilityNodeInfo> billNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvBillCode");
 
         if (billNodes != null) {
             for (AccessibilityNodeInfo billNode : billNodes) {
                 if (billNode.getText() != null) {
                     String codeOnScreen = billNode.getText().toString().trim();
-                    // So khớp chính xác mã cần tìm
+                    // So khớp chính xác mã cần tìm với mã đang hiển thị trên màn hình
                     if (targetCode.equals(codeOnScreen)) {
-                        // Đã tìm thấy đúng dòng chứa mã đơn này! Lấy số điện thoại nằm trong cùng dòng đó.
+                        // Tìm thấy đúng dòng chứa mã! Trích xuất số điện thoại nằm trong cùng khung thẻ đơn hàng đó
                         phoneNumber = findPhoneNumberInSameRow(billNode);
                         break;
                     }
                 }
             }
         }
-
         rootNode.recycle();
 
         if (phoneNumber != null && !phoneNumber.isEmpty()) {
+            // Đã tìm thấy SĐT chính xác của đơn này -> Tiến hành gọi điện
+            currentCallIndex++;
+            if (FloatingWidgetService.instance != null) {
+                handler.post(() -> FloatingWidgetService.instance.updateProgress(currentCallIndex));
+            }
             makePhoneCall(phoneNumber);
-            return true;
+        } else {
+            // Nếu màn hình hiện tại chưa thấy mã này, tiến hành cuộn xuống để tìm tiếp (tối đa 3 lần cuộn cho mỗi mã)
+            if (scrollAttemptCount < 3) {
+                performScrollDownForCalling(() -> {
+                    findAndCallWithScrollRetry(targetCode, scrollAttemptCount + 1);
+                });
+            } else {
+                // Quá 3 lần cuộn không thấy mã -> Bỏ qua và chuyển sang mã tiếp theo
+                Toast.makeText(this, "Không tìm thấy mã trên màn hình: " + targetCode, Toast.LENGTH_SHORT).show();
+                currentCallIndex++;
+                if (FloatingWidgetService.instance != null) {
+                    handler.post(() -> FloatingWidgetService.instance.updateProgress(currentCallIndex));
+                }
+                handler.postDelayed(this::executeNextCallStep, 1000);
+            }
         }
-        return false;
     }
 
     private String findPhoneNumberInSameRow(AccessibilityNodeInfo node) {
-        // Duyệt ngược lên các node cha để tìm khung chứa toàn bộ item đơn hàng đó, sau đó quét lấy SĐT (tvPhoneNub)
+        // Duyệt ngược lên các node cha để gom gọn phạm vi vào đúng thẻ (card) của đơn hàng đó, 
+        // tránh lấy nhầm số điện thoại của các đơn hàng khác hiển thị bên trên hoặc bên dưới.
         AccessibilityNodeInfo parent = node.getParent();
         int depth = 0;
-        while (parent != null && depth < 5) {
+        while (parent != null && depth < 6) {
             List<AccessibilityNodeInfo> phoneNodes = parent.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
             if (phoneNodes != null && !phoneNodes.isEmpty()) {
                 for (AccessibilityNodeInfo pNode : phoneNodes) {
                     if (pNode.getText() != null) {
                         String phone = pNode.getText().toString().trim();
+                        // Chỉ nhận số điện thoại hợp lệ
                         if (phone.startsWith("0") && phone.length() >= 9) {
                             return phone;
                         }
@@ -248,7 +256,7 @@ public class AutoScrapeService extends AccessibilityService {
         }
     }
 
-    // ĐƯỢC GỌI TỪ MyInCallService NGAY SAU KHI CUỘC GỌI KẾT THÚC (700ms)
+    // ĐƯỢC GỌI TỪ MyInCallService NGAY SAU KHI CUỘC GỌI KẾT THÚC
     public void onCallFinished() {
         if (!isCallingProcessActive) return;
 
@@ -314,6 +322,41 @@ public class AutoScrapeService extends AccessibilityService {
         } else {
             handler.postDelayed(nextRunnable, 2000);
         }
+    }
+
+    private void performScrollDownForCalling(Runnable onScrolled) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+            Path path = new Path();
+            path.moveTo(500, 1000);
+            path.lineTo(500, 400);
+            
+            GestureDescription.Builder builder = new GestureDescription.Builder();
+            builder.addStroke(new GestureDescription.StrokeDescription(path, 0, 300));
+            
+            dispatchGesture(builder.build(), new GestureResultCallback() {
+                @Override
+                public void onCompleted(GestureDescription gestureDescription) {
+                    super.onCompleted(gestureDescription);
+                    handler.postDelayed(onScrolled, 1000);
+                }
+
+                @Override
+                public void onCancelled(GestureDescription gestureDescription) {
+                    super.onCancelled(gestureDescription);
+                    handler.postDelayed(onScrolled, 1000);
+                }
+            }, null);
+        } else {
+            handler.postDelayed(onScrolled, 1200);
+        }
+    }
+
+    private void moveToNextCodeAfterDelay() {
+        currentCallIndex++;
+        if (FloatingWidgetService.instance != null) {
+            handler.post(() -> FloatingWidgetService.instance.updateProgress(currentCallIndex));
+        }
+        handler.postDelayed(this::executeNextCallStep, 1000);
     }
 
     private void saveCodesToFile() {
