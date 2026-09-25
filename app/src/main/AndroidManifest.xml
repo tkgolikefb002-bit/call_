@@ -21,10 +21,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar">
 
-        <!-- Màn hình chính (Đã gộp chuẩn Intent Filter cho Dialer) -->
+        <!-- Màn hình chính (Đã thêm android:launchMode="singleTop") -->
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -56,13 +57,16 @@
             </intent-filter>
         </receiver>
 
-        <!-- Dịch vụ InCallService (điều khiển giao diện cuộc gọi ngầm) -->
+        <!-- Dịch vụ InCallService (Đã bổ sung meta-data xử lý chuông cuộc gọi) -->
         <service
             android:name=".MyInCallService"
             android:permission="android.permission.BIND_INCALL_SERVICE"
             android:exported="true">
             <meta-data
                 android:name="android.telecom.IN_CALL_SERVICE_UI"
+                android:value="true" />
+            <meta-data
+                android:name="android.telecom.IN_CALL_SERVICE_RINGING"
                 android:value="true" />
             <intent-filter>
                 <action android:name="android.telecom.InCallService" />
@@ -78,6 +82,7 @@
                 <action android:name="android.telecom.CallRedirectionService" />
             </intent-filter>
         </service>
+        
         <service android:name=".FloatingWidgetService" android:exported="false" />
         
     </application>
