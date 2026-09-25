@@ -107,7 +107,7 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // PHẦN 2: TIẾN TRÌNH TỰ ĐỘNG GỌI (ĐÃ TỐI ƯU DÁN MÃ BẰNG CLIPBOARD + PASTE)
+    // PHẦN 2: TIẾN TRÌNH TỰ ĐỘNG GỌI (SỬ DỤNG SHELL INPUT TEXT TƯƠNG ĐƯƠNG ADB)
     // =========================================================================
     public void startAutoCallingSequence() {
         if (isCallingProcessActive) return;
@@ -172,7 +172,7 @@ public class AutoScrapeService extends AccessibilityService {
     private void searchAndCallForCode(String targetCode) {
         if (!isCallingProcessActive) return;
 
-        Log.d(TAG, "Đang xử lý mã đơn: " + targetCode);
+        Log.d(TAG, "Đang xử lý mã đơn bằng Shell Input: " + targetCode);
 
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
         if (rootNode == null) {
@@ -180,8 +180,8 @@ public class AutoScrapeService extends AccessibilityService {
             return;
         }
 
-        // 1. Tìm node tìm kiếm lần đầu để focus
         List<AccessibilityNodeInfo> searchNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/etSearch");
+        
         if (searchNodes == null || searchNodes.isEmpty()) {
             searchNodes = new ArrayList<>();
             findEditTextNodes(rootNode, searchNodes);
@@ -190,35 +190,23 @@ public class AutoScrapeService extends AccessibilityService {
         if (searchNodes != null && !searchNodes.isEmpty()) {
             AccessibilityNodeInfo searchBox = searchNodes.get(0);
             
-            // Focus và Click vào ô để app kích hoạt bàn phím / input connection
+            // 1. Focus và Click vào ô tìm kiếm để hiện con trỏ nhấp nháy
             searchBox.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
             searchBox.performAction(AccessibilityNodeInfo.ACTION_CLICK);
 
-            // 2. Đợi 300ms cho app sẵn sàng, sau đó lấy node TƯƠI MỚI (Fresh Node) để set text, 
-            // tránh tình trạng node cũ bị stale/mất hiệu lực.
+            // 2. Chờ 300ms cho bàn phím/input sẵn sàng, sau đó dùng lệnh hệ thống gõ text trực tiếp (giống ADB)
             handler.postDelayed(() -> {
-                AccessibilityNodeInfo freshRoot = getRootInActiveWindow();
-                if (freshRoot == null) {
-                    moveToNextCodeAfterDelay();
-                    return;
+                try {
+                    String command = "input text " + targetCode;
+                    Runtime.getRuntime().exec(command);
+                    Log.d(TAG, "Đã gửi lệnh Shell gõ mã: " + targetCode);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    Log.e(TAG, "Lỗi khi chạy lệnh shell input text: " + e.getMessage());
                 }
 
-                List<AccessibilityNodeInfo> freshSearchNodes = freshRoot.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/etSearch");
-                if (freshSearchNodes != null && !freshSearchNodes.isEmpty()) {
-                    AccessibilityNodeInfo freshSearchBox = freshSearchNodes.get(0);
-
-                    // Đưa trực tiếp chuỗi mã đơn vào ô thông qua Accessibility Bundle chuẩn API
-                    Bundle arguments = new Bundle();
-                    arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, targetCode);
-                    boolean success = freshSearchBox.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
-
-                    Log.d(TAG, "Set text mã " + targetCode + ": " + (success ? "THÀNH CÔNG" : "THẤT BẠI"));
-                } else {
-                    Log.e(TAG, "Không tìm thấy lại ô tìm kiếm sau khi delay!");
-                }
-
-                // 3. Đợi 1000ms (1 giây) để ứng dụng tự động lọc kết quả tìm kiếm theo mã vừa điền
-                handler.postDelayed(this::findAndCallFilteredPhoneNumber, 1000);
+                // 3. Đợi 1200ms để app tự động lọc kết quả tìm kiếm theo mã vừa gõ
+                handler.postDelayed(this::findAndCallFilteredPhoneNumber, 1200);
             }, 300);
 
         } else {
