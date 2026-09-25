@@ -40,7 +40,7 @@ public class MainActivity extends AppCompatActivity {
             btnOpenDefaultSettings.setOnClickListener(v -> openDefaultAppsSettings());
         }
 
-        // BỔ SUNG: Nút mở bảng điều khiển popup nổi Auto
+        // Nút mở bảng điều khiển popup nổi Auto (hoặc dùng để test gọi số tự động)
         Button btnStartPopup = findViewById(R.id.btnStartPopup);
         if (btnStartPopup != null) {
             btnStartPopup.setOnClickListener(v -> {
@@ -51,14 +51,35 @@ public class MainActivity extends AppCompatActivity {
                             Uri.parse("package:" + getPackageName()));
                     startActivity(intent);
                 } else {
-                    // Khởi chạy Service hiển thị popup nổi lên màn hình
-                    Intent serviceIntent = new Intent(MainActivity.this, FloatingWidgetService.class);
-                    startService(serviceIntent);
-                    
-                    // Thu nhỏ ứng dụng chính xuống nền để popup hiển thị đè lên các ứng dụng khác
-                    finish();
+                    // Ví dụ mẫu: Khi bấm nút này sẽ gọi trực tiếp qua TelecomManager để test định tuyến ngầm
+                    // (Bạn có thể thay số điện thoại cần test vào đây)
+                    makeCallUsingTelecomManager("0123456789");
                 }
             });
+        }
+    }
+
+    /**
+     * Dùng TelecomManager.placeCall() để ép hệ thống gọi đi qua InCallService của app
+     * thay vì gọi qua Intent thô, giúp triệt tiêu hoàn toàn giao diện gọi gốc của máy.
+     */
+    private void makeCallUsingTelecomManager(String phoneNumber) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED) {
+                TelecomManager telecomManager = (TelecomManager) getSystemService(Context.TELECOM_SERVICE);
+                if (telecomManager != null) {
+                    Uri uri = Uri.parse("tel:" + phoneNumber);
+                    Bundle extras = new Bundle();
+                    try {
+                        telecomManager.placeCall(uri, extras);
+                    } catch (SecurityException e) {
+                        e.printStackTrace();
+                        Toast.makeText(this, "Lỗi bảo mật khi gọi: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                }
+            } else {
+                Toast.makeText(this, "Chưa được cấp quyền CALL_PHONE!", Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
@@ -104,7 +125,7 @@ public class MainActivity extends AppCompatActivity {
             if (roleManager != null && roleManager.isRoleAvailable(android.app.role.RoleManager.ROLE_DIALER)) {
                 if (!roleManager.isRoleHeld(android.app.role.RoleManager.ROLE_DIALER)) {
                     Intent intent = roleManager.createRequestRoleIntent(android.app.role.RoleManager.ROLE_DIALER);
-                    startActivityForResult(intent, 123); // Bạn có thể bắt kết quả trả về ở onActivityResult nếu muốn
+                    startActivityForResult(intent, 123);
                 }
             }
         } else {
