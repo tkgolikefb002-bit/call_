@@ -10,6 +10,10 @@
     
     <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
     <uses-permission android:name="android.permission.CONTROL_INCALL_USER_INTERFACE" />
+
+    <!-- ĐÃ THÊM: Các quyền bắt buộc cho Foreground Service -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     
     <application
         android:allowBackup="true"
@@ -75,7 +79,11 @@
             </intent-filter>
         </service>
         
-        <service android:name=".FloatingWidgetService" android:exported="false" />
+        <!-- ĐÃ CẬP NHẬT: Thêm thuộc tính foregroundServiceType cho FloatingWidgetService -->
+        <service 
+            android:name=".FloatingWidgetService" 
+            android:exported="false"
+            android:foregroundServiceType="specialUse" />
 
         <service
             android:name=".AutoScrapeService"
