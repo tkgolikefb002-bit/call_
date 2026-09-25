@@ -46,7 +46,6 @@ public class AutoScrapeService extends AccessibilityService {
 
         Handler handler = new Handler(Looper.getMainLooper());
         
-        // Runnable thực hiện nhiệm vụ quét mã tại chỗ
         Runnable scrapeRunnable = new Runnable() {
             int scrollAttempts = 0;
             
@@ -70,26 +69,29 @@ public class AutoScrapeService extends AccessibilityService {
 
                     if (collectedCodes.size() == previousSize) {
                         scrollAttempts++;
-                        if (scrollAttempts >= 4) { // Tăng nhẹ số lần thử để tránh dừng quá sớm khi mạng chậm
-                            isScraping = false;
-                            saveCodesToFile();
+                        // Khi đã thử cuộn 4 lần mà không thấy mã mới xuất hiện thêm -> Đã đến cuối trang
+                        if (scrollAttempts >= 4) {
+                            isScraping = false; // Dừng trạng thái quét
+                            saveCodesToFile();   // Lưu file
+                            
+                            // GIỮ NGUYÊN POPUP, CHỈ HIỆN THÔNG BÁO THÀNH CÔNG VÀ SỐ LƯỢNG MÃ
                             Toast.makeText(getApplicationContext(), "Đã quét xong! Tổng: " + collectedCodes.size() + " mã.", Toast.LENGTH_LONG).show();
+                            
                             rootNode.recycle();
-                            return;
+                            return; // Dừng vòng lặp tại đây, tuyệt đối KHÔNG gọi tắt service/popup
                         }
                     } else {
-                        scrollAttempts = 0; // Reset lại nếu quét thêm được mã mới
+                        scrollAttempts = 0; // Reset lại đếm nếu tìm thấy mã mới
                     }
 
                     rootNode.recycle();
                 }
 
-                // Thực hiện vuốt màn hình để sang trang/danh sách tiếp theo
+                // Tiếp tục cuộn trang kế tiếp nếu chưa hết
                 performScrollDownAndContinue(handler, this);
             }
         };
 
-        // Bắt đầu vòng lặp quét ngay lập tức lần đầu tiên
         handler.post(scrapeRunnable);
     }
 
