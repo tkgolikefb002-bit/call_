@@ -169,97 +169,71 @@ public class AutoScrapeService extends AccessibilityService {
             handler.post(() -> FloatingWidgetService.instance.updateProgress(currentCallIndex));
         }
 
-        // Bước 1: Dán mã vận đơn vào khung tìm kiếm
-        boolean pasted = pasteCodeIntoSearchBox(targetCode);
+        // Quét trực tiếp trên màn hình, tìm đúng dòng có mã 'targetCode' và gọi số điện thoại tương ứng
+        boolean foundAndCalled = findAndCallForCode(targetCode);
 
-        // Bước 2: Chờ app logistics load kết quả (1.5 giây)
-        handler.postDelayed(() -> {
-            if (!isCallingProcessActive) return;
-
-            // Bước 3: Quét số điện thoại trên màn hình (id: tvPhoneNub)
-            String phoneNumber = findPhoneNumberOnScreen();
-
-            if (phoneNumber != null && !phoneNumber.isEmpty()) {
-                // Bước 4: Gọi điện (Sẽ kích hoạt InCallService ngắt 700ms và nhảy giây)
-                makePhoneCall(phoneNumber);
-            } else {
-                Toast.makeText(this, "Không tìm thấy SĐT cho mã: " + targetCode, Toast.LENGTH_SHORT).show();
-                handler.postDelayed(this::executeNextCallStep, 1500);
-            }
-        }, 1500);
+        if (!foundAndCalled) {
+            Toast.makeText(this, "Không thấy mã trên màn hình: " + targetCode, Toast.LENGTH_SHORT).show();
+            // Nếu không thấy mã này trên màn hình hiện tại, tự động chuyển sang mã tiếp theo sau 1.5 giây
+            handler.postDelayed(this::executeNextCallStep, 1500);
+        }
     }
 
-    private boolean pasteCodeIntoSearchBox(String code) {
+    private boolean findAndCallForCode(String targetCode) {
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
         if (rootNode == null) return false;
 
-        boolean foundAndFilled = false;
-        
-        AccessibilityNodeInfo editableBox = findFirstEditableNode(rootNode);
-        
-        if (editableBox == null) {
-            List<AccessibilityNodeInfo> textNodes = rootNode.findAccessibilityNodeInfosByText("Nhập mã vận đơn");
-            for (AccessibilityNodeInfo node : textNodes) {
-                editableBox = findEditableNode(node);
-                if (editableBox != null) break;
-            }
+        String phoneNumber = null;
+
+        // Tìm tất cả các node hiển thị mã vận đơn đang có trên màn hình
+        List<AccessibilityNodeInfo> billNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvBillCard");
+        if (billNodes == null || billNodes.isEmpty()) {
+            billNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvBillCode");
         }
 
-        if (editableBox != null) {
-            editableBox.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
-            
-            android.os.Bundle arguments = new android.os.Bundle();
-            arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, code);
-            foundAndFilled = editableBox.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
-            
-            editableBox.recycle();
-        }
-
-        rootNode.recycle();
-        return foundAndFilled;
-    }
-
-    private AccessibilityNodeInfo findFirstEditableNode(AccessibilityNodeInfo node) {
-        if (node == null) return null;
-        if (node.isEditable() && "android.widget.EditText".equals(node.getClassName())) {
-            return node;
-        }
-        for (int i = 0; i < node.getChildCount(); i++) {
-            AccessibilityNodeInfo result = findFirstEditableNode(node.getChild(i));
-            if (result != null) return result;
-        }
-        return null;
-    }
-
-    private AccessibilityNodeInfo findEditableNode(AccessibilityNodeInfo node) {
-        if (node == null) return null;
-        if (node.isEditable()) return node;
-        for (int i = 0; i < node.getChildCount(); i++) {
-            AccessibilityNodeInfo result = findEditableNode(node.getChild(i));
-            if (result != null) return result;
-        }
-        return null;
-    }
-
-    private String findPhoneNumberOnScreen() {
-        AccessibilityNodeInfo rootNode = getRootInActiveWindow();
-        if (rootNode == null) return null;
-
-        String phone = null;
-        List<AccessibilityNodeInfo> nodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
-        if (nodes != null && !nodes.isEmpty()) {
-            for (AccessibilityNodeInfo node : nodes) {
-                if (node.getText() != null) {
-                    String text = node.getText().toString().trim();
-                    if (text.startsWith("0") && text.length() >= 9) {
-                        phone = text;
+        if (billNodes != null) {
+            for (AccessibilityNodeInfo billNode : billNodes) {
+                if (billNode.getText() != null) {
+                    String codeOnScreen = billNode.getText().toString().trim();
+                    // So khớp chính xác mã cần tìm
+                    if (targetCode.equals(codeOnScreen)) {
+                        // Đã tìm thấy đúng dòng chứa mã đơn này! Lấy số điện thoại nằm trong cùng dòng đó.
+                        phoneNumber = findPhoneNumberInSameRow(billNode);
                         break;
                     }
                 }
             }
         }
+
         rootNode.recycle();
-        return phone;
+
+        if (phoneNumber != null && !phoneNumber.isEmpty()) {
+            makePhoneCall(phoneNumber);
+            return true;
+        }
+        return false;
+    }
+
+    private String findPhoneNumberInSameRow(AccessibilityNodeInfo node) {
+        // Duyệt ngược lên các node cha để tìm khung chứa toàn bộ item đơn hàng đó, sau đó quét lấy SĐT (tvPhoneNub)
+        AccessibilityNodeInfo parent = node.getParent();
+        int depth = 0;
+        while (parent != null && depth < 5) {
+            List<AccessibilityNodeInfo> phoneNodes = parent.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
+            if (phoneNodes != null && !phoneNodes.isEmpty()) {
+                for (AccessibilityNodeInfo pNode : phoneNodes) {
+                    if (pNode.getText() != null) {
+                        String phone = pNode.getText().toString().trim();
+                        if (phone.startsWith("0") && phone.length() >= 9) {
+                            return phone;
+                        }
+                    }
+                }
+            }
+            parent = parent.getParent();
+            depth++;
+        }
+        return null;
     }
 
     private void makePhoneCall(String phoneNumber) {
