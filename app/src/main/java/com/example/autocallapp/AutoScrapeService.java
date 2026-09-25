@@ -180,7 +180,7 @@ public class AutoScrapeService extends AccessibilityService {
             AccessibilityNodeInfo editableBox = findEditableNode(node);
             if (editableBox != null) {
                 android.os.Bundle arguments = new android.os.Bundle();
-                arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_VALUE, code);
+                arguments.putCharSequence("ACTION_ARGUMENT_SET_TEXT_VALUE", code);
                 editableBox.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
                 foundAndFilled = true;
                 break;
