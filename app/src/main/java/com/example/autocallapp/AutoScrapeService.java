@@ -109,7 +109,6 @@ public class AutoScrapeService extends AccessibilityService {
     public void startAutoCallingSequence() {
         if (isCallingProcessActive) return;
 
-        // Đảm bảo nạp lại dữ liệu từ file hoặc đồng bộ trực tiếp từ collectedCodes
         loadExistingCodesForCalling();
 
         if (callQueueList.isEmpty()) {
@@ -132,12 +131,10 @@ public class AutoScrapeService extends AccessibilityService {
     private void loadExistingCodesForCalling() {
         callQueueList.clear();
         
-        // Ưu tiên lấy trực tiếp từ bộ nhớ đang có sẵn (`collectedCodes`) nếu đã quét trước đó
         if (!collectedCodes.isEmpty()) {
             callQueueList.addAll(collectedCodes);
         }
 
-        // Nếu bộ nhớ tạm trống, tiến hành đọc bổ sung từ file lưu trữ
         try {
             File file = new File(getExternalFilesDir(null), "DanhSachMaDon.txt");
             if (file.exists()) {
@@ -168,14 +165,25 @@ public class AutoScrapeService extends AccessibilityService {
         String targetCode = callQueueList.get(currentCallIndex);
         currentCallIndex++;
 
-        // Bước 1: Tự động điền mã vào khung tìm kiếm trên màn hình ứng dụng
+        // Bước 1: Tự động điền mã vận đơn vào khung tìm kiếm
         boolean pasted = pasteCodeIntoSearchBox(targetCode);
 
-        // Bước 2: Thực hiện gọi điện sau khi đã điền
+        // Bước 2: Chờ ứng dụng load kết quả tìm kiếm đơn hàng (2 giây)
         handler.postDelayed(() -> {
             if (!isCallingProcessActive) return;
-            makePhoneCall(targetCode);
-        }, 1000);
+
+            // Bước 3: Lấy số điện thoại tương ứng từ màn hình (id: tvPhoneNub)
+            String phoneNumber = findPhoneNumberOnScreen();
+
+            if (phoneNumber != null && !phoneNumber.isEmpty()) {
+                // Bước 4: Thực hiện cuộc gọi tới số điện thoại tìm được
+                makePhoneCall(phoneNumber);
+            } else {
+                Toast.makeText(this, "Không tìm thấy SĐT cho mã: " + targetCode, Toast.LENGTH_SHORT).show();
+                // Tự động chuyển sang mã tiếp theo nếu không thấy số
+                onCallFinished();
+            }
+        }, 2000);
     }
 
     private boolean pasteCodeIntoSearchBox(String code) {
@@ -206,6 +214,28 @@ public class AutoScrapeService extends AccessibilityService {
             if (result != null) return result;
         }
         return null;
+    }
+
+    // Hàm quét tìm số điện thoại hiển thị trên màn hình dựa theo resource-id 'tvPhoneNub'
+    private String findPhoneNumberOnScreen() {
+        AccessibilityNodeInfo rootNode = getRootInActiveWindow();
+        if (rootNode == null) return null;
+
+        String phone = null;
+        List<AccessibilityNodeInfo> nodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
+        if (nodes != null && !nodes.isEmpty()) {
+            for (AccessibilityNodeInfo node : nodes) {
+                if (node.getText() != null) {
+                    String text = node.getText().toString().trim();
+                    if (text.startsWith("0") && text.length() >= 9) {
+                        phone = text;
+                        break;
+                    }
+                }
+            }
+        }
+        rootNode.recycle();
+        return phone;
     }
 
     private void makePhoneCall(String phoneNumber) {
