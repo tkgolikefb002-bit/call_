@@ -46,7 +46,7 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // PHẦN 1: TIẾN TRÌNH QUÉT MÃ (Cuộn và thu thập mã - Đã giảm số lần thử còn 1 và tăng tốc độ)
+    // PHẦN 1: TIẾN TRÌNH QUÉT MÃ
     // =========================================================================
     public void startScraping() {
         if (isScraping) {
@@ -82,11 +82,11 @@ public class AutoScrapeService extends AccessibilityService {
                     }
 
                     if (collectedCodes.size() > previousSize) {
-                        scrollAttempts = 0; // Reset lại nếu vẫn thu thập thêm được mã mới
+                        scrollAttempts = 0; 
                         updatePopupProgress(collectedCodes.size());
                     } else {
                         scrollAttempts++;
-                        // Thay vì 3 lần, giờ chỉ cần cuộn 1 lần mà không thấy mã mới tăng thêm là kết thúc luôn
+                        // Cuộn 1 lần không thấy mã mới là dừng
                         if (scrollAttempts >= 1) {
                             isScraping = false;
                             saveCodesToFile();
@@ -98,7 +98,6 @@ public class AutoScrapeService extends AccessibilityService {
                     }
                     rootNode.recycle();
                 }
-                // Tốc độ cuộn nhanh hơn (giảm thời gian chờ)
                 performFastScrollDownAndContinue(handler, this);
             }
         };
@@ -107,7 +106,7 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // PHẦN 2: TIẾN TRÌNH TỰ ĐỘNG GỌI (Dán mã vào khung tìm kiếm để gọi chính xác)
+    // PHẦN 2: TIẾN TRÌNH TỰ ĐỘNG GỌI (Dán mã vào ô tìm kiếm)
     // =========================================================================
     public void startAutoCallingSequence() {
         if (isCallingProcessActive) return;
@@ -166,8 +165,6 @@ public class AutoScrapeService extends AccessibilityService {
         }
 
         String targetCode = callQueueList.get(currentCallIndex);
-        
-        // Dán mã vào ô tìm kiếm để app tự động lọc ra đơn chính xác
         searchAndCallForCode(targetCode);
     }
 
@@ -180,10 +177,8 @@ public class AutoScrapeService extends AccessibilityService {
             return;
         }
 
-        // Tìm ô nhập tìm kiếm theo ID chuẩn của ứng dụng
         List<AccessibilityNodeInfo> searchNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/search_src_text");
         
-        // Nếu không thấy bằng ID, quét tìm bất kỳ ô EditText nào
         if (searchNodes == null || searchNodes.isEmpty()) {
             searchNodes = new ArrayList<>();
             findEditTextNodes(rootNode, searchNodes);
@@ -192,16 +187,13 @@ public class AutoScrapeService extends AccessibilityService {
         if (searchNodes != null && !searchNodes.isEmpty()) {
             AccessibilityNodeInfo searchBox = searchNodes.get(0);
             
-            // 1. Click vào ô tìm kiếm
             searchBox.performAction(AccessibilityNodeInfo.ACTION_CLICK);
             
-            // 2. Dán mã đơn hàng vào
             handler.postDelayed(() -> {
                 Bundle arguments = new Bundle();
                 arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_VALUE, targetCode);
                 searchBox.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
                 
-                // 3. Chờ 600ms cho app lọc kết quả rồi lấy số điện thoại gọi luôn
                 handler.postDelayed(() -> {
                     findAndCallFilteredPhoneNumber();
                 }, 600);
@@ -223,7 +215,8 @@ public class AutoScrapeService extends AccessibilityService {
             results.add(node);
         }
         for (int i = 0; i < node.getChildCount(); i++) {
-            findEditTextNodes(node.getChildAt(i), results);
+            // Sửa lại thành getChild(i) thay vì getChildAt(i)
+            findEditTextNodes(node.getChild(i), results);
         }
     }
 
@@ -237,7 +230,6 @@ public class AutoScrapeService extends AccessibilityService {
         }
 
         String phoneNumber = null;
-        // Lấy số điện thoại từ kết quả đã được lọc chuẩn xác sau khi dán mã
         List<AccessibilityNodeInfo> phoneNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
 
         if (phoneNodes != null && !phoneNodes.isEmpty()) {
@@ -280,7 +272,6 @@ public class AutoScrapeService extends AccessibilityService {
     public void onCallFinished() {
         if (!isCallingProcessActive) return;
 
-        // Sau khi kết thúc cuộc gọi, chờ 1.5 giây để chuyển sang mã tiếp theo (nhanh hơn)
         handler.postDelayed(new Runnable() {
             @Override
             public void run() {
@@ -315,7 +306,6 @@ public class AutoScrapeService extends AccessibilityService {
         }
     }
 
-    // Tốc độ cuộn và thời gian chờ đã được tối ưu nhanh hơn
     private void performFastScrollDownAndContinue(Handler handler, Runnable nextRunnable) {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
             Path path = new Path();
@@ -323,13 +313,13 @@ public class AutoScrapeService extends AccessibilityService {
             path.lineTo(500, 500);
             
             GestureDescription.Builder builder = new GestureDescription.Builder();
-            builder.addStroke(new GestureDescription.StrokeDescription(path, 0, 250)); // Vuốt nhanh hơn (250ms)
+            builder.addStroke(new GestureDescription.StrokeDescription(path, 0, 250));
             
             dispatchGesture(builder.build(), new GestureResultCallback() {
                 @Override
                 public void onCompleted(GestureDescription gestureDescription) {
                     super.onCompleted(gestureDescription);
-                    handler.postDelayed(nextRunnable, 1000); // Chờ ngắn hơn (1 giây) để load trang tiếp theo
+                    handler.postDelayed(nextRunnable, 1000);
                 }
 
                 @Override
