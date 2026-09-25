@@ -98,8 +98,17 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        // 3. Xin quyền làm Trình gọi điện mặc định (Default Dialer)
+        // 3. Xin quyền làm Trình gọi điện mặc định (Default Dialer) bằng RoleManager chuẩn Android 10+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            android.app.role.RoleManager roleManager = (android.app.role.RoleManager) getSystemService(Context.ROLE_SERVICE);
+            if (roleManager != null && roleManager.isRoleAvailable(android.app.role.RoleManager.ROLE_DIALER)) {
+                if (!roleManager.isRoleHeld(android.app.role.RoleManager.ROLE_DIALER)) {
+                    Intent intent = roleManager.createRequestRoleIntent(android.app.role.RoleManager.ROLE_DIALER);
+                    startActivityForResult(intent, 123); // Bạn có thể bắt kết quả trả về ở onActivityResult nếu muốn
+                }
+            }
+        } else {
+            // Dành cho các dòng máy Android cũ dưới Android 10
             TelecomManager telecomManager = (TelecomManager) getSystemService(TELECOM_SERVICE);
             if (telecomManager != null && !getPackageName().equals(telecomManager.getDefaultDialerPackage())) {
                 Intent intent = new Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER);
