@@ -1,5 +1,8 @@
 package com.example.autocallapp;
 
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Intent;
 import android.graphics.PixelFormat;
@@ -13,13 +16,17 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
+import androidx.core.app.NotificationCompat;
 
 public class FloatingWidgetService extends Service {
-    public static FloatingWidgetService instance; // Instance để service khác gọi cập nhật giao diện
+    public static FloatingWidgetService instance; 
     private WindowManager windowManager;
     private View floatingView;
-    private boolean isRunning = false; 
-    private TextView tvProgress; // TextView hiển thị tiến độ quét
+    private boolean isRunning = false;  
+    private TextView tvProgress; 
+
+    private static final String CHANNEL_ID = "AutoScrapeForegroundChannel";
+    private static final int NOTIFICATION_ID = 12345;
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -29,11 +36,21 @@ public class FloatingWidgetService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        instance = this; // Gán instance khi service được tạo
+        instance = this; 
 
+        // 1. Đưa Service lên Foreground để Android KHÔNG BAO GIỜ kill ngầm popup
+        createNotificationChannel();
+        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle("Bảng điều khiển Auto đang chạy")
+                .setContentText("Đang hiển thị dạng nổi trên màn hình")
+                .setSmallIcon(android.R.drawable.ic_menu_compass) // Dùng icon hệ thống sẵn có tránh lỗi thiếu icon
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .build();
+        startForeground(NOTIFICATION_ID, notification);
+
+        // 2. Khởi tạo giao diện popup nổi
         floatingView = LayoutInflater.from(this).inflate(R.layout.layout_floating_popup, null);
 
-        // Ánh xạ TextView hiển thị tiến độ từ layout XML
         tvProgress = floatingView.findViewById(R.id.tvProgress);
 
         int LAYOUT_FLAG;
@@ -81,21 +98,30 @@ public class FloatingWidgetService extends Service {
             }
         });
 
-        // Nút Đóng popup (dấu X)
-        floatingView.findViewById(R.id.btnClose).setOnClickListener(v -> stopSelf());
+        // =========================================================================
+        // NÚT ĐÓNG (✕) - DUY NHẤT NÚT NÀY MỚI TẮT POPUP
+        // =========================================================================
+        Button btnClose = floatingView.findViewById(R.id.btnClose);
+        if (btnClose != null) {
+            btnClose.setOnClickListener(v -> {
+                stopSelf(); // Gọi hủy service thủ công khi người dùng bấm vào dấu X
+            });
+        }
 
         // Xử lý nút Chạy / Dừng (Nút Play/Pause ở giữa)
         Button btnPlayPause = floatingView.findViewById(R.id.btnPlayPause);
-        btnPlayPause.setOnClickListener(v -> {
-            isRunning = !isRunning;
-            if (isRunning) {
-                btnPlayPause.setText("⏸");
-                Toast.makeText(this, "Đã bắt đầu Auto chạy ngầm!", Toast.LENGTH_SHORT).show();
-            } else {
-                btnPlayPause.setText("▶");
-                Toast.makeText(this, "Đã tạm dừng Auto!", Toast.LENGTH_SHORT).show();
-            }
-        });
+        if (btnPlayPause != null) {
+            btnPlayPause.setOnClickListener(v -> {
+                isRunning = !isRunning;
+                if (isRunning) {
+                    btnPlayPause.setText("⏸");
+                    Toast.makeText(this, "Đã bắt đầu Auto chạy ngầm!", Toast.LENGTH_SHORT).show();
+                } else {
+                    btnPlayPause.setText("▶");
+                    Toast.makeText(this, "Đã tạm dừng Auto!", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
 
         // =========================================================================
         // SỰ KIỆN CHO NÚT KÍNH LÚP (btnSearch) - Bắt đầu quét mã
@@ -104,7 +130,6 @@ public class FloatingWidgetService extends Service {
         if (btnSearch != null) {
             btnSearch.setOnClickListener(v -> {
                 if (AutoScrapeService.instance != null) {
-                    // Reset lại hiển thị tiến độ về 0 khi bắt đầu quét mới
                     updateProgress(0);
                     AutoScrapeService.instance.startScraping();
                 } else {
@@ -122,7 +147,7 @@ public class FloatingWidgetService extends Service {
                 if (AutoScrapeService.instance != null) {
                     boolean cleared = AutoScrapeService.instance.clearSavedData();
                     if (cleared) {
-                        updateProgress(0); // Reset tiến độ về 0 khi xóa dữ liệu
+                        updateProgress(0);
                         Toast.makeText(this, "Đã xóa toàn bộ dữ liệu đơn hàng đã lưu!", Toast.LENGTH_SHORT).show();
                     } else {
                         Toast.makeText(this, "Không có dữ liệu hoặc file chưa tồn tại.", Toast.LENGTH_SHORT).show();
@@ -144,8 +169,22 @@ public class FloatingWidgetService extends Service {
         }
     }
 
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    CHANNEL_ID,
+                    "Auto Scrape Foreground Service",
+                    NotificationManager.IMPORTANCE_LOW
+            );
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) {
+                manager.createNotificationChannel(channel);
+            }
+        }
+    }
+
     /**
-     * Hàm công khai để AutoScrapeService gọi cập nhật số lượng mã quét được lên giao diện
+     * Hàm cập nhật tiến độ lên giao diện popup
      */
     public void updateProgress(int count) {
         if (tvProgress != null) {
@@ -156,9 +195,13 @@ public class FloatingWidgetService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        instance = null; // Xóa instance khi service bị hủy
+        instance = null; 
         if (floatingView != null) {
-            windowManager.removeView(floatingView);
+            try {
+                windowManager.removeView(floatingView);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
     }
 }
