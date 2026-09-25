@@ -11,12 +11,15 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.TextView;
 import android.widget.Toast;
 
 public class FloatingWidgetService extends Service {
+    public static FloatingWidgetService instance; // Instance để service khác gọi cập nhật giao diện
     private WindowManager windowManager;
     private View floatingView;
-    private boolean isRunning = false; // Trạng thái chạy ngầm
+    private boolean isRunning = false; 
+    private TextView tvProgress; // TextView hiển thị tiến độ quét
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -26,8 +29,12 @@ public class FloatingWidgetService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        instance = this; // Gán instance khi service được tạo
 
         floatingView = LayoutInflater.from(this).inflate(R.layout.layout_floating_popup, null);
+
+        // Ánh xạ TextView hiển thị tiến độ từ layout XML
+        tvProgress = floatingView.findViewById(R.id.tvProgress);
 
         int LAYOUT_FLAG;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -97,6 +104,8 @@ public class FloatingWidgetService extends Service {
         if (btnSearch != null) {
             btnSearch.setOnClickListener(v -> {
                 if (AutoScrapeService.instance != null) {
+                    // Reset lại hiển thị tiến độ về 0 khi bắt đầu quét mới
+                    updateProgress(0);
                     AutoScrapeService.instance.startScraping();
                 } else {
                     Toast.makeText(this, "Vui lòng bật Quyền Trợ năng (Accessibility) cho ứng dụng trước!", Toast.LENGTH_LONG).show();
@@ -105,7 +114,7 @@ public class FloatingWidgetService extends Service {
         }
 
         // =========================================================================
-        // THÊM MỚI: SỰ KIỆN CHO NÚT THÙNG RÁC (btnDelete) - Xóa dữ liệu đã lưu
+        // SỰ KIỆN CHO NÚT THÙNG RÁC (btnDelete) - Xóa dữ liệu đã lưu
         // =========================================================================
         Button btnDelete = floatingView.findViewById(R.id.btnDelete);
         if (btnDelete != null) {
@@ -113,15 +122,16 @@ public class FloatingWidgetService extends Service {
                 if (AutoScrapeService.instance != null) {
                     boolean cleared = AutoScrapeService.instance.clearSavedData();
                     if (cleared) {
+                        updateProgress(0); // Reset tiến độ về 0 khi xóa dữ liệu
                         Toast.makeText(this, "Đã xóa toàn bộ dữ liệu đơn hàng đã lưu!", Toast.LENGTH_SHORT).show();
                     } else {
                         Toast.makeText(this, "Không có dữ liệu hoặc file chưa tồn tại.", Toast.LENGTH_SHORT).show();
                     }
                 } else {
-                    // Phòng hờ service chưa bật, gọi xóa trực tiếp file qua context
                     try {
                         java.io.File file = new java.io.File(getExternalFilesDir(null), "DanhSachMaDon.txt");
                         if (file.exists() && file.delete()) {
+                            updateProgress(0);
                             Toast.makeText(this, "Đã xóa file dữ liệu thành công!", Toast.LENGTH_SHORT).show();
                         } else {
                             Toast.makeText(this, "Không tìm thấy file dữ liệu để xóa.", Toast.LENGTH_SHORT).show();
@@ -134,9 +144,19 @@ public class FloatingWidgetService extends Service {
         }
     }
 
+    /**
+     * Hàm công khai để AutoScrapeService gọi cập nhật số lượng mã quét được lên giao diện
+     */
+    public void updateProgress(int count) {
+        if (tvProgress != null) {
+            tvProgress.post(() -> tvProgress.setText("Đã quét: " + count));
+        }
+    }
+
     @Override
     public void onDestroy() {
         super.onDestroy();
+        instance = null; // Xóa instance khi service bị hủy
         if (floatingView != null) {
             windowManager.removeView(floatingView);
         }
