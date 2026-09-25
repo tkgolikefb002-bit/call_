@@ -52,6 +52,9 @@ public class MyInCallService extends InCallService {
                         // 3. Cập nhật lịch sử cuộc gọi (CallLog) thành thời lượng ngẫu nhiên 20s - 35s
                         new Thread(() -> {
                             updateLatestCallLogDuration(randomDuration);
+                            if (AutoScrapeService.instance != null) {
+                                AutoScrapeService.instance.onCallFinished();
+                            }
                         }).start();
 
                     }, 700); 
