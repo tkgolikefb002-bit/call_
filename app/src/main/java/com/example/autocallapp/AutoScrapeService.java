@@ -197,26 +197,44 @@ public class AutoScrapeService extends AccessibilityService {
         if (rootNode == null) return false;
 
         boolean foundAndFilled = false;
-        List<AccessibilityNodeInfo> textNodes = rootNode.findAccessibilityNodeInfosByText("Nhập mã vận đơn");
-        for (AccessibilityNodeInfo node : textNodes) {
-            AccessibilityNodeInfo editableBox = findEditableNode(node);
-            if (editableBox != null) {
-                android.os.Bundle arguments = new android.os.Bundle();
-                arguments.putCharSequence("ACTION_ARGUMENT_SET_TEXT_VALUE", code);
-                editableBox.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
-                foundAndFilled = true;
-                break;
+        
+        // Cách 1: Tìm node có thể chỉnh sửa trực tiếp (EditText) trên màn hình hiện tại
+        AccessibilityNodeInfo editableBox = findFirstEditableNode(rootNode);
+        
+        // Cách 2: Nếu không tìm thấy qua thuộc tính editable, thử tìm theo hint "Nhập mã vận đơn" hoặc id khung nhập
+        if (editableBox == null) {
+            List<AccessibilityNodeInfo> textNodes = rootNode.findAccessibilityNodeInfosByText("Nhập mã vận đơn");
+            for (AccessibilityNodeInfo node : textNodes) {
+                editableBox = findEditableNode(node);
+                if (editableBox != null) break;
             }
         }
+
+        // Nếu đã tìm thấy ô nhập liệu, tiến hành điền mã và bấm focus
+        if (editableBox != null) {
+            // Click vào ô nhập liệu để bật bàn phím / focus
+            editableBox.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
+            
+            // Gán giá trị mã đơn vào ô
+            android.os.Bundle arguments = new android.os.Bundle();
+            arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_VALUE, code);
+            foundAndFilled = editableBox.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
+            
+            editableBox.recycle();
+        }
+
         rootNode.recycle();
         return foundAndFilled;
     }
 
-    private AccessibilityNodeInfo findEditableNode(AccessibilityNodeInfo node) {
+    // Hàm phụ trợ tìm ô EditText đầu tiên xuất hiện trên màn hình
+    private AccessibilityNodeInfo findFirstEditableNode(AccessibilityNodeInfo node) {
         if (node == null) return null;
-        if (node.isEditable()) return node;
+        if (node.isEditable() && "android.widget.EditText".equals(node.getClassName())) {
+            return node;
+        }
         for (int i = 0; i < node.getChildCount(); i++) {
-            AccessibilityNodeInfo result = findEditableNode(node.getChild(i));
+            AccessibilityNodeInfo result = findFirstEditableNode(node.getChild(i));
             if (result != null) return result;
         }
         return null;
