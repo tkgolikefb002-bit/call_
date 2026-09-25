@@ -107,7 +107,7 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // PHẦN 2: TIẾN TRÌNH TỰ ĐỘNG GỌI (CHỌN KỸ Ô RỒI MỚI DÁN)
+    // PHẦN 2: TIẾN TRÌNH TỰ ĐỘNG GỌI (ĐÃ TỐI ƯU DÁN MÃ BẰNG CLIPBOARD + PASTE)
     // =========================================================================
     public void startAutoCallingSequence() {
         if (isCallingProcessActive) return;
@@ -180,6 +180,11 @@ public class AutoScrapeService extends AccessibilityService {
             return;
         }
 
+        // 1. Đưa mã đơn hàng vào Clipboard hệ thống trước tiên
+        android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        android.content.ClipData clip = android.content.ClipData.newPlainText("TargetCode", targetCode);
+        clipboard.setPrimaryClip(clip);
+
         List<AccessibilityNodeInfo> searchNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/etSearch");
         
         if (searchNodes == null || searchNodes.isEmpty()) {
@@ -190,22 +195,25 @@ public class AutoScrapeService extends AccessibilityService {
         if (searchNodes != null && !searchNodes.isEmpty()) {
             AccessibilityNodeInfo searchBox = searchNodes.get(0);
             
-            // 1. Thực hiện Focus và Click qua Accessibility Node trước
+            // 2. Thực hiện Focus và Click qua Accessibility Node
             searchBox.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
             searchBox.performAction(AccessibilityNodeInfo.ACTION_CLICK);
 
-            // 2. Chạm bằng tọa độ vật lý (Gesture click) chính xác vào giữa khung etSearch [0,505][632,577] để ép app nhận chọn ô
+            // 3. Chạm bằng tọa độ vật lý (Gesture click) chính xác vào giữa khung etSearch [0,505][632,577]
             clickAtCoordinates(316, 541);
 
-            // 3. Sau khi chắc chắn ô đã được chọn/focus, đợi 300ms rồi thực hiện dán mã vào
+            // 4. Sau 300ms, tiến hành gán text và thực hiện lệnh PASTE từ Clipboard để ép ứng dụng nhận mã
             handler.postDelayed(() -> {
                 Bundle arguments = new Bundle();
                 arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, targetCode);
-                boolean success = searchBox.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
-                Log.d(TAG, "Dán mã " + targetCode + " vào ô tìm kiếm: " + (success ? "THÀNH CÔNG" : "THẤT BẠI"));
+                searchBox.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
+                
+                // Kích hoạt thêm lệnh Dán (Paste) để bắt buộc ứng dụng nhận nội dung từ bộ nhớ tạm
+                boolean pasteResult = searchBox.performAction(AccessibilityNodeInfo.ACTION_PASTE);
+                Log.d(TAG, "Dán mã " + targetCode + " bằng lệnh Paste: " + (pasteResult ? "THÀNH CÔNG" : "THẤT BẠI"));
 
-                // 4. Đợi thêm 800ms để app lọc kết quả đơn hàng rồi tiến hành lấy số điện thoại gọi
-                handler.postDelayed(this::findAndCallFilteredPhoneNumber, 800);
+                // 5. Đợi 1000ms (1 giây) để app kịp lọc danh sách kết quả tìm kiếm theo mã vừa dán
+                handler.postDelayed(this::findAndCallFilteredPhoneNumber, 1000);
             }, 300);
 
         } else {
