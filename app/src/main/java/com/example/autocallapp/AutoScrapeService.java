@@ -43,7 +43,7 @@ public class AutoScrapeService extends AccessibilityService {
         }
         isScraping = true;
         
-        // 1. Tải các mã đã lưu từ file trước đó vào bộ nhớ để tiếp tục quét và đối chiếu
+        // Tải các mã đã lưu từ file trước đó vào bộ nhớ để tiếp tục quét và đối chiếu
         loadExistingCodes();
         updatePopupProgress(collectedCodes.size());
         
@@ -78,12 +78,13 @@ public class AutoScrapeService extends AccessibilityService {
                         updatePopupProgress(collectedCodes.size());
                     } else {
                         scrollAttempts++;
-                        // Tăng ngưỡng thử lên 5 lần để chờ ứng dụng load dữ liệu chậm
-                        if (scrollAttempts >= 5) {
+                        
+                        // Đã thay đổi: Giảm xuống 3 lần cuộn liên tiếp không thấy mã mới -> Dừng quét
+                        if (scrollAttempts >= 3) {
                             isScraping = false; // Dừng trạng thái quét
                             saveCodesToFile();   // Lưu toàn bộ vào file
                             
-                            // Cập nhật giao diện lần cuối, thông báo thành công và GIỮ NGUYÊN POPUP
+                            // Cập nhật giao diện lần cuối, thông báo thành công và giữ nguyên popup
                             updatePopupProgress(collectedCodes.size());
                             Toast.makeText(getApplicationContext(), "Đã quét xong! Tổng: " + collectedCodes.size() + " mã.", Toast.LENGTH_LONG).show();
                             
@@ -143,7 +144,7 @@ public class AutoScrapeService extends AccessibilityService {
                 @Override
                 public void onCompleted(GestureDescription gestureDescription) {
                     super.onCompleted(gestureDescription);
-                    // Tăng thời gian chờ lên 1.8 giây để ứng dụng Best Express kịp render dữ liệu mới
+                    // Giữ thời gian chờ 1.8 giây để app kịp tải dữ liệu ổn định sau khi vuốt
                     handler.postDelayed(nextRunnable, 1800);
                 }
 
