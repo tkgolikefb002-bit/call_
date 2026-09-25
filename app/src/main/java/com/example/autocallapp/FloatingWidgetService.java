@@ -91,17 +91,44 @@ public class FloatingWidgetService extends Service {
         });
 
         // =========================================================================
-        // THÊM SỰ KIỆN CHO NÚT KÍNH LÚP (btnSearch) Ở ĐÂY
+        // SỰ KIỆN CHO NÚT KÍNH LÚP (btnSearch) - Bắt đầu quét mã
         // =========================================================================
         Button btnSearch = floatingView.findViewById(R.id.btnSearch);
         if (btnSearch != null) {
             btnSearch.setOnClickListener(v -> {
-                // Kiểm tra xem dịch vụ trợ năng (Accessibility Service) đã được bật chưa
                 if (AutoScrapeService.instance != null) {
-                    // Kích hoạt tiến trình tự động quét mã đơn hàng và cuộn màn hình
                     AutoScrapeService.instance.startScraping();
                 } else {
                     Toast.makeText(this, "Vui lòng bật Quyền Trợ năng (Accessibility) cho ứng dụng trước!", Toast.LENGTH_LONG).show();
+                }
+            });
+        }
+
+        // =========================================================================
+        // THÊM MỚI: SỰ KIỆN CHO NÚT THÙNG RÁC (btnDelete) - Xóa dữ liệu đã lưu
+        // =========================================================================
+        Button btnDelete = floatingView.findViewById(R.id.btnDelete);
+        if (btnDelete != null) {
+            btnDelete.setOnClickListener(v -> {
+                if (AutoScrapeService.instance != null) {
+                    boolean cleared = AutoScrapeService.instance.clearSavedData();
+                    if (cleared) {
+                        Toast.makeText(this, "Đã xóa toàn bộ dữ liệu đơn hàng đã lưu!", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(this, "Không có dữ liệu hoặc file chưa tồn tại.", Toast.LENGTH_SHORT).show();
+                    }
+                } else {
+                    // Phòng hờ service chưa bật, gọi xóa trực tiếp file qua context
+                    try {
+                        java.io.File file = new java.io.File(getExternalFilesDir(null), "DanhSachMaDon.txt");
+                        if (file.exists() && file.delete()) {
+                            Toast.makeText(this, "Đã xóa file dữ liệu thành công!", Toast.LENGTH_SHORT).show();
+                        } else {
+                            Toast.makeText(this, "Không tìm thấy file dữ liệu để xóa.", Toast.LENGTH_SHORT).show();
+                        }
+                    } catch (Exception e) {
+                        Toast.makeText(this, "Lỗi khi xóa: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
                 }
             });
         }
