@@ -97,8 +97,8 @@ public class AutoScrapeService extends AccessibilityService {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
             Path path = new Path();
             // Tọa độ vuốt từ dưới lên trên (giữa màn hình)
-            path.moveTo(500, 1600);
-            path.lineTo(500, 400);
+            path.moveTo(500, 1200);
+            path.lineTo(500, 500);
             
             GestureDescription.Builder builder = new GestureDescription.Builder();
             builder.addStroke(new GestureDescription.StrokeDescription(path, 0, 400));
@@ -107,19 +107,17 @@ public class AutoScrapeService extends AccessibilityService {
                 @Override
                 public void onCompleted(GestureDescription gestureDescription) {
                     super.onCompleted(gestureDescription);
-                    // Sau khi vuốt xong, đợi thêm 1 giây để app logistics render/tải dữ liệu rồi mới chạy tiếp
-                    handler.postDelayed(nextRunnable, 1000);
+                    // Đợi 1.2 giây để app logistics kịp tải thêm dữ liệu sau khi vuốt
+                    handler.postDelayed(nextRunnable, 1200);
                 }
 
                 @Override
                 public void onCancelled(GestureDescription gestureDescription) {
                     super.onCancelled(gestureDescription);
-                    // Nếu lỡ bị hủy cử chỉ, vẫn thử cho chạy tiếp sau 1 giây
-                    handler.postDelayed(nextRunnable, 1000);
+                    handler.postDelayed(nextRunnable, 1200);
                 }
             }, null);
         } else {
-            // Hỗ trợ dự phòng nếu máy Android quá cũ không hỗ trợ Gesture
             handler.postDelayed(nextRunnable, 1500);
         }
     }
