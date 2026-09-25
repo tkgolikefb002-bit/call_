@@ -113,10 +113,22 @@ public class FloatingWidgetService extends Service {
                     isRunning = !isRunning;
                     if (isRunning) {
                         btnPlayPause.setText("⏸");
-                        Toast.makeText(this, "Đã bắt đầu Auto chạy ngầm!", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, "Đã bắt đầu tiến trình gọi tự động!", Toast.LENGTH_SHORT).show();
+                        
+                        if (AutoScrapeService.instance != null) {
+                            AutoScrapeService.instance.startAutoCallingSequence();
+                        } else {
+                            Toast.makeText(this, "Vui lòng bật Quyền Trợ năng (Accessibility) trước!", Toast.LENGTH_LONG).show();
+                            isRunning = false;
+                            btnPlayPause.setText("▶");
+                        }
                     } else {
                         btnPlayPause.setText("▶");
-                        Toast.makeText(this, "Đã tạm dừng Auto!", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, "Đã tạm dừng tiến trình gọi!", Toast.LENGTH_SHORT).show();
+                        
+                        if (AutoScrapeService.instance != null) {
+                            AutoScrapeService.instance.stopAutoCallingSequence();
+                        }
                     }
                 });
             }
