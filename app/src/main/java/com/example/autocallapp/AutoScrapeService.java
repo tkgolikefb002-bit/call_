@@ -42,6 +42,9 @@ public class AutoScrapeService extends AccessibilityService {
         isScraping = true;
         collectedCodes.clear();
         
+        // Reset tiến độ trên popup về 0 khi bắt đầu quét mới
+        updatePopupProgress(0);
+        
         Toast.makeText(this, "Bắt đầu quét và cuộn mã đơn hàng...", Toast.LENGTH_SHORT).show();
 
         Handler handler = new Handler(Looper.getMainLooper());
@@ -67,21 +70,24 @@ public class AutoScrapeService extends AccessibilityService {
                         }
                     }
 
-                    if (collectedCodes.size() == previousSize) {
+                    // Nếu số lượng mã thay đổi (tìm thấy mã mới), cập nhật ngay lên giao diện popup
+                    if (collectedCodes.size() > previousSize) {
+                        scrollAttempts = 0; // Reset lại số lần thử cuộn
+                        updatePopupProgress(collectedCodes.size());
+                    } else {
                         scrollAttempts++;
                         // Khi đã thử cuộn 4 lần mà không thấy mã mới xuất hiện thêm -> Đã đến cuối trang
                         if (scrollAttempts >= 4) {
                             isScraping = false; // Dừng trạng thái quét
                             saveCodesToFile();   // Lưu file
                             
-                            // GIỮ NGUYÊN POPUP, CHỈ HIỆN THÔNG BÁO THÀNH CÔNG VÀ SỐ LƯỢNG MÃ
+                            // Cập nhật lần cuối và giữ nguyên popup, hiển thị Toast thông báo thành công
+                            updatePopupProgress(collectedCodes.size());
                             Toast.makeText(getApplicationContext(), "Đã quét xong! Tổng: " + collectedCodes.size() + " mã.", Toast.LENGTH_LONG).show();
                             
                             rootNode.recycle();
                             return; // Dừng vòng lặp tại đây, tuyệt đối KHÔNG gọi tắt service/popup
                         }
-                    } else {
-                        scrollAttempts = 0; // Reset lại đếm nếu tìm thấy mã mới
                     }
 
                     rootNode.recycle();
@@ -93,6 +99,12 @@ public class AutoScrapeService extends AccessibilityService {
         };
 
         handler.post(scrapeRunnable);
+    }
+
+    private void updatePopupProgress(int count) {
+        if (FloatingWidgetService.instance != null) {
+            FloatingWidgetService.instance.updateProgress(count);
+        }
     }
 
     private void performScrollDownAndContinue(Handler handler, Runnable nextRunnable) {
@@ -139,6 +151,7 @@ public class AutoScrapeService extends AccessibilityService {
 
     public boolean clearSavedData() {
         collectedCodes.clear();
+        updatePopupProgress(0); // Reset tiến độ về 0 khi xóa dữ liệu
         try {
             File file = new File(getExternalFilesDir(null), "DanhSachMaDon.txt");
             if (file.exists()) {
