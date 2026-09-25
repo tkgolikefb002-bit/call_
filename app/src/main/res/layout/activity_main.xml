@@ -34,19 +34,32 @@
         android:textColor="#FFFFFF"
         android:textSize="16sp" />
 
-     <!-- Nút khôi phục / reset quyền nhanh -->
-<Button
-    android:id="@+id/btnResetRole"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:text="Khôi phục / Reset Quyền Mặc Định"
-    android:layout_marginTop="10dp"/>
+    <!-- NÚT MỞ CÀI ĐẶT TRỢ NĂNG (MỚI THÊM) -->
+    <Button
+        android:id="@+id/btnOpenAccessibility"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:backgroundTint="#FF9800"
+        android:padding="15dp"
+        android:text="Bật Quyền Trợ Năng (Accessibility)"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp" />
 
-<!-- Nút hướng dẫn / lấy lệnh ADB nhanh -->
-<Button
-    android:id="@+id/btnShowAdbCommand"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:text="Lấy lệnh ADB gán quyền nhanh"
-    android:layout_marginTop="10dp"/>
+    <!-- Nút khôi phục / reset quyền nhanh -->
+    <Button
+        android:id="@+id/btnResetRole"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Khôi phục / Reset Quyền Mặc Định"
+        android:layout_marginTop="16dp"/>
+
+    <!-- Nút hướng dẫn / lấy lệnh ADB nhanh -->
+    <Button
+        android:id="@+id/btnShowAdbCommand"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Lấy lệnh ADB gán quyền nhanh"
+        android:layout_marginTop="16dp"/>
+
 </LinearLayout>
