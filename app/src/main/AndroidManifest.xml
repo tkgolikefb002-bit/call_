@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Khai báo đầy đủ các quyền tối quan trọng cho Default Dialer -->
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.READ_CALL_LOG" />
     <uses-permission android:name="android.permission.WRITE_CALL_LOG" />
@@ -9,7 +8,6 @@
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     
-    <!-- Các quyền bắt buộc để làm Default Dialer -->
     <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
     <uses-permission android:name="android.permission.CONTROL_INCALL_USER_INTERFACE" />
     
@@ -21,7 +19,6 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar">
 
-        <!-- Màn hình chính (Đã thêm android:launchMode="singleTop") -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -31,7 +28,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
             
-            <!-- Bộ lọc hợp nhất bắt buộc cho ứng dụng gọi điện mặc định -->
             <intent-filter>
                 <action android:name="android.intent.action.DIAL" />
                 <action android:name="android.intent.action.VIEW" />
@@ -41,14 +37,12 @@
             </intent-filter>
         </activity>
 
-        <!-- Màn hình gọi điện (hiển thị số & nút kết thúc ảo) -->
         <activity
             android:name=".CallActivity"
             android:exported="false"
             android:showWhenLocked="true"
             android:turnScreenOn="true" />
 
-        <!-- Khai báo BroadcastReceiver để bắt trạng thái cuộc gọi -->
         <receiver
             android:name=".CallReceiver"
             android:exported="true">
@@ -57,7 +51,6 @@
             </intent-filter>
         </receiver>
 
-        <!-- Dịch vụ InCallService (Đã bổ sung meta-data xử lý chuông cuộc gọi) -->
         <service
             android:name=".MyInCallService"
             android:permission="android.permission.BIND_INCALL_SERVICE"
@@ -73,7 +66,6 @@
             </intent-filter>
         </service>
 
-        <!-- Dịch vụ chuyển hướng cuộc gọi (Call Redirection Service) -->
         <service
             android:name=".MyCallRedirectionService"
             android:permission="android.permission.BIND_CALL_REDIRECTION_SERVICE"
@@ -85,7 +77,6 @@
         
         <service android:name=".FloatingWidgetService" android:exported="false" />
 
-        <!-- THÊM MỚI: Dịch vụ Trợ năng tự động quét mã đơn hàng và cuộn màn hình -->
         <service
             android:name=".AutoScrapeService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
