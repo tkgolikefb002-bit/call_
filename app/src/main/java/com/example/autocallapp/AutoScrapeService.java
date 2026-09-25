@@ -112,4 +112,20 @@ public class AutoScrapeService extends AccessibilityService {
             e.printStackTrace();
         }
     }
+
+    // =========================================================================
+    // HÀM XÓA DỮ LIỆU ĐÃ LƯU (Dành cho nút Thùng rác 🗑)
+    // =========================================================================
+    public boolean clearSavedData() {
+        collectedCodes.clear();
+        try {
+            File file = new File(getExternalFilesDir(null), "DanhSachMaDon.txt");
+            if (file.exists()) {
+                return file.delete();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
 }
