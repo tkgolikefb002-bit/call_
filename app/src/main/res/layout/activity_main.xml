@@ -34,4 +34,19 @@
         android:textColor="#FFFFFF"
         android:textSize="16sp" />
 
+     <!-- Nút khôi phục / reset quyền nhanh -->
+<Button
+    android:id="@+id/btnResetRole"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:text="Khôi phục / Reset Quyền Mặc Định"
+    android:layout_marginTop="10dp"/>
+
+<!-- Nút hướng dẫn / lấy lệnh ADB nhanh -->
+<Button
+    android:id="@+id/btnShowAdbCommand"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:text="Lấy lệnh ADB gán quyền nhanh"
+    android:layout_marginTop="10dp"/>
 </LinearLayout>
