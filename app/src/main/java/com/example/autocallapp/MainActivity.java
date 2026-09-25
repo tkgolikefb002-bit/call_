@@ -57,20 +57,16 @@ public class MainActivity extends AppCompatActivity {
             btnShowAdbCommand.setOnClickListener(v -> showAdbCommandDialog());
         }
 
-        // =========================================================================
-        // ĐÃ SỬA: Nút mở bảng điều khiển popup nổi Auto (Không gọi điện nữa)
-        // =========================================================================
+        // Nút mở bảng điều khiển popup nổi Auto
         Button btnStartPopup = findViewById(R.id.btnStartPopup);
         if (btnStartPopup != null) {
             btnStartPopup.setOnClickListener(v -> {
-                // 1. Kiểm tra quyền "Hiển thị trên ứng dụng khác" (Overlay)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
                     Toast.makeText(this, "Vui lòng cấp quyền hiển thị trên ứng dụng khác trước!", Toast.LENGTH_LONG).show();
                     Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                             Uri.parse("package:" + getPackageName()));
                     startActivity(intent);
                 } else {
-                    // 2. Khởi chạy FloatingWidgetService để hiện bảng popup điều khiển
                     Intent serviceIntent = new Intent(MainActivity.this, FloatingWidgetService.class);
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                         startForegroundService(serviceIntent);
@@ -80,6 +76,28 @@ public class MainActivity extends AppCompatActivity {
                     Toast.makeText(this, "Đã mở bảng điều khiển Auto!", Toast.LENGTH_SHORT).show();
                 }
             });
+        }
+
+        // =========================================================================
+        // THÊM MỚI: Nút bấm mở thẳng cài đặt Trợ năng (Accessibility)
+        // =========================================================================
+        Button btnOpenAccessibility = findViewById(R.id.btnOpenAccessibility);
+        if (btnOpenAccessibility != null) {
+            btnOpenAccessibility.setOnClickListener(v -> openAccessibilitySettings());
+        }
+    }
+
+    /**
+     * Mở thẳng trang Cài đặt Trợ năng (Accessibility) của hệ thống
+     */
+    private void openAccessibilitySettings() {
+        try {
+            Intent intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
+            startActivity(intent);
+            Toast.makeText(this, "Hãy tìm ứng dụng và bật dịch vụ Trợ năng lên!", Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            e.printStackTrace();
+            Toast.makeText(this, "Không thể mở cài đặt Trợ năng!", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -94,10 +112,8 @@ public class MainActivity extends AppCompatActivity {
                     ComponentName componentName = new ComponentName(this, MyInCallService.class);
                     PhoneAccountHandle handle = new PhoneAccountHandle(componentName, "MyCustomDialerId");
                     
-                    // Hủy đăng ký cũ
                     telecomManager.unregisterPhoneAccount(handle);
                     
-                    // Đăng ký lại mới tinh
                     PhoneAccount account = PhoneAccount.builder(handle, "AutoCallApp")
                             .setCapabilities(PhoneAccount.CAPABILITY_CALL_PROVIDER | PhoneAccount.CAPABILITY_CONNECTION_MANAGER)
                             .build();
