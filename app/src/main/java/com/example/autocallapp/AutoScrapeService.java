@@ -51,7 +51,7 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // QUÉT CHUẨN XÁC TỪNG KHUNG ĐƠN HÀNG TRÊN MÀN HÌNH HIỆN TẠI
+    // QUÉT CHUẨN XÁC DỰA TRÊN TRẠNG THÁI HIỂN THỊ CỦA VIEW (KHÔNG DÙNG TỌA ĐỘ)
     // =========================================================================
     public void startScraping() {
         if (isScraping) {
@@ -76,25 +76,26 @@ public class AutoScrapeService extends AccessibilityService {
                 if (rootNode != null) {
                     int previousSize = collectedPhones.size();
                     
-                    // Tìm các khung chứa mã vận đơn để xác định chính xác thẻ đơn hàng hiện tại
                     List<AccessibilityNodeInfo> billNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvBillCode");
                     
                     if (billNodes != null && !billNodes.isEmpty()) {
                         for (AccessibilityNodeInfo billNode : billNodes) {
-                            AccessibilityNodeInfo parentCard = getOrderCardContainer(billNode);
-                            if (parentCard != null) {
-                                // Chỉ trích xuất số điện thoại nằm bên trong đúng khung đơn hàng này
-                                List<AccessibilityNodeInfo> phoneNodes = parentCard.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
-                                if (phoneNodes != null) {
-                                    for (AccessibilityNodeInfo phoneNode : phoneNodes) {
-                                        if (phoneNode != null && phoneNode.getText() != null) {
-                                            String rawText = phoneNode.getText().toString();
-                                            extractAndAddPhone(rawText);
+                            // Chỉ lấy các mã vận đơn thực sự đang hiển thị trên màn hình (bỏ qua cache ẩn)
+                            if (billNode != null && billNode.isVisibleToUser()) {
+                                AccessibilityNodeInfo parentCard = getOrderCardContainer(billNode);
+                                if (parentCard != null) {
+                                    List<AccessibilityNodeInfo> phoneNodes = parentCard.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
+                                    if (phoneNodes != null) {
+                                        for (AccessibilityNodeInfo phoneNode : phoneNodes) {
+                                            if (phoneNode != null && phoneNode.isVisibleToUser() && phoneNode.getText() != null) {
+                                                String rawText = phoneNode.getText().toString();
+                                                extractAndAddPhone(rawText);
+                                            }
+                                            if (phoneNode != null) phoneNode.recycle();
                                         }
-                                        if (phoneNode != null) phoneNode.recycle();
                                     }
+                                    parentCard.recycle();
                                 }
-                                parentCard.recycle();
                             }
                         }
                     }
