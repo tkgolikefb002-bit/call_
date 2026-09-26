@@ -28,14 +28,12 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         
-        // 1. Nhận và hiển thị ngày hết hạn bản quyền được truyền từ CheckKeyActivity sang
-        String expiryDate = getIntent().getStringExtra("EXPIRY_DATE");
-        if (expiryDate != null) {
-            // Giả sử trong file activity_main.xml của bạn có một TextView dùng để hiển thị hạn, ví dụ id là txtExpiry
-            TextView txtExpiry = findViewById(R.id.txtExpiry);
-            Intent intent = getIntent();
-            if (intent != null && intent.hasExtra("EXPIRY_DATE")) {
-                String expiryDate = intent.getStringExtra("EXPIRY_DATE");
+        // Nhận và hiển thị chính xác ngày hết hạn bản quyền được truyền từ LicenseActivity sang
+        TextView txtExpiry = findViewById(R.id.txtExpiry);
+        Intent intent = getIntent();
+        if (intent != null && intent.hasExtra("EXPIRY_DATE")) {
+            String expiryDate = intent.getStringExtra("EXPIRY_DATE");
+            if (txtExpiry != null) {
                 txtExpiry.setText("Hạn sử dụng đến ngày: " + expiryDate);
             }
         }
@@ -61,9 +59,9 @@ public class MainActivity extends AppCompatActivity {
             btnStartPopup.setOnClickListener(v -> {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
                     Toast.makeText(this, "Vui lòng cấp quyền hiển thị trên ứng dụng khác trước!", Toast.LENGTH_LONG).show();
-                    Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Intent overlayIntent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                             Uri.parse("package:" + getPackageName()));
-                    startActivity(intent);
+                    startActivity(overlayIntent);
                 } else {
                     Intent serviceIntent = new Intent(MainActivity.this, FloatingWidgetService.class);
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -83,9 +81,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    /**
-     * Mở thẳng trang Cài đặt Trợ năng (Accessibility) của hệ thống
-     */
     private void openAccessibilitySettings() {
         try {
             Intent intent = new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
@@ -136,6 +131,8 @@ public class MainActivity extends AppCompatActivity {
                 if (!roleManager.isRoleHeld(android.app.role.RoleManager.ROLE_DIALER)) {
                     Intent intent = roleManager.createRequestRoleIntent(android.app.role.RoleManager.ROLE_DIALER);
                     startActivityForResult(intent, 123);
+                } else {
+                    Toast.makeText(this, "Ứng dụng đã là Trình gọi điện mặc định!", Toast.LENGTH_SHORT).show();
                 }
             }
         } else {
