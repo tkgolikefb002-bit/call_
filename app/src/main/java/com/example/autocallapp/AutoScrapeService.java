@@ -50,7 +50,7 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // PHẦN 1: QUÉT VÀ LƯU SỐ ĐIỆN THOẠI TRỰC TIẾP QUA TỌA ĐỘ MÀN HÌNH
+    // PHẦN 1: QUÉT VÀ LƯU SỐ ĐIỆN THOẠI (CHỈ LẤY SỐ NGƯỜI NHẬN Ở DƯỚI CÙNG THẺ ĐƠN)
     // =========================================================================
     public void startScraping() {
         if (isScraping) {
@@ -77,24 +77,51 @@ public class AutoScrapeService extends AccessibilityService {
                 if (rootNode != null) {
                     int previousSize = collectedPhones.size();
                     
-                    // Tìm trực tiếp các node số điện thoại trên màn hình
-                    List<AccessibilityNodeInfo> phoneNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
+                    // Tìm tất cả các khung container đơn hàng trên màn hình
+                    List<AccessibilityNodeInfo> containerNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/llBottomParent");
                     
-                    if (phoneNodes != null && !phoneNodes.isEmpty()) {
-                        for (AccessibilityNodeInfo node : phoneNodes) {
-                            if (node != null && node.getText() != null) {
-                                Rect bounds = new Rect();
-                                node.getBoundsInScreen(bounds);
+                    if (containerNodes != null && !containerNodes.isEmpty()) {
+                        for (AccessibilityNodeInfo container : containerNodes) {
+                            if (container != null) {
+                                Rect containerBounds = new Rect();
+                                container.getBoundsInScreen(containerBounds);
                                 
-                                // CHỈ LẤY SỐ NẾU NÓ NẰM TRONG KHUNG NHÌN THẤY THỰC TẾ TRÊN MÀN HÌNH
-                                if (bounds.top > 100 && bounds.bottom < 2400 && bounds.top < bounds.bottom) {
-                                    String phone = node.getText().toString().trim();
-                                    if (isValidPhoneNumber(phone)) {
-                                        collectedPhones.add(phone);
+                                // Kiểm tra container có hiển thị thực tế trên màn hình không
+                                if (containerBounds.top >= 0 && containerBounds.bottom > 0 && containerBounds.top < 2400) {
+                                    // Tìm tất cả các số điện thoại bên trong khung đơn hàng này
+                                    List<AccessibilityNodeInfo> phoneNodes = container.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
+                                    
+                                    if (phoneNodes != null && !phoneNodes.isEmpty()) {
+                                        AccessibilityNodeInfo targetPhoneNode = null;
+                                        int maxTop = -1;
+                                        
+                                        // Lọc lấy số nằm ở vị trí thấp nhất trong thẻ đơn (số của người nhận)
+                                        for (AccessibilityNodeInfo pNode : phoneNodes) {
+                                            if (pNode != null) {
+                                                Rect pBounds = new Rect();
+                                                pNode.getBoundsInScreen(pBounds);
+                                                if (pBounds.top > maxTop) {
+                                                    maxTop = pBounds.top;
+                                                    targetPhoneNode = pNode;
+                                                }
+                                            }
+                                        }
+                                        
+                                        if (targetPhoneNode != null && targetPhoneNode.getText() != null) {
+                                            String phone = targetPhoneNode.getText().toString().trim();
+                                            if (isValidPhoneNumber(phone)) {
+                                                collectedPhones.add(phone);
+                                            }
+                                        }
+                                        
+                                        // Giải phóng bộ nhớ node
+                                        for (AccessibilityNodeInfo pNode : phoneNodes) {
+                                            if (pNode != null) pNode.recycle();
+                                        }
                                     }
                                 }
+                                container.recycle();
                             }
-                            if (node != null) node.recycle();
                         }
                     }
 
