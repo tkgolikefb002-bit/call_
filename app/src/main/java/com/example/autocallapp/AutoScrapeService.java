@@ -107,7 +107,7 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // PHẦN 2: TIẾN TRÌNH TỰ ĐỘNG GỌI (SỬ DỤNG SHELL INPUT TEXT TƯƠNG ĐƯƠNG ADB)
+    // PHẦN 2: TIẾN TRÌNH TỰ ĐỘNG GỌI (DÙNG TỌA ĐỘ ĐỘNG VÀ MENU DÁN)
     // =========================================================================
     public void startAutoCallingSequence() {
         if (isCallingProcessActive) return;
@@ -172,7 +172,12 @@ public class AutoScrapeService extends AccessibilityService {
     private void searchAndCallForCode(String targetCode) {
         if (!isCallingProcessActive) return;
 
-        Log.d(TAG, "Đang xử lý mã đơn bằng Shell Input: " + targetCode);
+        Log.d(TAG, "Đang xử lý mã đơn bằng cơ chế Menu Dán tự động: " + targetCode);
+
+        // 1. Đưa mã vào Clipboard hệ thống trước
+        android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        android.content.ClipData clip = android.content.ClipData.newPlainText("TargetCode", targetCode);
+        clipboard.setPrimaryClip(clip);
 
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
         if (rootNode == null) {
@@ -180,8 +185,8 @@ public class AutoScrapeService extends AccessibilityService {
             return;
         }
 
+        // 2. Tìm ô tìm kiếm
         List<AccessibilityNodeInfo> searchNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/etSearch");
-        
         if (searchNodes == null || searchNodes.isEmpty()) {
             searchNodes = new ArrayList<>();
             findEditTextNodes(rootNode, searchNodes);
@@ -190,22 +195,46 @@ public class AutoScrapeService extends AccessibilityService {
         if (searchNodes != null && !searchNodes.isEmpty()) {
             AccessibilityNodeInfo searchBox = searchNodes.get(0);
             
-            // 1. Focus và Click vào ô tìm kiếm để hiện con trỏ nhấp nháy
-            searchBox.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
-            searchBox.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+            // LẤY TỌA ĐỘ ĐỘNG THEO THIẾT BỊ THỰC TẾ (Tự co giãn mọi màn hình)
+            Rect bounds = new Rect();
+            searchBox.getBoundsInScreen(bounds);
+            
+            if (bounds.width() > 0 && bounds.height() > 0) {
+                clickAtCoordinates(bounds.centerX(), bounds.centerY());
+            } else {
+                searchBox.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+            }
 
-            // 2. Chờ 300ms cho bàn phím/input sẵn sàng, sau đó dùng lệnh hệ thống gõ text trực tiếp (giống ADB)
+            // 3. Đợi 300ms cho menu "Dán" hiện lên, sau đó quét tìm chữ "Dán" để bấm
             handler.postDelayed(() -> {
-                try {
-                    String command = "input text " + targetCode;
-                    Runtime.getRuntime().exec(command);
-                    Log.d(TAG, "Đã gửi lệnh Shell gõ mã: " + targetCode);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    Log.e(TAG, "Lỗi khi chạy lệnh shell input text: " + e.getMessage());
+                AccessibilityNodeInfo freshRoot = getRootInActiveWindow();
+                boolean clickedPaste = false;
+
+                if (freshRoot != null) {
+                    List<AccessibilityNodeInfo> pasteNodes = freshRoot.findAccessibilityNodeInfosByText("Dán");
+                    if (pasteNodes == null || pasteNodes.isEmpty()) {
+                        pasteNodes = freshRoot.findAccessibilityNodeInfosByText("Paste");
+                    }
+
+                    if (pasteNodes != null && !pasteNodes.isEmpty()) {
+                        for (AccessibilityNodeInfo pNode : pasteNodes) {
+                            if (pNode.isClickable()) {
+                                clickedPaste = pNode.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                                break;
+                            } else {
+                                AccessibilityNodeInfo parent = pNode.getParent();
+                                if (parent != null) {
+                                    clickedPaste = parent.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                                    break;
+                                }
+                            }
+                        }
+                    }
                 }
 
-                // 3. Đợi 1200ms để app tự động lọc kết quả tìm kiếm theo mã vừa gõ
+                Log.d(TAG, "Tự động bấm nút Dán: " + (clickedPaste ? "THÀNH CÔNG" : "THẤT BẠI"));
+
+                // 4. Đợi 1200ms để app tự động lọc kết quả tìm kiếm theo mã vừa dán
                 handler.postDelayed(this::findAndCallFilteredPhoneNumber, 1200);
             }, 300);
 
