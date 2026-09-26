@@ -107,7 +107,7 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // PHẦN 2: TIẾN TRÌNH TỰ ĐỘNG GỌI (DÙNG TỌA ĐỘ ĐỘNG VÀ MENU DÁN)
+    // PHẦN 2: TIẾN TRÌNH TỰ ĐỘNG GỌI 
     // =========================================================================
     public void startAutoCallingSequence() {
         if (isCallingProcessActive) return;
@@ -172,12 +172,7 @@ public class AutoScrapeService extends AccessibilityService {
     private void searchAndCallForCode(String targetCode) {
         if (!isCallingProcessActive) return;
 
-        Log.d(TAG, "Đang xử lý mã đơn bằng cơ chế Menu Dán tự động: " + targetCode);
-
-        // 1. Đưa mã vào Clipboard hệ thống trước
-        android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-        android.content.ClipData clip = android.content.ClipData.newPlainText("TargetCode", targetCode);
-        clipboard.setPrimaryClip(clip);
+        Log.d(TAG, "Đang xử lý mã đơn: " + targetCode);
 
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
         if (rootNode == null) {
@@ -185,7 +180,6 @@ public class AutoScrapeService extends AccessibilityService {
             return;
         }
 
-        // 2. Tìm ô tìm kiếm
         List<AccessibilityNodeInfo> searchNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/etSearch");
         if (searchNodes == null || searchNodes.isEmpty()) {
             searchNodes = new ArrayList<>();
@@ -195,48 +189,47 @@ public class AutoScrapeService extends AccessibilityService {
         if (searchNodes != null && !searchNodes.isEmpty()) {
             AccessibilityNodeInfo searchBox = searchNodes.get(0);
             
-            // LẤY TỌA ĐỘ ĐỘNG THEO THIẾT BỊ THỰC TẾ (Tự co giãn mọi màn hình)
+            // Lấy tọa độ động của ô tìm kiếm
             Rect bounds = new Rect();
             searchBox.getBoundsInScreen(bounds);
             
+            // BƯỚC 0: Click vào ô để focus và xóa sạch nội dung cũ bằng cách bấm dấu X (hoặc clear text)
             if (bounds.width() > 0 && bounds.height() > 0) {
                 clickAtCoordinates(bounds.centerX(), bounds.centerY());
             } else {
                 searchBox.performAction(AccessibilityNodeInfo.ACTION_CLICK);
             }
 
-            // 3. Đợi 300ms cho menu "Dán" hiện lên, sau đó quét tìm chữ "Dán" để bấm
+            // Đợi 200ms rồi clear ô (mô phỏng bấm dấu X xóa text cũ bằng adb input hoặc set text rỗng)
             handler.postDelayed(() -> {
-                AccessibilityNodeInfo freshRoot = getRootInActiveWindow();
-                boolean clickedPaste = false;
-
-                if (freshRoot != null) {
-                    List<AccessibilityNodeInfo> pasteNodes = freshRoot.findAccessibilityNodeInfosByText("Dán");
-                    if (pasteNodes == null || pasteNodes.isEmpty()) {
-                        pasteNodes = freshRoot.findAccessibilityNodeInfosByText("Paste");
-                    }
-
-                    if (pasteNodes != null && !pasteNodes.isEmpty()) {
-                        for (AccessibilityNodeInfo pNode : pasteNodes) {
-                            if (pNode.isClickable()) {
-                                clickedPaste = pNode.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                                break;
-                            } else {
-                                AccessibilityNodeInfo parent = pNode.getParent();
-                                if (parent != null) {
-                                    clickedPaste = parent.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                                    break;
-                                }
-                            }
-                        }
-                    }
+                try {
+                    // Xóa trắng ô trước bằng lệnh adv/shell hoặc clear, sau đó gõ mã mới
+                    // Gửi lệnh xóa (hoặc gõ đè)
+                    String clearCmd = "input keyevent 67"; // Gửi phím Backspace vài lần cho chắc chắn sạch ô nếu cần
+                    Runtime.getRuntime().exec(clearCmd);
+                } catch (Exception e) {
+                    e.printStackTrace();
                 }
 
-                Log.d(TAG, "Tự động bấm nút Dán: " + (clickedPaste ? "THÀNH CÔNG" : "THẤT BẠI"));
+                // BƯỚC 1 & 2: Click lại khung và gõ mã mới vào
+                handler.postDelayed(() -> {
+                    if (bounds.width() > 0 && bounds.height() > 0) {
+                        clickAtCoordinates(bounds.centerX(), bounds.centerY());
+                    }
+                    
+                    try {
+                        String command = "input text " + targetCode;
+                        Runtime.getRuntime().exec(command);
+                        Log.d(TAG, "Đã gõ mã mới: " + targetCode);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
 
-                // 4. Đợi 1200ms để app tự động lọc kết quả tìm kiếm theo mã vừa dán
-                handler.postDelayed(this::findAndCallFilteredPhoneNumber, 1200);
-            }, 300);
+                    // BƯỚC 3: Đợi 1200ms để app lọc kết quả rồi tiến hành lấy số điện thoại gọi
+                    handler.postDelayed(this::findAndCallFilteredPhoneNumber, 1200);
+                }, 200);
+
+            }, 200);
 
         } else {
             Log.e(TAG, "Không tìm thấy ô tìm kiếm etSearch!");
@@ -393,7 +386,7 @@ public class AutoScrapeService extends AccessibilityService {
 
     private void saveCodesToFile() {
         try {
-            File file = new File(getExternalFilesDir(null), "DanhSachMaDon.txt");
+            File file = new File(getExternalFilesDir(null), "DanhSachMDon.txt");
             FileOutputStream fos = new FileOutputStream(file, false);
             for (String code : collectedCodes) {
                 fos.write((code + "\n").getBytes(StandardCharsets.UTF_8));
