@@ -23,13 +23,12 @@ public class LicenseActivity extends AppCompatActivity {
     private EditText etKey;
     private Button btnCheckKey;
     
-    // Thay URL Worker của bạn vào đây (giữ nguyên tham số ?key=)
     private static final String WORKER_URL = "https://autocall-license.tkgolikefb002.workers.dev/?key=";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_check_key); // Hoặc activity_license tuỳ theo tên file xml của bạn
+        setContentView(R.layout.activity_check_key);
 
         etKey = findViewById(R.id.etKey);
         btnCheckKey = findViewById(R.id.btnCheckKey);
@@ -64,18 +63,15 @@ public class LicenseActivity extends AppCompatActivity {
                 if (response.isSuccessful() && response.body() != null) {
                     String responseData = response.body().string();
                     try {
-                        // Phân tích chuỗi JSON trả về từ Cloudflare Worker
                         JSONObject jsonObject = new JSONObject(responseData);
                         String status = jsonObject.optString("status", "");
                         
                         if (status.equalsIgnoreCase("success") || status.equalsIgnoreCase("active")) {
-                            // Lấy ngày hết hạn từ JSON (ví dụ: "29.09.2026")[cite: 14]
                             String expiryDate = jsonObject.optString("expiry_date", "Không rõ");
                             
                             runOnUiThread(() -> {
                                 Toast.makeText(LicenseActivity.this, "Kích hoạt thành công!", Toast.LENGTH_SHORT).show();
                                 Intent intent = new Intent(LicenseActivity.this, MainActivity.class);
-                                // Truyền ngày hết hạn nhận được sang MainActivity
                                 intent.putExtra("EXPIRY_DATE", expiryDate);
                                 startActivity(intent);
                                 finish();
