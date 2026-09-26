@@ -8,24 +8,28 @@ import android.widget.EditText;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
+import org.json.JSONObject;
+
+import java.io.IOException;
+
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
-import java.io.IOException;
 
 public class LicenseActivity extends AppCompatActivity {
 
     private EditText etKey;
     private Button btnCheckKey;
     
+    // Thay URL Worker của bạn vào đây (giữ nguyên tham số ?key=)
     private static final String WORKER_URL = "https://autocall-license.tkgolikefb002.workers.dev/?key=";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_license);
+        setContentView(R.layout.activity_check_key); // Hoặc activity_license tuỳ theo tên file xml của bạn
 
         etKey = findViewById(R.id.etKey);
         btnCheckKey = findViewById(R.id.btnCheckKey);
@@ -59,15 +63,30 @@ public class LicenseActivity extends AppCompatActivity {
             public void onResponse(Call call, Response response) throws IOException {
                 if (response.isSuccessful() && response.body() != null) {
                     String responseData = response.body().string();
-                    if (responseData.contains("VALID") || responseData.contains("success") || responseData.contains("true")) {
-                        runOnUiThread(() -> {
-                            Toast.makeText(LicenseActivity.this, "Kích hoạt thành công!", Toast.LENGTH_SHORT).show();
-                            Intent intent = new Intent(LicenseActivity.this, MainActivity.class);
-                            startActivity(intent);
-                            finish();
-                        });
-                    } else {
-                        runOnUiThread(() -> Toast.makeText(LicenseActivity.this, "Key không hợp lệ hoặc đã hết hạn!", Toast.LENGTH_SHORT).show());
+                    try {
+                        // Phân tích chuỗi JSON trả về từ Cloudflare Worker
+                        JSONObject jsonObject = new JSONObject(responseData);
+                        String status = jsonObject.optString("status", "");
+                        
+                        if (status.equalsIgnoreCase("success") || status.equalsIgnoreCase("active")) {
+                            // Lấy ngày hết hạn từ JSON (ví dụ: "29.09.2026")[cite: 14]
+                            String expiryDate = jsonObject.optString("expiry_date", "Không rõ");
+                            
+                            runOnUiThread(() -> {
+                                Toast.makeText(LicenseActivity.this, "Kích hoạt thành công!", Toast.LENGTH_SHORT).show();
+                                Intent intent = new Intent(LicenseActivity.this, MainActivity.class);
+                                // Truyền ngày hết hạn nhận được sang MainActivity
+                                intent.putExtra("EXPIRY_DATE", expiryDate);
+                                startActivity(intent);
+                                finish();
+                            });
+                        } else {
+                            String message = jsonObject.optString("message", "Key không hợp lệ hoặc đã hết hạn!");
+                            runOnUiThread(() -> Toast.makeText(LicenseActivity.this, message, Toast.LENGTH_SHORT).show());
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        runOnUiThread(() -> Toast.makeText(LicenseActivity.this, "Lỗi đọc dữ liệu từ Server!", Toast.LENGTH_SHORT).show());
                     }
                 } else {
                     runOnUiThread(() -> Toast.makeText(LicenseActivity.this, "Lỗi từ Server bản quyền!", Toast.LENGTH_SHORT).show());
