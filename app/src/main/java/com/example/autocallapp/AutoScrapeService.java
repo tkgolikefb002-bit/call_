@@ -50,7 +50,7 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // PHẦN 1: QUÉT VÀ LƯU SỐ ĐIỆN THOẠI TRỰC TIẾP THEO CONTAINER
+    // PHẦN 1: QUÉT VÀ LƯU SỐ ĐIỆN THOẠI TRỰC TIẾP QUA TỌA ĐỘ MÀN HÌNH
     // =========================================================================
     public void startScraping() {
         if (isScraping) {
@@ -75,33 +75,25 @@ public class AutoScrapeService extends AccessibilityService {
                 if (rootNode != null) {
                     int previousSize = collectedPhones.size();
                     
-                    // Tìm tất cả các khung container đơn hàng (llBottomParent)
-                    List<AccessibilityNodeInfo> containerNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/llBottomParent");
+                    // Tìm trực tiếp các node số điện thoại trên màn hình
+                    List<AccessibilityNodeInfo> phoneNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
                     
-                    if (containerNodes != null && !containerNodes.isEmpty()) {
-                        for (AccessibilityNodeInfo container : containerNodes) {
-                            if (container != null) {
-                                // Kiểm tra tọa độ hiển thị thực tế trên màn hình để loại bỏ view ảo/ẩn
-                                Rect outBounds = new Rect();
-                                container.getBoundsInScreen(outBounds);
+                    if (phoneNodes != null && !phoneNodes.isEmpty()) {
+                        for (AccessibilityNodeInfo node : phoneNodes) {
+                            if (node != null && node.getText() != null) {
+                                Rect bounds = new Rect();
+                                node.getBoundsInScreen(bounds);
                                 
-                                if (outBounds.top >= 0 && outBounds.bottom > 0 && outBounds.top < 2500) {
-                                    // Lấy số điện thoại bên trong container này
-                                    List<AccessibilityNodeInfo> phoneNodes = container.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
-                                    if (phoneNodes != null) {
-                                        for (AccessibilityNodeInfo pNode : phoneNodes) {
-                                            if (pNode != null && pNode.getText() != null) {
-                                                String phone = pNode.getText().toString().trim();
-                                                if (isValidPhoneNumber(phone)) {
-                                                    collectedPhones.add(phone);
-                                                }
-                                            }
-                                            if (pNode != null) pNode.recycle();
-                                        }
+                                // CHỈ LẤY SỐ NẾU NÓ NẰM TRONG KHUNG NHÌN THẤY THỰC TẾ TRÊN MÀN HÌNH 
+                                // (Loại bỏ các view cũ/view ảo nằm ngoài tầm nhìn)
+                                if (bounds.top > 100 && bounds.bottom < 2400 && bounds.top < bounds.bottom) {
+                                    String phone = node.getText().toString().trim();
+                                    if (isValidPhoneNumber(phone)) {
+                                        collectedPhones.add(phone);
                                     }
                                 }
-                                container.recycle();
                             }
+                            if (node != null) node.recycle();
                         }
                     }
 
@@ -110,7 +102,7 @@ public class AutoScrapeService extends AccessibilityService {
                         updatePopupProgress(collectedPhones.size());
                     } else {
                         scrollAttempts++;
-                        // Nếu cuộn 2 lần không thấy số mới thì dừng quét và lưu file
+                        // Nếu cuộn 2 lần không tìm thấy số mới -> Dừng quét và lưu file
                         if (scrollAttempts >= 2) {
                             isScraping = false;
                             savePhonesToFile();
