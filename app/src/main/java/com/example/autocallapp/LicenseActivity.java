@@ -1,6 +1,7 @@
 package com.example.autocallapp;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -23,10 +24,26 @@ public class LicenseActivity extends AppCompatActivity {
     private EditText etKey;
     private Button btnCheckKey;
     private static final String WORKER_URL = "https://autocall-license.tkgolikefb002.workers.dev/?key=";
+    private static final String PREF_NAME = "AppPrefs";
+    private static final String KEY_EXPIRY = "saved_expiry_date";
+    private static final String KEY_ACTIVATED = "is_activated";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // KIỂM TRA NHANH: Nếu trước đó đã nhập key kích hoạt rồi thì tự động sang thẳng MainActivity luôn
+        SharedPreferences prefs = getSharedPreferences(PREF_NAME, MODE_PRIVATE);
+        boolean isActivated = prefs.getBoolean(KEY_ACTIVATED, false);
+        if (isActivated) {
+            String savedExpiry = prefs.getString(KEY_EXPIRY, "Đang cập nhật");
+            Intent intent = new Intent(LicenseActivity.this, MainActivity.class);
+            intent.putExtra("EXPIRY_DATE", savedExpiry);
+            startActivity(intent);
+            finish();
+            return;
+        }
+
         setContentView(R.layout.activity_check_key);
 
         etKey = findViewById(R.id.etKey);
@@ -69,6 +86,12 @@ public class LicenseActivity extends AppCompatActivity {
                             // Lấy chính xác trường expiry_date từ JSON của Worker (ví dụ: "29.09.2026")
                             String expiryDate = jsonObject.optString("expiry_date", "Đang cập nhật");
                             
+                            // LƯU TRỮ VÀO BỘ NHỚ ĐỂ LẦN SAU KHÔNG CẦN NHẬP LẠI
+                            SharedPreferences.Editor editor = getSharedPreferences(PREF_NAME, MODE_PRIVATE).edit();
+                            editor.putBoolean(KEY_ACTIVATED, true);
+                            editor.putString(KEY_EXPIRY, expiryDate);
+                            editor.apply();
+
                             runOnUiThread(() -> {
                                 Toast.makeText(LicenseActivity.this, "Kích hoạt thành công!", Toast.LENGTH_SHORT).show();
                                 Intent intent = new Intent(LicenseActivity.this, MainActivity.class);
