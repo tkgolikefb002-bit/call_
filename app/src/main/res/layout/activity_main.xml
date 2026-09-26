@@ -4,7 +4,8 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:gravity="center"
-    android:padding="24dp">
+    android:padding="24dp"
+    android:background="#F5F5F5">
 
     <!-- Hiển thị hạn sử dụng bản quyền -->
     <TextView
@@ -13,7 +14,8 @@
         android:layout_height="wrap_content"
         android:text="Hạn sử dụng đến ngày: Đang cập nhật..."
         android:textSize="16sp"
-        android:textColor="#000000"
+        android:textStyle="bold"
+        android:textColor="#333333"
         android:gravity="center"
         android:layout_marginBottom="24dp"/>
 
@@ -23,6 +25,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Cấp quyền ứng dụng &amp; Mặc định"
+        android:backgroundTint="#00796B"
+        android:textColor="#FFFFFF"
         android:layout_marginBottom="12dp"/>
 
     <!-- Nút mở cài đặt ứng dụng mặc định -->
@@ -31,21 +35,29 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Mở Cài đặt Ứng dụng Mặc định"
+        android:backgroundTint="#00796B"
+        android:textColor="#FFFFFF"
         android:layout_marginBottom="12dp"/>
 
-    <!-- Nút mở bảng điều khiển popup nổi -->
-    <Button
-        android:id="@+id/btnStartPopup"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Bật Popup Điều Khiển Auto"
-        android:layout_marginBottom="12dp"/>
+    
 
     <!-- Nút mở cài đặt trợ năng -->
     <Button
         android:id="@+id/btnOpenAccessibility"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Mở Cài đặt Trợ năng (Accessibility)"/>
+        android:text="Mở Cài đặt Trợ năng (Accessibility)"
+        android:backgroundTint="#1976D2"
+        android:textColor="#FFFFFF"/>
+
+    <!-- Nút mở bảng điều khiển popup nổi -->
+    <Button
+        android:id="@+id/btnStartPopup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Bật Bảng Điều Khiển Auto"
+        android:backgroundTint="#D32F2F"
+        android:textColor="#FFFFFF"
+        android:layout_marginBottom="12dp"/>
 
 </LinearLayout>
