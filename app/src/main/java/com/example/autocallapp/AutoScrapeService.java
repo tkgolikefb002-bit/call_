@@ -4,12 +4,10 @@ import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
 import android.content.Intent;
 import android.graphics.Path;
-import android.graphics.Rect;
 import android.net.Uri;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.Bundle;
 import android.util.Log;
 import android.widget.Toast;
 import java.io.BufferedReader;
@@ -27,7 +25,9 @@ public class AutoScrapeService extends AccessibilityService {
     public static AutoScrapeService instance;
     private boolean isScraping = false;
     private boolean isCallingProcessActive = false; 
-    private final Set<String> collectedCodes = new HashSet<>();
+    
+    // Lưu trữ số điện thoại thay vì mã vận đơn
+    private final Set<String> collectedPhones = new HashSet<>();
     private final List<String> callQueueList = new ArrayList<>();
     private int currentCallIndex = 0;
     private Handler handler = new Handler(Looper.getMainLooper());
@@ -49,17 +49,20 @@ public class AutoScrapeService extends AccessibilityService {
         isCallingProcessActive = false;
     }
 
+    // =========================================================================
+    // PHẦN 1: QUÉT VÀ LƯU SỐ ĐIỆN THOẠI TRỰC TIẾP
+    // =========================================================================
     public void startScraping() {
         if (isScraping) {
-            Toast.makeText(this, "Đang trong quá trình quét mã, vui lòng đợi...", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Đang trong quá trình quét số điện thoại...", Toast.LENGTH_SHORT).show();
             return;
         }
         isScraping = true;
         
-        loadExistingCodes();
-        updatePopupProgress(collectedCodes.size());
+        loadExistingPhones();
+        updatePopupProgress(collectedPhones.size());
         
-        Toast.makeText(this, "Bắt đầu quét nhanh mã đơn hàng...", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Bắt đầu quét danh sách số điện thoại...", Toast.LENGTH_SHORT).show();
 
         Runnable scrapeRunnable = new Runnable() {
             int scrollAttempts = 0;
@@ -70,28 +73,33 @@ public class AutoScrapeService extends AccessibilityService {
 
                 AccessibilityNodeInfo rootNode = getRootInActiveWindow();
                 if (rootNode != null) {
-                    List<AccessibilityNodeInfo> nodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvBillCode");
+                    // Quét các view chứa SĐT trực tiếp trên màn hình danh sách đơn hàng
+                    List<AccessibilityNodeInfo> phoneNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
                     
-                    int previousSize = collectedCodes.size();
-                    for (AccessibilityNodeInfo node : nodes) {
-                        if (node.getText() != null) {
-                            String code = node.getText().toString().trim();
-                            if (!code.isEmpty()) {
-                                collectedCodes.add(code);
+                    int previousSize = collectedPhones.size();
+                    if (phoneNodes != null) {
+                        for (AccessibilityNodeInfo node : phoneNodes) {
+                            if (node.getText() != null) {
+                                String phone = node.getText().toString().trim();
+                                // Lọc chuẩn SĐT di động Việt Nam bắt đầu bằng 0 và đủ độ dài
+                                if (phone.startsWith("0") && phone.length() >= 9) {
+                                    collectedPhones.add(phone);
+                                }
                             }
                         }
                     }
 
-                    if (collectedCodes.size() > previousSize) {
+                    if (collectedPhones.size() > previousSize) {
                         scrollAttempts = 0; 
-                        updatePopupProgress(collectedCodes.size());
+                        updatePopupProgress(collectedPhones.size());
                     } else {
                         scrollAttempts++;
-                        if (scrollAttempts >= 1) {
+                        // Nếu cuộn 2 lần liên tiếp không tìm thấy số mới thì dừng quá trình quét
+                        if (scrollAttempts >= 2) {
                             isScraping = false;
-                            saveCodesToFile();
-                            updatePopupProgress(collectedCodes.size());
-                            Toast.makeText(getApplicationContext(), "Đã quét xong! Tổng: " + collectedCodes.size() + " mã.", Toast.LENGTH_LONG).show();
+                            savePhonesToFile();
+                            updatePopupProgress(collectedPhones.size());
+                            Toast.makeText(getApplicationContext(), "Đã quét xong! Tổng số điện thoại: " + collectedPhones.size(), Toast.LENGTH_LONG).show();
                             return;
                         }
                     }
@@ -103,19 +111,22 @@ public class AutoScrapeService extends AccessibilityService {
         handler.post(scrapeRunnable);
     }
 
+    // =========================================================================
+    // PHẦN 2: TIẾN TRÌNH TỰ ĐỘNG GỌI CÁC SỐ ĐÃ LƯU
+    // =========================================================================
     public void startAutoCallingSequence() {
         if (isCallingProcessActive) return;
 
-        loadExistingCodesForCalling();
+        loadPhonesForCalling();
 
         if (callQueueList.isEmpty()) {
-            Toast.makeText(this, "Không có mã nào trong danh sách để gọi!", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Không có số điện thoại nào trong danh sách để gọi! Hãy quét trước.", Toast.LENGTH_LONG).show();
             return;
         }
 
         isCallingProcessActive = true;
         currentCallIndex = 0;
-        Toast.makeText(this, "Bắt đầu tự động gọi " + callQueueList.size() + " đơn hàng...", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Bắt đầu tự động gọi " + callQueueList.size() + " số điện thoại...", Toast.LENGTH_SHORT).show();
         executeNextCallStep();
     }
 
@@ -125,15 +136,15 @@ public class AutoScrapeService extends AccessibilityService {
         Toast.makeText(this, "Đã dừng tiến trình gọi tự động!", Toast.LENGTH_SHORT).show();
     }
 
-    private void loadExistingCodesForCalling() {
+    private void loadPhonesForCalling() {
         callQueueList.clear();
         
-        if (!collectedCodes.isEmpty()) {
-            callQueueList.addAll(collectedCodes);
+        if (!collectedPhones.isEmpty()) {
+            callQueueList.addAll(collectedPhones);
         }
 
         try {
-            File file = new File(getExternalFilesDir(null), "DanhSachMaDon.txt");
+            File file = new File(getExternalFilesDir(null), "DanhSachSoDienThoai.txt");
             if (file.exists()) {
                 BufferedReader reader = new BufferedReader(new FileReader(file));
                 String line;
@@ -154,132 +165,21 @@ public class AutoScrapeService extends AccessibilityService {
         if (!isCallingProcessActive) return;
 
         if (currentCallIndex >= callQueueList.size()) {
-            Toast.makeText(this, "Đã hoàn thành toàn bộ danh sách đơn hàng!", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Đã hoàn thành toàn bộ danh sách gọi điện!", Toast.LENGTH_LONG).show();
             isCallingProcessActive = false;
             return;
         }
 
-        String targetCode = callQueueList.get(currentCallIndex);
-        searchAndCallForCode(targetCode);
-    }
-
-    private void searchAndCallForCode(String targetCode) {
-        if (!isCallingProcessActive) return;
-
-        Log.d(TAG, "Đang xử lý mã đơn: " + targetCode);
-
-        AccessibilityNodeInfo rootNode = getRootInActiveWindow();
-        if (rootNode == null) {
-            moveToNextCodeAfterDelay();
-            return;
-        }
-
-        List<AccessibilityNodeInfo> searchNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/etSearch");
-        if (searchNodes == null || searchNodes.isEmpty()) {
-            searchNodes = new ArrayList<>();
-            findEditTextNodes(rootNode, searchNodes);
-        }
-
-        if (searchNodes != null && !searchNodes.isEmpty()) {
-            AccessibilityNodeInfo searchBox = searchNodes.get(0);
-
-            android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-            android.content.ClipData clip = android.content.ClipData.newPlainText("SubCode", targetCode);
-            if (clipboard != null) {
-                clipboard.setPrimaryClip(clip);
-            }
-
-            Rect bounds = new Rect();
-            searchBox.getBoundsInScreen(bounds);
-            
-            if (bounds.width() > 0 && bounds.height() > 0) {
-                clickAtCoordinates(bounds.centerX(), bounds.centerY());
-            } else {
-                searchBox.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-            }
-
-            handler.postDelayed(() -> {
-                searchBox.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
-                
-                Bundle arguments = new Bundle();
-                arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, targetCode);
-                boolean textSet = searchBox.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
-
-                if (!textSet) {
-                    searchBox.performAction(AccessibilityNodeInfo.ACTION_PASTE);
-                }
-
-                Log.d(TAG, "Đã điền mã: " + targetCode);
-
-                handler.postDelayed(this::findAndCallFilteredPhoneNumber, 1200);
-            }, 300);
-
-        } else {
-            Log.e(TAG, "Không tìm thấy ô tìm kiếm etSearch!");
-            moveToNextCodeAfterDelay();
-        }
-    }
-
-    private void clickAtCoordinates(int x, int y) {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
-            Path path = new Path();
-            path.moveTo(x, y);
-            GestureDescription.Builder builder = new GestureDescription.Builder();
-            builder.addStroke(new GestureDescription.StrokeDescription(path, 0, 100));
-            dispatchGesture(builder.build(), null, null);
-        }
-    }
-
-    private void findEditTextNodes(AccessibilityNodeInfo node, List<AccessibilityNodeInfo> results) {
-        if (node == null) return;
+        String targetPhone = callQueueList.get(currentCallIndex);
         
-        String className = node.getClassName() != null ? node.getClassName().toString() : "";
-        if (node.isEditable() || className.contains("EditText") || className.contains("AutoCompleteTextView")) {
-            results.add(node);
-        }
-        
-        for (int i = 0; i < node.getChildCount(); i++) {
-            AccessibilityNodeInfo child = node.getChild(i);
-            if (child != null) {
-                findEditTextNodes(child, results);
-            }
-        }
-    }
-
-    private void findAndCallFilteredPhoneNumber() {
-        if (!isCallingProcessActive) return;
-
-        AccessibilityNodeInfo rootNode = getRootInActiveWindow();
-        if (rootNode == null) {
-            moveToNextCodeAfterDelay();
-            return;
+        // Cập nhật giao diện tiến trình gọi
+        currentCallIndex++;
+        if (FloatingWidgetService.instance != null) {
+            handler.post(() -> FloatingWidgetService.instance.updateProgress(currentCallIndex));
         }
 
-        String phoneNumber = null;
-        List<AccessibilityNodeInfo> phoneNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
-
-        if (phoneNodes != null && !phoneNodes.isEmpty()) {
-            for (AccessibilityNodeInfo pNode : phoneNodes) {
-                if (pNode.getText() != null) {
-                    String phone = pNode.getText().toString().trim();
-                    if (phone.startsWith("0") && phone.length() >= 9) {
-                        phoneNumber = phone;
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (phoneNumber != null && !phoneNumber.isEmpty()) {
-            currentCallIndex++;
-            if (FloatingWidgetService.instance != null) {
-                handler.post(() -> FloatingWidgetService.instance.updateProgress(currentCallIndex));
-            }
-            makePhoneCall(phoneNumber);
-        } else {
-            Toast.makeText(this, "Không tìm thấy SĐT cho mã: " + callQueueList.get(currentCallIndex), Toast.LENGTH_SHORT).show();
-            moveToNextCodeAfterDelay();
-        }
+        Log.d(TAG, "Đang gọi số: " + targetPhone);
+        makePhoneCall(targetPhone);
     }
 
     private void makePhoneCall(String phoneNumber) {
@@ -291,9 +191,11 @@ public class AutoScrapeService extends AccessibilityService {
         } catch (SecurityException e) {
             e.printStackTrace();
             Toast.makeText(this, "Thiếu quyền gọi điện thoại!", Toast.LENGTH_SHORT).show();
+            moveToNextCodeAfterDelay();
         }
     }
 
+    // Được gọi từ BroadcastReceiver hoặc sự kiện kết thúc cuộc gọi để chuyển sang số tiếp theo
     public void onCallFinished() {
         if (!isCallingProcessActive) return;
 
@@ -305,17 +207,21 @@ public class AutoScrapeService extends AccessibilityService {
         }, 1500);
     }
 
-    private void loadExistingCodes() {
-        collectedCodes.clear();
+    private void moveToNextCodeAfterDelay() {
+        handler.postDelayed(this::executeNextCallStep, 1000);
+    }
+
+    private void loadExistingPhones() {
+        collectedPhones.clear();
         try {
-            File file = new File(getExternalFilesDir(null), "DanhSachMaDon.txt");
+            File file = new File(getExternalFilesDir(null), "DanhSachSoDienThoai.txt");
             if (file.exists()) {
                 BufferedReader reader = new BufferedReader(new FileReader(file));
                 String line;
                 while ((line = reader.readLine()) != null) {
                     String trimmed = line.trim();
                     if (!trimmed.isEmpty()) {
-                        collectedCodes.add(trimmed);
+                        collectedPhones.add(trimmed);
                     }
                 }
                 reader.close();
@@ -323,6 +229,34 @@ public class AutoScrapeService extends AccessibilityService {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    private void savePhonesToFile() {
+        try {
+            File file = new File(getExternalFilesDir(null), "DanhSachSoDienThoai.txt");
+            FileOutputStream fos = new FileOutputStream(file, false);
+            for (String phone : collectedPhones) {
+                fos.write((phone + "\n").getBytes(StandardCharsets.UTF_8));
+            }
+            fos.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public boolean clearSavedData() {
+        collectedPhones.clear();
+        callQueueList.clear();
+        updatePopupProgress(0);
+        try {
+            File file = new File(getExternalFilesDir(null), "DanhSachSoDienThoai.txt");
+            if (file.exists()) {
+                return file.delete();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
     private void updatePopupProgress(int count) {
@@ -356,41 +290,5 @@ public class AutoScrapeService extends AccessibilityService {
         } else {
             handler.postDelayed(nextRunnable, 1200);
         }
-    }
-
-    private void moveToNextCodeAfterDelay() {
-        currentCallIndex++;
-        if (FloatingWidgetService.instance != null) {
-            handler.post(() -> FloatingWidgetService.instance.updateProgress(currentCallIndex));
-        }
-        handler.postDelayed(this::executeNextCallStep, 800);
-    }
-
-    private void saveCodesToFile() {
-        try {
-            File file = new File(getExternalFilesDir(null), "DanhSachMaDon.txt");
-            FileOutputStream fos = new FileOutputStream(file, false);
-            for (String code : collectedCodes) {
-                fos.write((code + "\n").getBytes(StandardCharsets.UTF_8));
-            }
-            fos.close();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    public boolean clearSavedData() {
-        collectedCodes.clear();
-        callQueueList.clear();
-        updatePopupProgress(0);
-        try {
-            File file = new File(getExternalFilesDir(null), "DanhSachMaDon.txt");
-            if (file.exists()) {
-                return file.delete();
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return false;
     }
 }
