@@ -15,7 +15,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     
-    <!-- Quyền truy cập Internet để check key bản quyền qua Cloudflare Worker -->
+    <!-- Quyền Internet để check key bản quyền qua Cloudflare Worker -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     
@@ -27,7 +27,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar">
 
-        <!-- MÀN HÌNH KIỂM TRA KEY: Đặt làm màn hình khởi động đầu tiên (MAIN/LAUNCHER) -->
+        <!-- MÀN HÌNH KIỂM TRA KEY: Mở đầu tiên khi click icon app -->
         <activity
             android:name=".LicenseActivity"
             android:exported="true">
@@ -37,10 +37,10 @@
             </intent-filter>
         </activity>
 
-        <!-- MAIN ACTIVITY: Giữ nguyên tên cũ, chuyển thành exported="false" vì sẽ được gọi từ CheckKeyActivity -->
+        <!-- MAIN ACTIVITY: Bắt buộc phải có exported="true" để RoleManager nhận diện làm trình quay số mặc định -->
         <activity
             android:name=".MainActivity"
-            android:exported="false"
+            android:exported="true"
             android:launchMode="singleTop">
             
             <!-- BỘ LỌC 1: Bắt buộc để RoleManager nhận diện app là ứng dụng gọi điện -->
