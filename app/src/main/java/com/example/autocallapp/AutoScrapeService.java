@@ -1,9 +1,7 @@
 package com.example.autocallapp;
 
 import android.accessibilityservice.AccessibilityService;
-import android.accessibilityservice.GestureDescription;
 import android.content.Intent;
-import android.graphics.Path;
 import android.net.Uri;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.os.Handler;
@@ -23,7 +21,6 @@ import java.util.Set;
 public class AutoScrapeService extends AccessibilityService {
     private static final String TAG = "AutoScrapeService";
     public static AutoScrapeService instance;
-    private boolean isScraping = false;
     private boolean isCallingProcessActive = false; 
     
     private final Set<String> collectedPhones = new LinkedHashSet<>();
@@ -44,64 +41,27 @@ public class AutoScrapeService extends AccessibilityService {
 
     @Override
     public void onInterrupt() {
-        isScraping = false;
         isCallingProcessActive = false;
     }
 
     // =========================================================================
-    // PHẦN 1: QUÉT TẤT CẢ SỐ ĐIỆN THOẠI HỢP LỆ TRÊN MÀN HÌNH (LỌC TRÙNG TỰ ĐỘNG)
+    // QUÉT MÀN HÌNH HIỆN TẠI VỚI HÀM LỌC SỐ ĐIỆN THOẠI LINH HOẠT
     // =========================================================================
     public void startScraping() {
-        if (isScraping) {
-            Toast.makeText(this, "Đang trong quá trình quét số điện thoại...", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        
-        // Xóa sạch dữ liệu cũ trước khi bắt đầu quét mới
         clearSavedData();
         
-        isScraping = true;
-        updatePopupProgress(0);
+        Toast.makeText(this, "Đang quét màn hình hiện tại...", Toast.LENGTH_SHORT).show();
+
+        AccessibilityNodeInfo rootNode = getRootInActiveWindow();
+        if (rootNode != null) {
+            traverseAndCollectPhones(rootNode);
+            rootNode.recycle();
+        }
+
+        savePhonesToFile();
+        updatePopupProgress(collectedPhones.size());
         
-        Toast.makeText(this, "Bắt đầu quét danh sách số điện thoại mới...", Toast.LENGTH_SHORT).show();
-
-        Runnable scrapeRunnable = new Runnable() {
-            int scrollAttempts = 0;
-            
-            @Override
-            public void run() {
-                if (!isScraping) return;
-
-                AccessibilityNodeInfo rootNode = getRootInActiveWindow();
-                if (rootNode != null) {
-                    int previousSize = collectedPhones.size();
-                    
-                    // Duyệt toàn bộ cây giao diện và gom mọi số điện thoại xuất hiện
-                    traverseAndCollectPhones(rootNode);
-
-                    if (collectedPhones.size() > previousSize) {
-                        scrollAttempts = 0; 
-                        updatePopupProgress(collectedPhones.size());
-                    } else {
-                        scrollAttempts++;
-                        // Nếu cuộn 2 lần liên tiếp không tìm thấy số mới -> Dừng quét và lưu file
-                        if (scrollAttempts >= 2) {
-                            isScraping = false;
-                            savePhonesToFile();
-                            updatePopupProgress(collectedPhones.size());
-                            Toast.makeText(getApplicationContext(), "Đã quét xong! Tổng số điện thoại: " + collectedPhones.size(), Toast.LENGTH_LONG).show();
-                            rootNode.recycle();
-                            return;
-                        }
-                    }
-                    rootNode.recycle();
-                }
-                
-                performFastScrollDownAndContinue(handler, this);
-            }
-        };
-
-        handler.post(scrapeRunnable);
+        Toast.makeText(getApplicationContext(), "Đã quét xong! Tổng số điện thoại: " + collectedPhones.size(), Toast.LENGTH_LONG).show();
     }
 
     // Hàm đệ quy duyệt qua tất cả các node con trên màn hình
@@ -110,9 +70,9 @@ public class AutoScrapeService extends AccessibilityService {
 
         if (node.getText() != null) {
             String text = node.getText().toString().trim();
-            if (isValidPhoneNumber(text)) {
-                // LinkedHashSet tự động loại bỏ các số bị trùng lặp khi cuộn màn hình
-                collectedPhones.add(text);
+            String cleanedPhone = extractPhoneNumber(text);
+            if (cleanedPhone != null) {
+                collectedPhones.add(cleanedPhone);
             }
         }
 
@@ -125,10 +85,17 @@ public class AutoScrapeService extends AccessibilityService {
         }
     }
 
-    private boolean isValidPhoneNumber(String phone) {
-        if (phone == null) return false;
-        phone = phone.replaceAll("\\s+", "").replaceAll("-", "");
-        return phone.matches("^0\\d{8,10}$");
+    // Hàm trích xuất số điện thoại linh hoạt, loại bỏ khoảng trắng và ký tự thừa
+    private String extractPhoneNumber(String text) {
+        if (text == null) return null;
+        // Loại bỏ khoảng trắng, dấu gạch ngang hoặc ký tự lạ nếu có
+        String cleaned = text.replaceAll("[^0-9]", "");
+        
+        // Kiểm tra xem chuỗi số có bắt đầu bằng số 0 và có độ dài từ 10 đến 11 số không (hoặc 9-11 tùy nhà mạng)
+        if (cleaned.startsWith("0") && cleaned.length() >= 9 && cleaned.length() <= 11) {
+            return cleaned;
+        }
+        return null;
     }
 
     // =========================================================================
@@ -260,33 +227,6 @@ public class AutoScrapeService extends AccessibilityService {
     private void updatePopupProgress(int count) {
         if (FloatingWidgetService.instance != null) {
             FloatingWidgetService.instance.updateProgress(count);
-        }
-    }
-
-    private void performFastScrollDownAndContinue(Handler handler, Runnable nextRunnable) {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
-            Path path = new Path();
-            path.moveTo(500, 1100);
-            path.lineTo(500, 500);
-            
-            GestureDescription.Builder builder = new GestureDescription.Builder();
-            builder.addStroke(new GestureDescription.StrokeDescription(path, 0, 250));
-            
-            dispatchGesture(builder.build(), new GestureResultCallback() {
-                @Override
-                public void onCompleted(GestureDescription gestureDescription) {
-                    super.onCompleted(gestureDescription);
-                    handler.postDelayed(nextRunnable, 1000);
-                }
-
-                @Override
-                public void onCancelled(GestureDescription gestureDescription) {
-                    super.onCancelled(gestureDescription);
-                    handler.postDelayed(nextRunnable, 1000);
-                }
-            }, null);
-        } else {
-            handler.postDelayed(nextRunnable, 1200);
         }
     }
 }
