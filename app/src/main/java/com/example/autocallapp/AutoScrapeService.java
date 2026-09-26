@@ -51,7 +51,7 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // QUÉT CHUẨN XÁC DỰA TRÊN TRẠNG THÁI HIỂN THỊ CỦA VIEW (KHÔNG DÙNG TỌA ĐỘ)
+    // QUY TRÌNH CHUẨN: QUÉT DỮ LIỆU HIỆN TẠI TRƯỚC -> SAU ĐÓ MỚI CUỘN XUỐNG
     // =========================================================================
     public void startScraping() {
         if (isScraping) {
@@ -76,11 +76,11 @@ public class AutoScrapeService extends AccessibilityService {
                 if (rootNode != null) {
                     int previousSize = collectedPhones.size();
                     
+                    // BƯỚC 1: TÌM VÀ QUÉT CÁC SỐ TRÊN MÀN HÌNH HIỆN TẠI TRƯỚC
                     List<AccessibilityNodeInfo> billNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvBillCode");
                     
                     if (billNodes != null && !billNodes.isEmpty()) {
                         for (AccessibilityNodeInfo billNode : billNodes) {
-                            // Chỉ lấy các mã vận đơn thực sự đang hiển thị trên màn hình (bỏ qua cache ẩn)
                             if (billNode != null && billNode.isVisibleToUser()) {
                                 AccessibilityNodeInfo parentCard = getOrderCardContainer(billNode);
                                 if (parentCard != null) {
@@ -100,11 +100,17 @@ public class AutoScrapeService extends AccessibilityService {
                         }
                     }
 
+                    // Cập nhật lại giao diện popup số lượng đã quét được
                     if (collectedPhones.size() > previousSize) {
                         scrollAttempts = 0; 
                         updatePopupProgress(collectedPhones.size());
+                        rootNode.recycle();
+                        
+                        // Nếu vừa tìm thấy số mới, chờ 1 giây rồi tiếp tục cuộn xuống tìm tiếp
+                        handler.postDelayed(this, 1000);
                     } else {
                         scrollAttempts++;
+                        // Nếu cuộn 2 lần liên tiếp không thấy số mới -> Đã đến cuối danh sách
                         if (scrollAttempts >= 2) {
                             isScraping = false;
                             savePhonesToFile();
@@ -113,14 +119,19 @@ public class AutoScrapeService extends AccessibilityService {
                             rootNode.recycle();
                             return;
                         }
+                        rootNode.recycle();
+                        
+                        // BƯỚC 2: SAU KHI ĐÃ QUÉT XONG HIỆN TẠI MÀ KHÔNG THẤY THÊM, THỰC HIỆN CUỘN XUỐNG
+                        performFastScrollDownAndContinue(handler, this);
                     }
-                    rootNode.recycle();
+                } else {
+                    // Nếu không bắt được root node, thử lại sau 1 giây
+                    handler.postDelayed(this, 1000);
                 }
-                
-                performFastScrollDownAndContinue(handler, this);
             }
         };
 
+        // Chạy ngay lượt quét đầu tiên cho màn hình hiện tại
         handler.post(scrapeRunnable);
     }
 
@@ -293,17 +304,18 @@ public class AutoScrapeService extends AccessibilityService {
                 @Override
                 public void onCompleted(GestureDescription gestureDescription) {
                     super.onCompleted(gestureDescription);
-                    handler.postDelayed(nextRunnable, 1000);
+                    // Chờ 800ms sau khi cuộn để RecyclerView kịp render dữ liệu mới rồi mới chạy tiếp vòng lặp quét
+                    handler.postDelayed(nextRunnable, 800);
                 }
 
                 @Override
                 public void onCancelled(GestureDescription gestureDescription) {
                     super.onCancelled(gestureDescription);
-                    handler.postDelayed(nextRunnable, 1000);
+                    handler.postDelayed(nextRunnable, 800);
                 }
             }, null);
         } else {
-            handler.postDelayed(nextRunnable, 1200);
+            handler.postDelayed(nextRunnable, 1000);
         }
     }
 }
