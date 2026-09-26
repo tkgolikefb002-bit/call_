@@ -213,7 +213,6 @@ public class AutoScrapeService extends AccessibilityService {
                         box.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
                         box.performAction(AccessibilityNodeInfo.ACTION_CLICK);
                         
-                        // Lấy ranh giới tọa độ thực tế của ô tìm kiếm trên màn hình để click giả lập chính xác
                         Rect rect = new Rect();
                         box.getBoundsInScreen(rect);
                         if (rect.width() > 0 && rect.height() > 0) {
@@ -229,12 +228,10 @@ public class AutoScrapeService extends AccessibilityService {
             rootNode.recycle();
 
             if (filled) {
-                // Chờ 600ms cho bàn phím ảo hoặc khung tìm kiếm mở hẳn ra rồi tiến hành dán
-                handler.postDelayed(() -> performClipboardPasteAndSearch(phoneNumber), 600);
+                handler.postDelayed(() -> performClipboardPasteAndSearch(phoneNumber), 400);
             } else {
-                // Fallback click tọa độ cứng lên thanh tìm kiếm phía trên nếu không tìm thấy node
                 clickAtCoordinates(500, 150);
-                handler.postDelayed(() -> performClipboardPasteAndSearch(phoneNumber), 600);
+                handler.postDelayed(() -> performClipboardPasteAndSearch(phoneNumber), 400);
             }
         } else {
             handler.postDelayed(this::executeNextCallStep, 500);
@@ -242,7 +239,7 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     private void performClipboardPasteAndSearch(String phoneNumber) {
-        // 1. Đưa số điện thoại vào Clipboard hệ thống
+        // Đưa số điện thoại vào Clipboard hệ thống
         ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
         ClipData clip = ClipData.newPlainText("Phone", phoneNumber);
         if (clipboard != null) {
@@ -264,13 +261,11 @@ public class AutoScrapeService extends AccessibilityService {
             rootNode.recycle();
         }
 
-        // 2. Click bồi tọa độ thanh tìm kiếm để đảm bảo lệnh Paste được app ghi nhận
         clickAtCoordinates(500, 150);
+        Log.d(TAG, "Đã dán số: " + phoneNumber + ", chờ 1s để app lọc kết quả...");
 
-        Log.d(TAG, "Đã thực hiện dán số: " + phoneNumber);
-
-        // Chờ 1200ms để app lọc danh sách đơn hàng rồi tiến hành bấm nút gọi
-        handler.postDelayed(() -> verifyAndClickCallButton(phoneNumber), 1200);
+        // Đã chỉnh thời gian chờ xuống còn 1000ms (1 giây)
+        handler.postDelayed(() -> verifyAndClickCallButton(phoneNumber), 1000);
     }
 
     private void clickAtCoordinates(float x, float y) {
@@ -340,6 +335,7 @@ public class AutoScrapeService extends AccessibilityService {
             if (clicked) {
                 Toast.makeText(this, "Đang gọi: " + phoneNumber, Toast.LENGTH_SHORT).show();
             } else {
+                Log.w(TAG, "Không tìm thấy nút gọi cho số: " + phoneNumber + ", chuyển sang số tiếp theo.");
                 handler.postDelayed(this::executeNextCallStep, 400);
             }
         } else {
