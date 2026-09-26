@@ -49,7 +49,7 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // PHẦN 1: QUÉT SỐ ĐIỆN THOẠI BẰNG CÁCH DUYỆT TẤT CẢ CÁC NODE VĂN BẢN
+    // PHẦN 1: QUÉT TẤT CẢ SỐ ĐIỆN THOẠI HỢP LỆ TRÊN MÀN HÌNH (LỌC TRÙNG TỰ ĐỘNG)
     // =========================================================================
     public void startScraping() {
         if (isScraping) {
@@ -76,7 +76,7 @@ public class AutoScrapeService extends AccessibilityService {
                 if (rootNode != null) {
                     int previousSize = collectedPhones.size();
                     
-                    // Duyệt toàn bộ cây giao diện để tìm mọi số điện thoại hợp lệ xuất hiện trên màn hình
+                    // Duyệt toàn bộ cây giao diện và gom mọi số điện thoại xuất hiện
                     traverseAndCollectPhones(rootNode);
 
                     if (collectedPhones.size() > previousSize) {
@@ -111,6 +111,7 @@ public class AutoScrapeService extends AccessibilityService {
         if (node.getText() != null) {
             String text = node.getText().toString().trim();
             if (isValidPhoneNumber(text)) {
+                // LinkedHashSet tự động loại bỏ các số bị trùng lặp khi cuộn màn hình
                 collectedPhones.add(text);
             }
         }
@@ -226,26 +227,6 @@ public class AutoScrapeService extends AccessibilityService {
 
     private void moveToNextCodeAfterDelay() {
         handler.postDelayed(this::executeNextCallStep, 1000);
-    }
-
-    private void loadExistingPhones() {
-        collectedPhones.clear();
-        try {
-            File file = new File(getExternalFilesDir(null), "DanhSachSoDienThoai.txt");
-            if (file.exists()) {
-                BufferedReader reader = new BufferedReader(new FileReader(file));
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    String trimmed = line.trim();
-                    if (!trimmed.isEmpty()) {
-                        collectedPhones.add(trimmed);
-                    }
-                }
-                reader.close();
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 
     private void savePhonesToFile() {
