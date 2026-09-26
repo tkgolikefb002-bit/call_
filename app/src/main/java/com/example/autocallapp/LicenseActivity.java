@@ -20,7 +20,7 @@ public class LicenseActivity extends AppCompatActivity {
     private EditText etKey;
     private Button btnCheckKey;
     
-    // Đã cấu hình đúng link Cloudflare Worker của bạn
+    // Đường dẫn Cloudflare Worker bản quyền của bạn
     private static final String WORKER_URL = "https://autocall-license.tkgolikefb002.workers.dev/?key=";
 
     @Override
@@ -60,11 +60,9 @@ public class LicenseActivity extends AppCompatActivity {
             public void onResponse(Call call, Response response) throws IOException {
                 if (response.isSuccessful()) {
                     String responseData = response.body().string();
-                    // Kiểm tra phản hồi từ Cloudflare Worker
                     if (responseData.contains("VALID") || responseData.contains("success") || responseData.contains("true")) {
                         runOnUiThread(() -> {
                             Toast.makeText(LicenseActivity.this, "Kích hoạt thành công!", Toast.LENGTH_SHORT).show();
-                            // Chuyển sang màn hình chính MainActivity
                             Intent intent = new Intent(LicenseActivity.this, MainActivity.class);
                             startActivity(intent);
                             finish();
