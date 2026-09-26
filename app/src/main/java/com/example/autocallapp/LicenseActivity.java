@@ -22,7 +22,6 @@ public class LicenseActivity extends AppCompatActivity {
 
     private EditText etKey;
     private Button btnCheckKey;
-    
     private static final String WORKER_URL = "https://autocall-license.tkgolikefb002.workers.dev/?key=";
 
     @Override
@@ -67,7 +66,8 @@ public class LicenseActivity extends AppCompatActivity {
                         String status = jsonObject.optString("status", "");
                         
                         if (status.equalsIgnoreCase("success") || status.equalsIgnoreCase("active")) {
-                            String expiryDate = jsonObject.optString("expiry_date", "Không rõ");
+                            // Lấy chính xác trường expiry_date từ JSON của Worker (ví dụ: "29.09.2026")
+                            String expiryDate = jsonObject.optString("expiry_date", "Đang cập nhật");
                             
                             runOnUiThread(() -> {
                                 Toast.makeText(LicenseActivity.this, "Kích hoạt thành công!", Toast.LENGTH_SHORT).show();
