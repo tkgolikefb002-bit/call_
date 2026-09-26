@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -5,47 +6,47 @@
     android:orientation="vertical"
     android:padding="20dp">
 
+    <!-- 1. NÚT CẤP QUYỀN (Màu Xanh) -->
     <Button
         android:id="@+id/btnGrantPermissions"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="15dp"
-        android:text="Cấp Tất Cả Quyền &amp; Mặc Định"
-        android:textSize="16sp" />
+        android:layout_marginBottom="12dp"
+        android:backgroundTint="#4CAF50"
+        android:text="CẤP TẤT CẢ QUYỀN &amp; MẶC ĐỊNH"
+        android:textColor="#FFFFFF"
+        android:textSize="14sp" />
 
+    <!-- 2. NÚT MỞ CÀI ĐẶT MẶC ĐỊNH (Màu Xanh) -->
     <Button
         android:id="@+id/btnOpenDefaultSettings"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:padding="15dp"
-        android:text="Mở Cài Đặt Ứng Dụng Mặc Định"
-        android:textSize="16sp" />
-
-    <!-- NÚT BẬT POPUP NỔI AUTO -->
-    <Button
-        android:id="@+id/btnStartPopup"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginBottom="12dp"
         android:backgroundTint="#4CAF50"
-        android:padding="15dp"
-        android:text="Mở Bảng Điều Khiển Auto"
+        android:text="MỞ CÀI ĐẶT ỨNG DỤNG MẶC ĐỊNH"
         android:textColor="#FFFFFF"
-        android:textSize="16sp" />
+        android:textSize="14sp" />
 
-    <!-- NÚT MỞ CÀI ĐẶT TRỢ NĂNG (MỚI THÊM) -->
+    <!-- 3. NÚT TRỢ NĂNG (Màu Xanh) -->
     <Button
         android:id="@+id/btnOpenAccessibility"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:backgroundTint="#FF9800"
-        android:padding="15dp"
-        android:text="Bật Quyền Trợ Năng (Accessibility)"
+        android:layout_marginBottom="12dp"
+        android:backgroundTint="#4CAF50"
+        android:text="BẬT QUYỀN TRỢ NĂNG (ACCESSIBILITY)"
         android:textColor="#FFFFFF"
-        android:textSize="16sp" />
+        android:textSize="14sp" />
 
-    
+    <!-- 4. NÚT MỞ BẢNG ĐIỀU KHIỂN AUTO (Đã chuyển xuống cuối cùng và đổi sang Màu Cam) -->
+    <Button
+        android:id="@+id/btnStartPopup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:backgroundTint="#FF9800"
+        android:text="MỞ BẢNG ĐIỀU KHIỂN AUTO"
+        android:textColor="#FFFFFF"
+        android:textSize="14sp" />
 
 </LinearLayout>
