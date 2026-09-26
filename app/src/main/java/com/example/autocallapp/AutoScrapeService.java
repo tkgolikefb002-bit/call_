@@ -51,7 +51,7 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // PHẦN 1: QUÉT SỐ ĐIỆN THOẠI BẰNG REGEX VÀ QUÉT ĐỒNG THỜI TEXT / DESCRIPTION
+    // PHẦN 1: QUÉT SỐ ĐIỆN THOẠI VỚI REGEX CHUẨN ĐẦU SỐ DI ĐỘNG VIỆT NAM
     // =========================================================================
     public void startScraping() {
         if (isScraping) {
@@ -76,7 +76,6 @@ public class AutoScrapeService extends AccessibilityService {
                 if (rootNode != null) {
                     int previousSize = collectedPhones.size();
                     
-                    // Duyệt toàn bộ cây giao diện màn hình hiện tại
                     traverseAndExtractPhones(rootNode);
 
                     if (collectedPhones.size() > previousSize) {
@@ -84,7 +83,6 @@ public class AutoScrapeService extends AccessibilityService {
                         updatePopupProgress(collectedPhones.size());
                     } else {
                         scrollAttempts++;
-                        // Nếu cuộn 2 lần liên tiếp không tìm thấy số mới -> Dừng quét và lưu file
                         if (scrollAttempts >= 2) {
                             isScraping = false;
                             savePhonesToFile();
@@ -104,16 +102,13 @@ public class AutoScrapeService extends AccessibilityService {
         handler.post(scrapeRunnable);
     }
 
-    // Hàm đệ quy duyệt qua tất cả các node để tìm số điện thoại ẩn trong Text hoặc ContentDescription
     private void traverseAndExtractPhones(AccessibilityNodeInfo node) {
         if (node == null) return;
 
-        // Kiểm tra qua getText()
         if (node.getText() != null) {
             extractAndAddPhones(node.getText().toString());
         }
 
-        // Kiểm tra qua getContentDescription() (Rất nhiều app render chữ ở đây)
         if (node.getContentDescription() != null) {
             extractAndAddPhones(node.getContentDescription().toString());
         }
@@ -127,17 +122,16 @@ public class AutoScrapeService extends AccessibilityService {
         }
     }
 
-    // Sử dụng Regex Pattern để quét tìm mọi chuỗi số điện thoại hợp lệ bên trong văn bản
+    // Chỉ bắt các đầu số di động chính xác của Việt Nam (03, 05, 07, 08, 09) gồm đúng 10 chữ số
     private void extractAndAddPhones(String text) {
         if (text == null || text.isEmpty()) return;
         
-        // Biểu thức chính quy tìm số điện thoại Việt Nam bắt đầu bằng số 0, theo sau là 9 hoặc 10 chữ số tiếp theo
-        Pattern pattern = Pattern.compile("0\\d{9,10}");
+        Pattern pattern = Pattern.compile("0[35789]\\d{8}");
         Matcher matcher = pattern.matcher(text);
         
         while (matcher.find()) {
             String phone = matcher.group();
-            if (phone != null && phone.length() >= 10 && phone.length() <= 11) {
+            if (phone != null && phone.length() == 10) {
                 collectedPhones.add(phone);
             }
         }
