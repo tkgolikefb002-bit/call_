@@ -24,8 +24,7 @@ public class LicenseActivity extends AppCompatActivity {
 
     private EditText etKey;
     private Button btnCheckKey;
-    // Đã trỏ đúng đường dẫn /verify trên Worker
-    private static final String WORKER_URL = "https://autocall-license.tkgolikefb002.workers.dev/verify?key=";
+    private static final String BASE_URL = "https://autocall-license.tkgolikefb002.workers.dev/";
     private static final String PREF_NAME = "AppPrefs";
     private static final String KEY_EXPIRY = "saved_expiry_date";
     private static final String KEY_SAVED = "saved_key";
@@ -35,73 +34,112 @@ public class LicenseActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Lấy Android ID độc nhất của thiết bị này
         String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
-
-        // TỰ ĐỘNG KIỂM TRA NGẦM: Nếu trước đó đã lưu key, tự gửi kèm device_id lên check luôn
         SharedPreferences prefs = getSharedPreferences(PREF_NAME, MODE_PRIVATE);
+        
         boolean isActivated = prefs.getBoolean(KEY_ACTIVATED, false);
         String savedKey = prefs.getString(KEY_SAVED, "");
 
+        // TRƯỜNG HỢP 1: Đã lưu key sẵn trong máy -> Verify bình thường
         if (isActivated && !savedKey.isEmpty()) {
-            // Gọi ngầm verify lại để đảm bảo máy này vẫn đúng là máy được cấp quyền
-            verifyKeyOnCloudflare(savedKey, deviceId, true);
+            verifyKey(BASE_URL + "verify?key=" + savedKey + "&device_id=" + deviceId, true);
             return;
         }
 
-        setContentView(R.layout.activity_check_key);
-
-        etKey = findViewById(R.id.etKey);
-        btnCheckKey = findViewById(R.id.btnCheckKey);
-
-        btnCheckKey.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                String key = etKey.getText().toString().trim();
-                if (key.isEmpty()) {
-                    Toast.makeText(LicenseActivity.this, "Vui lòng nhập mã key!", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                // Gửi key kèm device_id của máy khi người dùng bấm nút kích hoạt
-                verifyKeyOnCloudflare(key, deviceId, false);
-            }
-        });
+        // TRƯỜNG HỢP 2: Vừa mới gỡ app cài lại (mất sạch dữ liệu) -> Tự động gọi API khôi phục theo device_id
+        recoverKeyAutomatically(deviceId);
     }
 
-    private void verifyKeyOnCloudflare(String key, String deviceId, boolean isAutoLogin) {
+    private void recoverKeyAutomatically(String deviceId) {
         OkHttpClient client = new OkHttpClient();
-        // Ghép thêm tham số &device_id= vào URL gọi lên Cloudflare Worker
-        String url = WORKER_URL + key + "&device_id=" + deviceId;
-
-        Request request = new Request.Builder()
-                .url(url)
-                .build();
+        Request request = new Request.Builder().url(BASE_URL + "recover?device_id=" + deviceId).build();
 
         client.newCall(request).enqueue(new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
-                runOnUiThread(() -> {
-                    if (!isAutoLogin) {
-                        Toast.makeText(LicenseActivity.this, "Lỗi kết nối mạng!", Toast.LENGTH_SHORT).show();
-                    }
-                });
+                showInputScreen();
             }
 
             @Override
             public void onResponse(Call call, Response response) throws IOException {
                 if (response.isSuccessful() && response.body() != null) {
-                    String responseData = response.body().string();
                     try {
-                        JSONObject jsonObject = new JSONObject(responseData);
-                        String status = jsonObject.optString("status", "");
-                        
-                        if (status.equalsIgnoreCase("success") || status.equalsIgnoreCase("active")) {
-                            String expiryDate = jsonObject.optString("expiry_date", "Đang cập nhật");
-                            
-                            // Lưu trạng thái thành công và giữ lại key trong máy
+                        JSONObject json = new JSONObject(response.body().string());
+                        if (json.optString("status").equalsIgnoreCase("success")) {
+                            // Server tìm thấy key cũ của máy này -> Tự động khôi phục lại mà không cần nhập
+                            String recoveredKey = json.optString("key");
+                            String expiryDate = json.optString("expiry_date");
+
                             SharedPreferences.Editor editor = getSharedPreferences(PREF_NAME, MODE_PRIVATE).edit();
                             editor.putBoolean(KEY_ACTIVATED, true);
-                            editor.putString(KEY_SAVED, key);
+                            editor.putString(KEY_SAVED, recoveredKey);
+                            editor.putString(KEY_EXPIRY, expiryDate);
+                            editor.apply();
+
+                            runOnUiThread(() -> {
+                                Intent intent = new Intent(LicenseActivity.this, MainActivity.class);
+                                intent.putExtra("EXPIRY_DATE", expiryDate);
+                                startActivity(intent);
+                                finish();
+                            });
+                            return;
+                        }
+                    } catch (Exception ignored) {}
+                }
+                // Nếu chưa từng kích hoạt hoặc lỗi, hiện giao diện bắt nhập key thủ công
+                showInputScreen();
+            }
+        });
+    }
+
+    private void showInputScreen() {
+        runOnUiThread(() -> {
+            setContentView(R.layout.activity_check_key);
+            etKey = findViewById(R.id.etKey);
+            btnCheckKey = findViewById(R.id.btnCheckKey);
+
+            btnCheckKey.setOnClickListener(v -> {
+                String key = etKey.getText().toString().trim();
+                if (key.isEmpty()) {
+                    Toast.makeText(LicenseActivity.this, "Vui lòng nhập mã key!", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
+                verifyKey(BASE_URL + "verify?key=" + key + "&device_id=" + deviceId, false);
+            });
+        });
+    }
+
+    private void verifyKey(String url, boolean isAutoLogin) {
+        OkHttpClient client = new OkHttpClient();
+        Request request = new Request.Builder().url(url).build();
+
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                if (!isAutoLogin) {
+                    runOnUiThread(() -> Toast.makeText(LicenseActivity.this, "Lỗi kết nối mạng!", Toast.LENGTH_SHORT).show());
+                } else {
+                    showInputScreen();
+                }
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                if (response.isSuccessful() && response.body() != null) {
+                    try {
+                        JSONObject json = new JSONObject(response.body().string());
+                        String status = json.optString("status");
+
+                        if (status.equalsIgnoreCase("success") || status.equalsIgnoreCase("active")) {
+                            String expiryDate = json.optString("expiry_date", "Đang cập nhật");
+                            
+                            // Lấy lại key từ URL nếu đang ở chế độ auto verify
+                            String currentKey = url.contains("key=") ? url.split("key=")[1].split("&")[0] : "";
+
+                            SharedPreferences.Editor editor = getSharedPreferences(PREF_NAME, MODE_PRIVATE).edit();
+                            editor.putBoolean(KEY_ACTIVATED, true);
+                            if (!currentKey.isEmpty()) editor.putString(KEY_SAVED, currentKey);
                             editor.putString(KEY_EXPIRY, expiryDate);
                             editor.apply();
 
@@ -115,37 +153,21 @@ public class LicenseActivity extends AppCompatActivity {
                                 finish();
                             });
                         } else {
-                            // Bắt thông báo lỗi trả về từ server (ví dụ: Key đã được kích hoạt trên thiết bị khác)
-                            String message = jsonObject.optString("message", "Key không hợp lệ hoặc đã hết hạn!");
-                            
-                            // Nếu đang auto-login mà bị lỗi (ví dụ key bị đổi máy hoặc hết hạn), ta xóa cache để bắt nhập lại
+                            String message = json.optString("message", "Key không hợp lệ!");
                             if (isAutoLogin) {
                                 SharedPreferences.Editor editor = getSharedPreferences(PREF_NAME, MODE_PRIVATE).edit();
                                 editor.clear();
                                 editor.apply();
+                                showInputScreen();
+                            } else {
+                                runOnUiThread(() -> Toast.makeText(LicenseActivity.this, message, Toast.LENGTH_LONG).show());
                             }
-
-                            runOnUiThread(() -> {
-                                if (!isAutoLogin || !message.contains("thiết bị khác")) {
-                                    setContentView(R.layout.activity_check_key); // Hiện lại form nhập nếu auto-login fail
-                                }
-                                Toast.makeText(LicenseActivity.this, message, Toast.LENGTH_LONG).show();
-                            });
                         }
                     } catch (Exception e) {
-                        e.printStackTrace();
-                        runOnUiThread(() -> {
-                            if (!isAutoLogin) {
-                                Toast.makeText(LicenseActivity.this, "Lỗi đọc dữ liệu từ Server!", Toast.LENGTH_SHORT).show();
-                            }
-                        });
+                        if (isAutoLogin) showInputScreen();
                     }
                 } else {
-                    runOnUiThread(() -> {
-                        if (!isAutoLogin) {
-                            Toast.makeText(LicenseActivity.this, "Lỗi từ Server bản quyền!", Toast.LENGTH_SHORT).show();
-                        }
-                    });
+                    if (isAutoLogin) showInputScreen();
                 }
             }
         });
