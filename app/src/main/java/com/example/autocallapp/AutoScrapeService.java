@@ -172,7 +172,7 @@ public class AutoScrapeService extends AccessibilityService {
     private void searchAndCallForCode(String targetCode) {
         if (!isCallingProcessActive) return;
 
-        Log.d(TAG, "Đang xử lý mã đơn: " + targetCode);
+        Log.d(TAG, "Đang xử lý mã đơn qua Clipboard: " + targetCode);
 
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
         if (rootNode == null) {
@@ -188,47 +188,35 @@ public class AutoScrapeService extends AccessibilityService {
 
         if (searchNodes != null && !searchNodes.isEmpty()) {
             AccessibilityNodeInfo searchBox = searchNodes.get(0);
-            
-            // Lấy tọa độ động của ô tìm kiếm
+
+            // BƯỚC 1: Đưa mã đơn vào Clipboard hệ thống để chuẩn bị dán
+            android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            android.content.ClipData clip = android.content.ClipData.newPlainText("SubCode", targetCode);
+            if (clipboard != null) {
+                clipboard.setPrimaryClip(clip);
+            }
+
+            // BƯỚC 2: Lấy tọa độ và click vào ô tìm kiếm để focus
             Rect bounds = new Rect();
             searchBox.getBoundsInScreen(bounds);
             
-            // BƯỚC 0: Click vào ô để focus và xóa sạch nội dung cũ bằng cách bấm dấu X (hoặc clear text)
             if (bounds.width() > 0 && bounds.height() > 0) {
                 clickAtCoordinates(bounds.centerX(), bounds.centerY());
             } else {
                 searchBox.performAction(AccessibilityNodeInfo.ACTION_CLICK);
             }
 
-            // Đợi 200ms rồi clear ô (mô phỏng bấm dấu X xóa text cũ bằng adb input hoặc set text rỗng)
+            // BƯỚC 3: Sau 200ms, thực hiện lệnh PASTE (Dán) nội dung từ Clipboard vào ô
             handler.postDelayed(() -> {
-                try {
-                    // Xóa trắng ô trước bằng lệnh adv/shell hoặc clear, sau đó gõ mã mới
-                    // Gửi lệnh xóa (hoặc gõ đè)
-                    String clearCmd = "input keyevent 67"; // Gửi phím Backspace vài lần cho chắc chắn sạch ô nếu cần
-                    Runtime.getRuntime().exec(clearCmd);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
+                // Focus lại cho chắc chắn ô đang nhận lệnh
+                searchBox.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
+                
+                // Dùng action PASTE chuẩn của Android Accessibility để dán mã (tự động đè/thay thế mã cũ)
+                boolean pasted = searchBox.performAction(AccessibilityNodeInfo.ACTION_PASTE);
+                Log.d(TAG, "Dán mã " + targetCode + ": " + (pasted ? "THÀNH CÔNG" : "THẤT BẠI"));
 
-                // BƯỚC 1 & 2: Click lại khung và gõ mã mới vào
-                handler.postDelayed(() -> {
-                    if (bounds.width() > 0 && bounds.height() > 0) {
-                        clickAtCoordinates(bounds.centerX(), bounds.centerY());
-                    }
-                    
-                    try {
-                        String command = "input text " + targetCode;
-                        Runtime.getRuntime().exec(command);
-                        Log.d(TAG, "Đã gõ mã mới: " + targetCode);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-
-                    // BƯỚC 3: Đợi 1200ms để app lọc kết quả rồi tiến hành lấy số điện thoại gọi
-                    handler.postDelayed(this::findAndCallFilteredPhoneNumber, 1200);
-                }, 200);
-
+                // BƯỚC 4: Đợi 1200ms để app tự động lọc kết quả theo mã vừa dán rồi tiến hành lấy SĐT gọi
+                handler.postDelayed(this::findAndCallFilteredPhoneNumber, 1200);
             }, 200);
 
         } else {
