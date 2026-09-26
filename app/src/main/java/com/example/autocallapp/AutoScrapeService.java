@@ -6,6 +6,7 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Intent;
 import android.graphics.Path;
+import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -198,19 +199,10 @@ public class AutoScrapeService extends AccessibilityService {
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
         if (rootNode != null) {
             List<AccessibilityNodeInfo> searchBoxes = new ArrayList<>();
-
-            // 1. Quét tìm theo Hint/Placeholder trên app Best Express
             findEditTextByHintRecursive(rootNode, searchBoxes);
 
-            // 2. Nếu không tìm thấy qua hint, quét tìm theo các ID phổ biến
             if (searchBoxes.isEmpty()) {
                 List<AccessibilityNodeInfo> byId = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/searchEditText");
-                if (byId != null) searchBoxes.addAll(byId);
-                
-                byId = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/et_search");
-                if (byId != null) searchBoxes.addAll(byId);
-                
-                byId = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/search_src_text");
                 if (byId != null) searchBoxes.addAll(byId);
             }
 
@@ -220,25 +212,29 @@ public class AutoScrapeService extends AccessibilityService {
                     if (box != null) {
                         box.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
                         box.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                        
+                        // Lấy ranh giới tọa độ thực tế của ô tìm kiếm trên màn hình để click giả lập chính xác
+                        Rect rect = new Rect();
+                        box.getBoundsInScreen(rect);
+                        if (rect.width() > 0 && rect.height() > 0) {
+                            clickAtCoordinates(rect.centerX(), rect.centerY());
+                        }
+                        
                         filled = true;
                         break;
                     }
                 }
             }
 
-            // Nếu vẫn không thấy, dùng đệ quy tìm ô EditText bất kỳ đầu tiên
-            if (!filled) {
-                filled = focusEditTextRecursive(rootNode);
-            }
-
             rootNode.recycle();
 
             if (filled) {
-                // Chờ 400ms cho app hoàn thành hiệu ứng mở rộng khung tìm kiếm rồi tiến hành dán
-                handler.postDelayed(() -> performClipboardPasteAndSearch(phoneNumber), 400);
+                // Chờ 600ms cho bàn phím ảo hoặc khung tìm kiếm mở hẳn ra rồi tiến hành dán
+                handler.postDelayed(() -> performClipboardPasteAndSearch(phoneNumber), 600);
             } else {
-                Log.e(TAG, "Không tìm thấy ô nhập liệu tìm kiếm!");
-                handler.postDelayed(this::executeNextCallStep, 400);
+                // Fallback click tọa độ cứng lên thanh tìm kiếm phía trên nếu không tìm thấy node
+                clickAtCoordinates(500, 150);
+                handler.postDelayed(() -> performClipboardPasteAndSearch(phoneNumber), 600);
             }
         } else {
             handler.postDelayed(this::executeNextCallStep, 500);
@@ -246,46 +242,44 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     private void performClipboardPasteAndSearch(String phoneNumber) {
+        // 1. Đưa số điện thoại vào Clipboard hệ thống
+        ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        ClipData clip = ClipData.newPlainText("Phone", phoneNumber);
+        if (clipboard != null) {
+            clipboard.setPrimaryClip(clip);
+        }
+
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
-        if (rootNode == null) {
-            handler.postDelayed(this::executeNextCallStep, 400);
-            return;
-        }
-
-        AccessibilityNodeInfo focusedNode = rootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
-        if (focusedNode == null) {
-            List<AccessibilityNodeInfo> editTexts = new ArrayList<>();
-            findEditTextByHintRecursive(rootNode, editTexts);
-            if (!editTexts.isEmpty()) {
-                focusedNode = editTexts.get(0);
-            }
-        }
-
-        if (focusedNode != null) {
-            ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-            ClipData clip = ClipData.newPlainText("Phone", phoneNumber);
-            if (clipboard != null) {
-                clipboard.setPrimaryClip(clip);
-            }
-
-            boolean success = focusedNode.performAction(AccessibilityNodeInfo.ACTION_PASTE);
-            
-            if (!success) {
+        if (rootNode != null) {
+            AccessibilityNodeInfo focusedNode = rootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
+            if (focusedNode != null) {
+                focusedNode.performAction(AccessibilityNodeInfo.ACTION_PASTE);
+                
                 Bundle arguments = new Bundle();
                 arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, phoneNumber);
                 focusedNode.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
+                
+                focusedNode.recycle();
             }
-
-            Log.d(TAG, "Đã dán thành công số: " + phoneNumber);
-            focusedNode.recycle();
             rootNode.recycle();
+        }
 
-            // Chờ 1000ms để app lọc danh sách đơn hàng xong rồi thực hiện click gọi
-            handler.postDelayed(() -> verifyAndClickCallButton(phoneNumber), 1000);
-        } else {
-            rootNode.recycle();
-            Log.e(TAG, "Không tìm thấy node để dán văn bản!");
-            handler.postDelayed(this::executeNextCallStep, 400);
+        // 2. Click bồi tọa độ thanh tìm kiếm để đảm bảo lệnh Paste được app ghi nhận
+        clickAtCoordinates(500, 150);
+
+        Log.d(TAG, "Đã thực hiện dán số: " + phoneNumber);
+
+        // Chờ 1200ms để app lọc danh sách đơn hàng rồi tiến hành bấm nút gọi
+        handler.postDelayed(() -> verifyAndClickCallButton(phoneNumber), 1200);
+    }
+
+    private void clickAtCoordinates(float x, float y) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+            Path path = new Path();
+            path.moveTo(x, y);
+            GestureDescription.Builder builder = new GestureDescription.Builder();
+            builder.addStroke(new GestureDescription.StrokeDescription(path, 0, 50));
+            dispatchGesture(builder.build(), null, null);
         }
     }
 
@@ -309,27 +303,6 @@ public class AutoScrapeService extends AccessibilityService {
             findEditTextByHintRecursive(child, results);
             if (child != null) child.recycle();
         }
-    }
-
-    private boolean focusEditTextRecursive(AccessibilityNodeInfo node) {
-        if (node == null) return false;
-
-        CharSequence className = node.getClassName();
-        if (className != null && className.toString().contains("EditText")) {
-            node.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
-            node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-            return true;
-        }
-
-        for (int i = 0; i < node.getChildCount(); i++) {
-            AccessibilityNodeInfo child = node.getChild(i);
-            if (focusEditTextRecursive(child)) {
-                if (child != null) child.recycle();
-                return true;
-            }
-            if (child != null) child.recycle();
-        }
-        return false;
     }
 
     private void verifyAndClickCallButton(String phoneNumber) {
