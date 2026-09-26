@@ -51,7 +51,7 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // QUÉT THEO TỪNG KHUNG ĐƠN HÀNG (DỰA VÀO ID MÃ VẬN ĐƠN HOẶC KHUNG BAO)
+    // QUÉT CHUẨN XÁC TỪNG KHUNG ĐƠN HÀNG TRÊN MÀN HÌNH HIỆN TẠI
     // =========================================================================
     public void startScraping() {
         if (isScraping) {
@@ -76,15 +76,14 @@ public class AutoScrapeService extends AccessibilityService {
                 if (rootNode != null) {
                     int previousSize = collectedPhones.size();
                     
-                    // Tìm tất cả các mã vận đơn trên màn hình để định vị từng khung đơn hàng
+                    // Tìm các khung chứa mã vận đơn để xác định chính xác thẻ đơn hàng hiện tại
                     List<AccessibilityNodeInfo> billNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvBillCode");
                     
                     if (billNodes != null && !billNodes.isEmpty()) {
                         for (AccessibilityNodeInfo billNode : billNodes) {
-                            // Lên cấp cha của mã vận đơn để lấy trọn khung chứa đơn hàng đó
                             AccessibilityNodeInfo parentCard = getOrderCardContainer(billNode);
                             if (parentCard != null) {
-                                // Tìm số điện thoại nằm riêng trong khung đơn hàng này
+                                // Chỉ trích xuất số điện thoại nằm bên trong đúng khung đơn hàng này
                                 List<AccessibilityNodeInfo> phoneNodes = parentCard.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
                                 if (phoneNodes != null) {
                                     for (AccessibilityNodeInfo phoneNode : phoneNodes) {
@@ -105,7 +104,6 @@ public class AutoScrapeService extends AccessibilityService {
                         updatePopupProgress(collectedPhones.size());
                     } else {
                         scrollAttempts++;
-                        // Nếu cuộn 2 lần liên tiếp không tìm thấy số mới -> Dừng quét và lưu file
                         if (scrollAttempts >= 2) {
                             isScraping = false;
                             savePhonesToFile();
@@ -125,15 +123,13 @@ public class AutoScrapeService extends AccessibilityService {
         handler.post(scrapeRunnable);
     }
 
-    // Hàm tìm ngược lên cấp khung chứa chung của đơn hàng
     private AccessibilityNodeInfo getOrderCardContainer(AccessibilityNodeInfo node) {
         AccessibilityNodeInfo current = node;
-        for (int i = 0; i < 4; i++) { // Đi ngược lên tối đa 4 cấp cha để tìm khung bao đơn
+        for (int i = 0; i < 4; i++) {
             if (current == null) break;
             AccessibilityNodeInfo parent = current.getParent();
             if (parent == null) break;
             
-            // Nếu cấp cha này có chứa cả trường số điện thoại thì chính là nó
             List<AccessibilityNodeInfo> testPhone = parent.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
             if (testPhone != null && !testPhone.isEmpty()) {
                 for(AccessibilityNodeInfo p : testPhone) p.recycle();
@@ -144,7 +140,7 @@ public class AutoScrapeService extends AccessibilityService {
             if (current != node) current.recycle();
             current = parent;
         }
-        return node.getParent(); // Trả về cấp cha gần nhất nếu không tìm thấy khung lớn hơn
+        return node.getParent();
     }
 
     private void extractAndAddPhone(String text) {
