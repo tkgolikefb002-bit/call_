@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
 import android.content.Intent;
 import android.graphics.Path;
+import android.graphics.Rect;
 import android.net.Uri;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.os.Handler;
@@ -26,11 +27,10 @@ public class AutoScrapeService extends AccessibilityService {
     private boolean isScraping = false;
     private boolean isCallingProcessActive = false; 
     
-    // Sử dụng LinkedHashSet để giữ nguyên thứ tự xuất hiện của số điện thoại và loại bỏ trùng lặp
     private final Set<String> collectedPhones = new LinkedHashSet<>();
     private final List<String> callQueueList = new ArrayList<>();
     private int currentCallIndex = 0;
-    private Handler handler = new Handler(Looper.getMainLooper());
+    private Handler handler = new Handler(Looper.getMainLocate() != null ? Looper.getMainLooper() : Looper.getMainLooper());
 
     @Override
     public void onServiceConnected() {
@@ -50,7 +50,7 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // PHẦN 1: QUÉT VÀ LƯU SỐ ĐIỆN THOẠI TRỰC TIẾP (ĐÃ SỬA LỖI ĐẾM NHẦM)
+    // PHẦN 1: QUÉT VÀ LƯU SỐ ĐIỆN THOẠI TRỰC TIẾP (ĐÃ FIX LỖI TÁI SỬ DỤNG VIEW)
     // =========================================================================
     public void startScraping() {
         if (isScraping) {
@@ -75,17 +75,33 @@ public class AutoScrapeService extends AccessibilityService {
                 if (rootNode != null) {
                     int previousSize = collectedPhones.size();
                     
-                    // Duyệt tìm các số điện thoại qua ViewID chính xác
-                    List<AccessibilityNodeInfo> phoneNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
+                    // Tìm tất cả các container chứa thông tin đơn hàng dưới cùng (llBottomParent)
+                    List<AccessibilityNodeInfo> containerNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/llBottomParent");
                     
-                    if (phoneNodes != null && !phoneNodes.isEmpty()) {
-                        for (AccessibilityNodeInfo node : phoneNodes) {
-                            if (node != null && node.getText() != null) {
-                                String phone = node.getText().toString().trim();
-                                // Chỉ lấy các số điện thoại hợp lệ (Bắt đầu bằng 0, từ 9-11 chữ số, không chứa ký tự lạ)
-                                if (isValidPhoneNumber(phone)) {
-                                    collectedPhones.add(phone);
+                    if (containerNodes != null && !containerNodes.isEmpty()) {
+                        for (AccessibilityNodeInfo container : containerNodes) {
+                            if (container != null) {
+                                // Kiểm tra xem container có thực sự hiển thị trên màn hình không
+                                Rect outBounds = new Rect();
+                                container.getBoundsInScreen(outBounds);
+                                
+                                // Nếu container nằm trong khoảng chiều cao màn hình hợp lệ (tránh các view ẩn ngoài màn hình)
+                                if (outBounds.top >= 0 && outBounds.bottom > 0 && outBounds.top < 2500) {
+                                    // Tìm số điện thoại tvPhoneNub NỘI BỘ bên trong container này
+                                    List<AccessibilityNodeInfo> phoneNodes = container.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
+                                    if (phoneNodes != null) {
+                                        for (AccessibilityNodeInfo pNode : phoneNodes) {
+                                            if (pNode != null && pNode.getText() != null) {
+                                                String phone = pNode.getText().toString().trim();
+                                                if (isValidPhoneNumber(phone)) {
+                                                    collectedPhones.add(phone);
+                                                }
+                                            }
+                                            if (pNode != null) pNode.recycle();
+                                        }
+                                    }
                                 }
+                                container.recycle();
                             }
                         }
                     }
@@ -95,18 +111,19 @@ public class AutoScrapeService extends AccessibilityService {
                         updatePopupProgress(collectedPhones.size());
                     } else {
                         scrollAttempts++;
-                        // Nếu cuộn qua 2 lần mà không thu thập thêm được số điện thoại mới nào -> Dừng quét
+                        // Nếu cuộn qua 2 lần liên tiếp không tìm thấy thêm số mới -> Dừng quét
                         if (scrollAttempts >= 2) {
                             isScraping = false;
                             savePhonesToFile();
                             updatePopupProgress(collectedPhones.size());
                             Toast.makeText(getApplicationContext(), "Đã quét xong! Tổng số điện thoại: " + collectedPhones.size(), Toast.LENGTH_LONG).show();
+                            rootNode.recycle();
                             return;
                         }
                     }
+                    rootNode.recycle();
                 }
                 
-                // Tiếp tục cuộn xuống để quét các đơn hàng phía dưới
                 performFastScrollDownAndContinue(handler, this);
             }
         };
@@ -114,13 +131,9 @@ public class AutoScrapeService extends AccessibilityService {
         handler.post(scrapeRunnable);
     }
 
-    // Hàm kiểm tra chuẩn số điện thoại di động Việt Nam
     private boolean isValidPhoneNumber(String phone) {
         if (phone == null) return false;
-        // Loại bỏ khoảng trắng hoặc dấu gạch ngang nếu có
         phone = phone.replaceAll("\\s+", "").replaceAll("-", "");
-        
-        // Kiểm tra đúng định dạng bắt đầu bằng 0 và độ dài từ 9 đến 11 số
         return phone.matches("^0\\d{8,10}$");
     }
 
@@ -185,7 +198,6 @@ public class AutoScrapeService extends AccessibilityService {
 
         String targetPhone = callQueueList.get(currentCallIndex);
         
-        // Cập nhật giao diện tiến trình gọi
         currentCallIndex++;
         if (FloatingWidgetService.instance != null) {
             handler.post(() -> FloatingWidgetService.instance.updateProgress(currentCallIndex));
@@ -248,16 +260,12 @@ public class AutoScrapeService extends AccessibilityService {
             File file = new File(getExternalFilesDir(null), "DanhSachSoDienThoai.txt");
             FileOutputStream fos = new FileOutputStream(file, false);
             for (String phone : collectedPhones) {
-                fos.write((phone + "\n").getBytes(StandardNamesUtf8()));
+                fos.write((phone + "\n").getBytes(StandardCharsets.UTF_8));
             }
             fos.close();
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }
-
-    private java.nio.charset.Charset StandardNamesUtf8() {
-        return StandardCharsets.UTF_8;
     }
 
     public boolean clearSavedData() {
