@@ -15,7 +15,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     
-    <!-- Quyền Internet để check key bản quyền qua Cloudflare Worker -->
+    <!-- Quyền Internet để check key bản quyền -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     
@@ -27,7 +27,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar">
 
-        <!-- MÀN HÌNH KIỂM TRA KEY: Mở đầu tiên khi click icon app -->
+        <!-- MÀN HÌNH KIỂM TRA KEY: Mở đầu tiên khi bấm icon ứng dụng -->
         <activity
             android:name=".LicenseActivity"
             android:exported="true">
@@ -37,19 +37,19 @@
             </intent-filter>
         </activity>
 
-        <!-- MAIN ACTIVITY: Bắt buộc phải có exported="true" để RoleManager nhận diện làm trình quay số mặc định -->
+        <!-- MAIN ACTIVITY: Chứa cấu hình bộ lọc để nhận diện ứng dụng quay số mặc định -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop">
             
-            <!-- BỘ LỌC 1: Bắt buộc để RoleManager nhận diện app là ứng dụng gọi điện -->
+            <!-- BỘ LỌC 1: Bắt buộc để RoleManager nhận diện app là ứng dụng quay số (Dialer) -->
             <intent-filter>
                 <action android:name="android.intent.action.DIAL" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
 
-            <!-- BỘ LỌC 2: Xử lý khi có lệnh gọi kèm theo scheme tel: -->
+            <!-- BỘ LỌC 2: Xử lý khi có lệnh gọi kèm theo scheme tel: hoặc xem số điện thoại -->
             <intent-filter>
                 <action android:name="android.intent.action.DIAL" />
                 <action android:name="android.intent.action.VIEW" />
@@ -97,7 +97,6 @@
             </intent-filter>
         </service>
         
-        <!-- Thuộc tính foregroundServiceType cho FloatingWidgetService -->
         <service 
             android:name=".FloatingWidgetService" 
             android:exported="false"
