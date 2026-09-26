@@ -29,7 +29,7 @@
 
         <!-- MÀN HÌNH KIỂM TRA KEY: Đặt làm màn hình khởi động đầu tiên (MAIN/LAUNCHER) -->
         <activity
-            android:name=".CheckKeyActivity"
+            android:name=".LicenseActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
