@@ -2,14 +2,18 @@ package com.example.autocallapp;
 
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Intent;
 import android.graphics.Path;
 import android.net.Uri;
-import android.view.accessibility.AccessibilityNodeInfo;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.Toast;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -205,30 +209,47 @@ public class AutoScrapeService extends AccessibilityService {
             if (searchBoxes != null && !searchBoxes.isEmpty()) {
                 for (AccessibilityNodeInfo box : searchBoxes) {
                     if (box != null) {
+                        // Bật focus và click vào ô tìm kiếm
                         box.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
-                        android.os.Bundle arguments = new android.os.Bundle();
-                        arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, phoneNumber);
-                        boolean success = box.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
-                        box.recycle();
-                        if (success) {
-                            filled = true;
-                            break;
+                        box.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+
+                        // Đưa số điện thoại vào Clipboard của hệ thống
+                        ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                        ClipData clip = ClipData.newPlainText("Phone", phoneNumber);
+                        if (clipboard != null) {
+                            clipboard.setPrimaryClip(clip);
                         }
+
+                        // Gửi lệnh PASTE (Dán) trực tiếp vào ô nhập liệu
+                        boolean pasteSuccess = box.performAction(AccessibilityNodeInfo.ACTION_PASTE);
+                        
+                        // Dự phòng: Nếu lệnh paste không chạy, thử dùng ACTION_SET_TEXT
+                        if (!pasteSuccess) {
+                            Bundle arguments = new Bundle();
+                            arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, phoneNumber);
+                            box.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
+                        }
+
+                        Log.d(TAG, "Đã thử dán số: " + phoneNumber + " vào ô tìm kiếm.");
+                        box.recycle();
+                        filled = true;
+                        break;
                     }
                 }
             }
 
+            // Nếu không tìm thấy qua ID chuẩn, dùng đệ quy tìm ô EditText đầu tiên trên màn hình để dán
             if (!filled) {
-                filled = focusAndTypeRecursive(rootNode, phoneNumber);
+                filled = focusAndPasteRecursive(rootNode, phoneNumber);
             }
 
             rootNode.recycle();
 
             if (filled) {
-                // Đã dán thành công, chờ 800ms để app lọc kết quả rồi tiến hành bấm gọi
-                handler.postDelayed(() -> verifyAndClickCallButton(phoneNumber), 800);
+                // Tăng thời gian chờ lên 1200ms để app kịp nhận diện text và load danh sách lọc
+                handler.postDelayed(() -> verifyAndClickCallButton(phoneNumber), 1200);
             } else {
-                // Không tìm thấy ô nhập -> Bỏ qua số này sang số tiếp theo
+                Log.e(TAG, "Không tìm thấy ô nhập liệu nào trên màn hình!");
                 handler.postDelayed(this::executeNextCallStep, 400);
             }
         } else {
@@ -236,21 +257,31 @@ public class AutoScrapeService extends AccessibilityService {
         }
     }
 
-    private boolean focusAndTypeRecursive(AccessibilityNodeInfo node, String textToType) {
+    private boolean focusAndPasteRecursive(AccessibilityNodeInfo node, String textToType) {
         if (node == null) return false;
 
         if (node.getClassName() != null && node.getClassName().toString().contains("EditText")) {
             node.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
-            android.os.Bundle arguments = new android.os.Bundle();
-            arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, textToType);
-            if (node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)) {
-                return true;
+            node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+
+            ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            ClipData clip = ClipData.newPlainText("Phone", textToType);
+            if (clipboard != null) {
+                clipboard.setPrimaryClip(clip);
             }
+
+            boolean success = node.performAction(AccessibilityNodeInfo.ACTION_PASTE);
+            if (!success) {
+                Bundle arguments = new Bundle();
+                arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, textToType);
+                success = node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
+            }
+            return success;
         }
 
         for (int i = 0; i < node.getChildCount(); i++) {
             AccessibilityNodeInfo child = node.getChild(i);
-            if (focusAndTypeRecursive(child, textToType)) {
+            if (focusAndPasteRecursive(child, textToType)) {
                 if (child != null) child.recycle();
                 return true;
             }
