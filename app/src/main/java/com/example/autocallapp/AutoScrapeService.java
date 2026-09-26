@@ -254,13 +254,19 @@ public class AutoScrapeService extends AccessibilityService {
 
             if (clicked) {
                 Toast.makeText(this, "Đang gọi: " + phoneNumber, Toast.LENGTH_SHORT).show();
-                handler.postDelayed(this::executeNextCallStep, 3500);
             } else {
+                // Không tìm thấy nút bấm gọi -> Tự động chuyển số tiếp theo sau 400ms
                 handler.postDelayed(this::executeNextCallStep, 400);
             }
         } else {
             handler.postDelayed(this::executeNextCallStep, 500);
         }
+    }
+
+    // Phương thức để MyInCallService gọi khi cuộc gọi kết thúc
+    public void onCallFinished() {
+        if (!isCallingProcessActive) return;
+        handler.postDelayed(this::executeNextCallStep, 1000);
     }
 
     private AccessibilityNodeInfo findClickableParent(AccessibilityNodeInfo node) {
