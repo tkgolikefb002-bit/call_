@@ -49,7 +49,7 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // QUÉT SỐ ĐIỆN THOẠI CHUẨN XÁC DỰA TRÊN VIEW ID CỦA APP
+    // QUÉT SỐ ĐIỆN THOẠI DỰA TRÊN VIEW ID CỦA APP KẾT HỢP TỰ ĐỘNG CUỘN
     // =========================================================================
     public void startScraping() {
         if (isScraping) {
@@ -83,7 +83,6 @@ public class AutoScrapeService extends AccessibilityService {
                                 String text = node.getText().toString().trim();
                                 String cleanedPhone = extractPhoneNumber(text);
                                 if (cleanedPhone != null) {
-                                    // LinkedHashSet tự động loại bỏ các số trùng lặp khi cuộn màn hình
                                     collectedPhones.add(cleanedPhone);
                                 }
                             }
@@ -270,7 +269,7 @@ public class AutoScrapeService extends AccessibilityService {
                 @Override
                 public void onCompleted(GestureDescription gestureDescription) {
                     super.onCompleted(gestureDescription);
-                    handler.postDividerDelayed(nextRunnable, 1000); // fixed syntax if needed, let's keep handler.postDelayed
+                    handler.postDelayed(nextRunnable, 1000);
                 }
 
                 @Override
