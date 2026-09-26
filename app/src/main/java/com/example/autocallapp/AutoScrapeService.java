@@ -172,7 +172,7 @@ public class AutoScrapeService extends AccessibilityService {
     private void searchAndCallForCode(String targetCode) {
         if (!isCallingProcessActive) return;
 
-        Log.d(TAG, "Đang xử lý mã đơn qua Clipboard: " + targetCode);
+        Log.d(TAG, "Đang xử lý mã đơn: " + targetCode);
 
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
         if (rootNode == null) {
@@ -189,14 +189,14 @@ public class AutoScrapeService extends AccessibilityService {
         if (searchNodes != null && !searchNodes.isEmpty()) {
             AccessibilityNodeInfo searchBox = searchNodes.get(0);
 
-            // BƯỚC 1: Đưa mã đơn vào Clipboard hệ thống để chuẩn bị dán
+            // BƯỚC 1: Đưa mã đơn vào Clipboard hệ thống
             android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
             android.content.ClipData clip = android.content.ClipData.newPlainText("SubCode", targetCode);
             if (clipboard != null) {
                 clipboard.setPrimaryClip(clip);
             }
 
-            // BƯỚC 2: Lấy tọa độ và click vào ô tìm kiếm để focus
+            // BƯỚC 2: Lấy tọa độ ô tìm kiếm và dùng hàm clickAtCoordinates để bấm chọn thực tế
             Rect bounds = new Rect();
             searchBox.getBoundsInScreen(bounds);
             
@@ -206,18 +206,25 @@ public class AutoScrapeService extends AccessibilityService {
                 searchBox.performAction(AccessibilityNodeInfo.ACTION_CLICK);
             }
 
-            // BƯỚC 3: Sau 200ms, thực hiện lệnh PASTE (Dán) nội dung từ Clipboard vào ô
+            // BƯỚC 3: Sau 300ms, thực hiện gán text / dán nội dung vào ô tìm kiếm
             handler.postDelayed(() -> {
-                // Focus lại cho chắc chắn ô đang nhận lệnh
                 searchBox.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
                 
-                // Dùng action PASTE chuẩn của Android Accessibility để dán mã (tự động đè/thay thế mã cũ)
-                boolean pasted = searchBox.performAction(AccessibilityNodeInfo.ACTION_PASTE);
-                Log.d(TAG, "Dán mã " + targetCode + ": " + (pasted ? "THÀNH CÔNG" : "THẤT BẠI"));
+                // Thử gán text trực tiếp bằng API
+                Bundle arguments = new Bundle();
+                arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, targetCode);
+                boolean textSet = searchBox.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
 
-                // BƯỚC 4: Đợi 1200ms để app tự động lọc kết quả theo mã vừa dán rồi tiến hành lấy SĐT gọi
+                if (!textSet) {
+                    // Nếu bị chặn, dùng ACTION_PASTE từ Clipboard
+                    searchBox.performAction(AccessibilityNodeInfo.ACTION_PASTE);
+                }
+
+                Log.d(TAG, "Đã điền mã: " + targetCode);
+
+                // BƯỚC 4: Đợi 1200ms để app lọc kết quả rồi tiến hành lấy SĐT gọi
                 handler.postDelayed(this::findAndCallFilteredPhoneNumber, 1200);
-            }, 200);
+            }, 300);
 
         } else {
             Log.e(TAG, "Không tìm thấy ô tìm kiếm etSearch!");
@@ -374,7 +381,7 @@ public class AutoScrapeService extends AccessibilityService {
 
     private void saveCodesToFile() {
         try {
-            File file = new File(getExternalFilesDir(null), "DanhSachMDon.txt");
+            File file = new File(getExternalFilesDir(null), "DanhSachMaDon.txt");
             FileOutputStream fos = new FileOutputStream(file, false);
             for (String code : collectedCodes) {
                 fos.write((code + "\n").getBytes(StandardCharsets.UTF_8));
