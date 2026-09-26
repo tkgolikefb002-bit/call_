@@ -49,7 +49,7 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // PHẦN 1: QUÉT SỐ ĐIỆN THOẠI DỰA TRÊN CẤU TRÚC LAYOUT (KHÔNG DÙNG TỌA ĐỘ)
+    // PHẦN 1: QUÉT SỐ ĐIỆN THOẠI BẰNG CÁCH DUYỆT TẤT CẢ CÁC NODE VĂN BẢN
     // =========================================================================
     public void startScraping() {
         if (isScraping) {
@@ -76,31 +76,8 @@ public class AutoScrapeService extends AccessibilityService {
                 if (rootNode != null) {
                     int previousSize = collectedPhones.size();
                     
-                    // Tìm tất cả các khung chứa thanh tác vụ dưới cùng của đơn hàng (llBottomParent)
-                    List<AccessibilityNodeInfo> containerNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/llBottomParent");
-                    
-                    if (containerNodes != null && !containerNodes.isEmpty()) {
-                        for (AccessibilityNodeInfo container : containerNodes) {
-                            if (container != null) {
-                                // Chỉ tìm số điện thoại nằm NỘI BỘ bên trong khung đơn hàng này 
-                                // (Giúp loại bỏ hoàn toàn số điện thoại của shop ở phía trên)
-                                List<AccessibilityNodeInfo> phoneNodes = container.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
-                                
-                                if (phoneNodes != null && !phoneNodes.isEmpty()) {
-                                    for (AccessibilityNodeInfo pNode : phoneNodes) {
-                                        if (pNode != null && pNode.getText() != null) {
-                                            String phone = pNode.getText().toString().trim();
-                                            if (isValidPhoneNumber(phone)) {
-                                                collectedPhones.add(phone);
-                                            }
-                                        }
-                                        if (pNode != null) pNode.recycle();
-                                    }
-                                }
-                                container.recycle();
-                            }
-                        }
-                    }
+                    // Duyệt toàn bộ cây giao diện để tìm mọi số điện thoại hợp lệ xuất hiện trên màn hình
+                    traverseAndCollectPhones(rootNode);
 
                     if (collectedPhones.size() > previousSize) {
                         scrollAttempts = 0; 
@@ -125,6 +102,26 @@ public class AutoScrapeService extends AccessibilityService {
         };
 
         handler.post(scrapeRunnable);
+    }
+
+    // Hàm đệ quy duyệt qua tất cả các node con trên màn hình
+    private void traverseAndCollectPhones(AccessibilityNodeInfo node) {
+        if (node == null) return;
+
+        if (node.getText() != null) {
+            String text = node.getText().toString().trim();
+            if (isValidPhoneNumber(text)) {
+                collectedPhones.add(text);
+            }
+        }
+
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo child = node.getChild(i);
+            if (child != null) {
+                traverseAndCollectPhones(child);
+                child.recycle();
+            }
+        }
     }
 
     private boolean isValidPhoneNumber(String phone) {
