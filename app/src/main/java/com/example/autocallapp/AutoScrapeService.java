@@ -197,11 +197,15 @@ public class AutoScrapeService extends AccessibilityService {
             if (searchBoxes == null || searchBoxes.isEmpty()) {
                 searchBoxes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/et_search");
             }
+            if (searchBoxes == null || searchBoxes.isEmpty()) {
+                searchBoxes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/search_src_text");
+            }
 
             boolean filled = false;
             if (searchBoxes != null && !searchBoxes.isEmpty()) {
                 for (AccessibilityNodeInfo box : searchBoxes) {
                     if (box != null) {
+                        box.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
                         android.os.Bundle arguments = new android.os.Bundle();
                         arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, phoneNumber);
                         boolean success = box.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
@@ -213,11 +217,18 @@ public class AutoScrapeService extends AccessibilityService {
                     }
                 }
             }
+
+            if (!filled) {
+                filled = focusAndTypeRecursive(rootNode, phoneNumber);
+            }
+
             rootNode.recycle();
 
             if (filled) {
-                handler.postDelayed(() -> verifyAndClickCallButton(phoneNumber), 600);
+                // Đã dán thành công, chờ 800ms để app lọc kết quả rồi tiến hành bấm gọi
+                handler.postDelayed(() -> verifyAndClickCallButton(phoneNumber), 800);
             } else {
+                // Không tìm thấy ô nhập -> Bỏ qua số này sang số tiếp theo
                 handler.postDelayed(this::executeNextCallStep, 400);
             }
         } else {
@@ -225,12 +236,36 @@ public class AutoScrapeService extends AccessibilityService {
         }
     }
 
+    private boolean focusAndTypeRecursive(AccessibilityNodeInfo node, String textToType) {
+        if (node == null) return false;
+
+        if (node.getClassName() != null && node.getClassName().toString().contains("EditText")) {
+            node.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
+            android.os.Bundle arguments = new android.os.Bundle();
+            arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, textToType);
+            if (node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)) {
+                return true;
+            }
+        }
+
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo child = node.getChild(i);
+            if (focusAndTypeRecursive(child, textToType)) {
+                if (child != null) child.recycle();
+                return true;
+            }
+            if (child != null) child.recycle();
+        }
+        return false;
+    }
+
     private void verifyAndClickCallButton(String phoneNumber) {
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
         if (rootNode != null) {
-            List<AccessibilityNodeInfo> phoneNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
             boolean clicked = false;
-
+            
+            // Tìm kiếm theo viewId chuẩn của số điện thoại trên app
+            List<AccessibilityNodeInfo> phoneNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
             if (phoneNodes != null && !phoneNodes.isEmpty()) {
                 for (AccessibilityNodeInfo node : phoneNodes) {
                     if (node != null && node.getText() != null && node.getText().toString().contains(phoneNumber)) {
@@ -250,17 +285,52 @@ public class AutoScrapeService extends AccessibilityService {
                     }
                 }
             }
+
+            // Nếu chưa click được bằng ID chuẩn, dùng đệ quy quét giao diện tìm nút gọi
+            if (!clicked) {
+                clicked = searchAndClickRecursive(rootNode, phoneNumber);
+            }
+
             rootNode.recycle();
 
             if (clicked) {
                 Toast.makeText(this, "Đang gọi: " + phoneNumber, Toast.LENGTH_SHORT).show();
             } else {
-                // Không tìm thấy nút bấm gọi -> Tự động chuyển số tiếp theo sau 400ms
+                // Không tìm thấy kết quả hoặc nút gọi -> Tự động bỏ qua ngay lập tức
                 handler.postDelayed(this::executeNextCallStep, 400);
             }
         } else {
             handler.postDelayed(this::executeNextCallStep, 500);
         }
+    }
+
+    private boolean searchAndClickRecursive(AccessibilityNodeInfo node, String targetPhone) {
+        if (node == null) return false;
+
+        CharSequence text = node.getText();
+        if (text != null && text.toString().contains(targetPhone)) {
+            AccessibilityNodeInfo current = node;
+            for (int i = 0; i < 4; i++) {
+                if (current == null) break;
+                if (current.isClickable()) {
+                    boolean success = current.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                    if (success) return true;
+                }
+                AccessibilityNodeInfo parent = current.getParent();
+                if (current != node) current.recycle();
+                current = parent;
+            }
+        }
+
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo child = node.getChild(i);
+            if (searchAndClickRecursive(child, targetPhone)) {
+                if (child != null) child.recycle();
+                return true;
+            }
+            if (child != null) child.recycle();
+        }
+        return false;
     }
 
     // Phương thức để MyInCallService gọi khi cuộc gọi kết thúc
