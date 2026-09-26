@@ -13,6 +13,7 @@ import android.telecom.PhoneAccount;
 import android.telecom.PhoneAccountHandle;
 import android.telecom.TelecomManager;
 import android.widget.Button;
+import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -26,6 +27,16 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        // 1. Nhận và hiển thị ngày hết hạn bản quyền được truyền từ CheckKeyActivity sang
+        String expiryDate = getIntent().getStringExtra("EXPIRY_DATE");
+        if (expiryDate != null) {
+            // Giả sử trong file activity_main.xml của bạn có một TextView dùng để hiển thị hạn, ví dụ id là txtExpiry
+            TextView txtExpiry = findViewById(R.id.txtExpiry);
+            if (txtExpiry != null) {
+                txtExpiry.setText("Hạn sử dụng đến ngày: " + expiryDate);
+            }
+        }
 
         // Đăng ký PhoneAccount ngầm
         registerPhoneAccount();
