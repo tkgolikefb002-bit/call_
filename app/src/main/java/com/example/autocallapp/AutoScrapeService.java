@@ -1,7 +1,9 @@
 package com.example.autocallapp;
 
 import android.accessibilityservice.AccessibilityService;
+import android.accessibilityservice.GestureDescription;
 import android.content.Intent;
+import android.graphics.Path;
 import android.net.Uri;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.os.Handler;
@@ -23,6 +25,7 @@ import java.util.regex.Pattern;
 public class AutoScrapeService extends AccessibilityService {
     private static final String TAG = "AutoScrapeService";
     public static AutoScrapeService instance;
+    private boolean isScraping = false;
     private boolean isCallingProcessActive = false; 
     
     private final Set<String> collectedPhones = new LinkedHashSet<>();
@@ -43,63 +46,111 @@ public class AutoScrapeService extends AccessibilityService {
 
     @Override
     public void onInterrupt() {
+        isScraping = false;
         isCallingProcessActive = false;
     }
 
     // =========================================================================
-    // QUÉT TĨNH 1 LẦN TRÊN MÀN HÌNH HIỆN TẠI (KHÔNG CUỘN, KHÔNG DÍNH RÁC CŨ)
+    // QUÉT THEO TỪNG KHUNG ĐƠN HÀNG (DỰA VÀO ID MÃ VẬN ĐƠN HOẶC KHUNG BAO)
     // =========================================================================
     public void startScraping() {
-        clearSavedData(); // Xóa sạch dữ liệu cũ trong bộ nhớ và file txt
-        
-        Toast.makeText(this, "Đang quét màn hình hiện tại...", Toast.LENGTH_SHORT).show();
-
-        AccessibilityNodeInfo rootNode = getRootInActiveWindow();
-        if (rootNode != null) {
-            traverseAndExtractPhones(rootNode);
-            rootNode.recycle();
+        if (isScraping) {
+            Toast.makeText(this, "Đang trong quá trình quét số điện thoại...", Toast.LENGTH_SHORT).show();
+            return;
         }
-
-        savePhonesToFile();
-        updatePopupProgress(collectedPhones.size());
         
-        Toast.makeText(getApplicationContext(), "Đã quét xong! Tổng số: " + collectedPhones.size(), Toast.LENGTH_LONG).show();
+        clearSavedData();
+        isScraping = true;
+        updatePopupProgress(0);
+        
+        Toast.makeText(this, "Bắt đầu quét danh sách đơn hàng...", Toast.LENGTH_SHORT).show();
+
+        Runnable scrapeRunnable = new Runnable() {
+            int scrollAttempts = 0;
+            
+            @Override
+            public void run() {
+                if (!isScraping) return;
+
+                AccessibilityNodeInfo rootNode = getRootInActiveWindow();
+                if (rootNode != null) {
+                    int previousSize = collectedPhones.size();
+                    
+                    // Tìm tất cả các mã vận đơn trên màn hình để định vị từng khung đơn hàng
+                    List<AccessibilityNodeInfo> billNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvBillCode");
+                    
+                    if (billNodes != null && !billNodes.isEmpty()) {
+                        for (AccessibilityNodeInfo billNode : billNodes) {
+                            // Lên cấp cha của mã vận đơn để lấy trọn khung chứa đơn hàng đó
+                            AccessibilityNodeInfo parentCard = getOrderCardContainer(billNode);
+                            if (parentCard != null) {
+                                // Tìm số điện thoại nằm riêng trong khung đơn hàng này
+                                List<AccessibilityNodeInfo> phoneNodes = parentCard.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
+                                if (phoneNodes != null) {
+                                    for (AccessibilityNodeInfo phoneNode : phoneNodes) {
+                                        if (phoneNode != null && phoneNode.getText() != null) {
+                                            String rawText = phoneNode.getText().toString();
+                                            extractAndAddPhone(rawText);
+                                        }
+                                        if (phoneNode != null) phoneNode.recycle();
+                                    }
+                                }
+                                parentCard.recycle();
+                            }
+                        }
+                    }
+
+                    if (collectedPhones.size() > previousSize) {
+                        scrollAttempts = 0; 
+                        updatePopupProgress(collectedPhones.size());
+                    } else {
+                        scrollAttempts++;
+                        // Nếu cuộn 2 lần liên tiếp không tìm thấy số mới -> Dừng quét và lưu file
+                        if (scrollAttempts >= 2) {
+                            isScraping = false;
+                            savePhonesToFile();
+                            updatePopupProgress(collectedPhones.size());
+                            Toast.makeText(getApplicationContext(), "Đã quét xong! Tổng số điện thoại: " + collectedPhones.size(), Toast.LENGTH_LONG).show();
+                            rootNode.recycle();
+                            return;
+                        }
+                    }
+                    rootNode.recycle();
+                }
+                
+                performFastScrollDownAndContinue(handler, this);
+            }
+        };
+
+        handler.post(scrapeRunnable);
     }
 
-    private void traverseAndExtractPhones(AccessibilityNodeInfo node) {
-        if (node == null) return;
-
-        // Ưu tiên quét ID chuẩn của số điện thoại nếu app cung cấp
-        if (node.getViewIdResourceName() != null && node.getViewIdResourceName().endsWith("tvPhoneNub")) {
-            if (node.getText() != null) {
-                extractAndAddPhones(node.getText().toString());
+    // Hàm tìm ngược lên cấp khung chứa chung của đơn hàng
+    private AccessibilityNodeInfo getOrderCardContainer(AccessibilityNodeInfo node) {
+        AccessibilityNodeInfo current = node;
+        for (int i = 0; i < 4; i++) { // Đi ngược lên tối đa 4 cấp cha để tìm khung bao đơn
+            if (current == null) break;
+            AccessibilityNodeInfo parent = current.getParent();
+            if (parent == null) break;
+            
+            // Nếu cấp cha này có chứa cả trường số điện thoại thì chính là nó
+            List<AccessibilityNodeInfo> testPhone = parent.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
+            if (testPhone != null && !testPhone.isEmpty()) {
+                for(AccessibilityNodeInfo p : testPhone) p.recycle();
+                if (current != node) current.recycle();
+                return parent;
             }
+            
+            if (current != node) current.recycle();
+            current = parent;
         }
-
-        // Quét dự phòng qua Text và ContentDescription của toàn bộ node trên màn hình hiện tại
-        if (node.getText() != null) {
-            extractAndAddPhones(node.getText().toString());
-        }
-        if (node.getContentDescription() != null) {
-            extractAndAddPhones(node.getContentDescription().toString());
-        }
-
-        for (int i = 0; i < node.getChildCount(); i++) {
-            AccessibilityNodeInfo child = node.getChild(i);
-            if (child != null) {
-                traverseAndExtractPhones(child);
-                child.recycle();
-            }
-        }
+        return node.getParent(); // Trả về cấp cha gần nhất nếu không tìm thấy khung lớn hơn
     }
 
-    // Lọc chuẩn xác tuyệt đối số di động VN (bắt đầu bằng 03, 05, 07, 08, 09 và đủ 10 số)
-    private void extractAndAddPhones(String text) {
+    private void extractAndAddPhone(String text) {
         if (text == null || text.isEmpty()) return;
-        
         Pattern pattern = Pattern.compile("0[35789]\\d{8}");
         Matcher matcher = pattern.matcher(text);
-        
         while (matcher.find()) {
             String phone = matcher.group();
             if (phone != null && phone.length() == 10) {
@@ -117,20 +168,20 @@ public class AutoScrapeService extends AccessibilityService {
         loadPhonesForCalling();
 
         if (callQueueList.isEmpty()) {
-            Toast.makeText(this, "Không có số điện thoại nào để gọi! Hãy quét trước.", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Không có số điện thoại nào trong danh sách để gọi! Hãy quét trước.", Toast.LENGTH_LONG).show();
             return;
         }
 
         isCallingProcessActive = true;
         currentCallIndex = 0;
-        Toast.makeText(this, "Bắt đầu tự động gọi " + callQueueList.size() + " số...", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Bắt đầu tự động gọi " + callQueueList.size() + " số điện thoại...", Toast.LENGTH_SHORT).show();
         executeNextCallStep();
     }
 
     public void stopAutoCallingSequence() {
         isCallingProcessActive = false;
         handler.removeCallbacksAndMessages(null);
-        Toast.makeText(this, "Đã dừng gọi tự động!", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Đã dừng tiến trình gọi tự động!", Toast.LENGTH_SHORT).show();
     }
 
     private void loadPhonesForCalling() {
@@ -161,7 +212,7 @@ public class AutoScrapeService extends AccessibilityService {
         if (!isCallingProcessActive) return;
 
         if (currentCallIndex >= callQueueList.size()) {
-            Toast.makeText(this, "Đã hoàn thành danh sách gọi điện!", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Đã hoàn thành toàn bộ danh sách gọi điện!", Toast.LENGTH_LONG).show();
             isCallingProcessActive = false;
             return;
         }
@@ -184,14 +235,18 @@ public class AutoScrapeService extends AccessibilityService {
             startActivity(intent);
         } catch (SecurityException e) {
             e.printStackTrace();
-            Toast.makeText(this, "Thiếu quyền gọi điện!", Toast.LENGTH_SHORT).show();
-            handler.postDelayed(this::executeNextCallStep, 1000);
+            Toast.makeText(this, "Thiếu quyền gọi điện thoại!", Toast.LENGTH_SHORT).show();
+            moveToNextCodeAfterDelay();
         }
     }
 
     public void onCallFinished() {
         if (!isCallingProcessActive) return;
         handler.postDelayed(this::executeNextCallStep, 1500);
+    }
+
+    private void moveToNextCodeAfterDelay() {
+        handler.postDelayed(this::executeNextCallStep, 1000);
     }
 
     private void savePhonesToFile() {
@@ -225,6 +280,33 @@ public class AutoScrapeService extends AccessibilityService {
     private void updatePopupProgress(int count) {
         if (FloatingWidgetService.instance != null) {
             FloatingWidgetService.instance.updateProgress(count);
+        }
+    }
+
+    private void performFastScrollDownAndContinue(Handler handler, Runnable nextRunnable) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+            Path path = new Path();
+            path.moveTo(500, 1100);
+            path.lineTo(500, 500);
+            
+            GestureDescription.Builder builder = new GestureDescription.Builder();
+            builder.addStroke(new GestureDescription.StrokeDescription(path, 0, 250));
+            
+            dispatchGesture(builder.build(), new GestureResultCallback() {
+                @Override
+                public void onCompleted(GestureDescription gestureDescription) {
+                    super.onCompleted(gestureDescription);
+                    handler.postDelayed(nextRunnable, 1000);
+                }
+
+                @Override
+                public void onCancelled(GestureDescription gestureDescription) {
+                    super.onCancelled(gestureDescription);
+                    handler.postDelayed(nextRunnable, 1000);
+                }
+            }, null);
+        } else {
+            handler.postDelayed(nextRunnable, 1200);
         }
     }
 }
