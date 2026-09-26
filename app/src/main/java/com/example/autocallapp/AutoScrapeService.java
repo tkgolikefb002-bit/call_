@@ -31,7 +31,7 @@ public class AutoScrapeService extends AccessibilityService {
     private final Set<String> collectedPhones = new LinkedHashSet<>();
     private final List<String> callQueueList = new ArrayList<>();
     private int currentCallIndex = 0;
-    private Handler handler = new Handler(Looper.getMainLooper());
+    private final Handler handler = new Handler(Looper.getMainLooper());
 
     @Override
     public void onServiceConnected() {
@@ -76,7 +76,6 @@ public class AutoScrapeService extends AccessibilityService {
                 int previousSize = collectedPhones.size();
                 
                 if (rootNode != null) {
-                    // Chỉ quét các số điện thoại đang hiển thị (thuộc tab hiện tại, bỏ qua tab ẩn)
                     List<AccessibilityNodeInfo> phoneNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
                     if (phoneNodes != null && !phoneNodes.isEmpty()) {
                         for (AccessibilityNodeInfo phoneNode : phoneNodes) {
@@ -99,7 +98,6 @@ public class AutoScrapeService extends AccessibilityService {
                     noNewDataCount++;
                 }
 
-                // Nếu 4 nhịp liên tục không tăng số mới -> Đã đến cuối trang của tab này
                 if (noNewDataCount >= 4) {
                     isScraping = false;
                     savePhonesToFile();
@@ -108,7 +106,6 @@ public class AutoScrapeService extends AccessibilityService {
                     return;
                 }
 
-                // Thực hiện vuốt dọc màn hình để cuộn tiếp
                 performVerticalSwipe(handler, this);
             }
         };
@@ -119,7 +116,6 @@ public class AutoScrapeService extends AccessibilityService {
     private void performVerticalSwipe(Handler handler, Runnable nextRunnable) {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
             Path path = new Path();
-            // Vuốt dọc ở giữa màn hình để tránh chạm vào thanh tab phía trên
             path.moveTo(500, 1400);
             path.lineTo(500, 500);
             
@@ -130,7 +126,6 @@ public class AutoScrapeService extends AccessibilityService {
                 @Override
                 public void onCompleted(GestureDescription gestureDescription) {
                     super.onCompleted(gestureDescription);
-                    // Độ trễ 300ms để ổn định khung hình đơn cuối cùng
                     handler.postDelayed(nextRunnable, 300);
                 }
 
@@ -192,7 +187,6 @@ public class AutoScrapeService extends AccessibilityService {
             handler.post(() -> FloatingWidgetService.instance.updateProgress(currentCallIndex));
         }
 
-        // Bước 1: Dán số điện thoại vào ô tìm kiếm của app BEST
         inputPhoneToSearchBox(targetPhone);
     }
 
@@ -222,10 +216,8 @@ public class AutoScrapeService extends AccessibilityService {
             rootNode.recycle();
 
             if (filled) {
-                // Chờ 600ms để app lọc kết quả rồi tiến hành kiểm tra
                 handler.postDelayed(() -> verifyAndClickCallButton(phoneNumber), 600);
             } else {
-                // Không tìm thấy ô nhập -> Bỏ qua ngay sang số tiếp theo
                 handler.postDelayed(this::executeNextCallStep, 400);
             }
         } else {
@@ -262,10 +254,8 @@ public class AutoScrapeService extends AccessibilityService {
 
             if (clicked) {
                 Toast.makeText(this, "Đang gọi: " + phoneNumber, Toast.LENGTH_SHORT).show();
-                // Bấm gọi thành công -> Chờ 3.5 giây để cuộc gọi kích hoạt rồi chuyển số kế tiếp
                 handler.postDelayed(this::executeNextCallStep, 3500);
             } else {
-                // KHÔNG HIỆN ĐƠN HOẶC KHÔNG CÓ NÚT GỌI -> BỎ QUA NGAY LẬP TỨC
                 handler.postDelayed(this::executeNextCallStep, 400);
             }
         } else {
