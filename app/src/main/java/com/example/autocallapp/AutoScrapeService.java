@@ -50,7 +50,7 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // PHẦN 1: QUÉT VÀ LƯU SỐ ĐIỆN THOẠI (CHỈ LẤY SỐ NGƯỜI NHẬN Ở DƯỚI CÙNG THẺ ĐƠN)
+    // PHẦN 1: QUÉT SỐ ĐIỆN THOẠI (LỌC LẤY SỐ NẰM THẤP NHẤT TRONG MỖI KHUNG ĐƠN)
     // =========================================================================
     public void startScraping() {
         if (isScraping) {
@@ -58,7 +58,7 @@ public class AutoScrapeService extends AccessibilityService {
             return;
         }
         
-        // Tự động xóa sạch danh sách cũ ngay khi bắt đầu quét mới
+        // Xóa sạch dữ liệu cũ trước khi bắt đầu quét mới
         clearSavedData();
         
         isScraping = true;
@@ -77,50 +77,63 @@ public class AutoScrapeService extends AccessibilityService {
                 if (rootNode != null) {
                     int previousSize = collectedPhones.size();
                     
-                    // Tìm tất cả các khung container đơn hàng trên màn hình
-                    List<AccessibilityNodeInfo> containerNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/llBottomParent");
+                    // Tìm tất cả các node số điện thoại đang hiển thị trên màn hình
+                    List<AccessibilityNodeInfo> phoneNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
                     
-                    if (containerNodes != null && !containerNodes.isEmpty()) {
-                        for (AccessibilityNodeInfo container : containerNodes) {
-                            if (container != null) {
-                                Rect containerBounds = new Rect();
-                                container.getBoundsInScreen(containerBounds);
+                    if (phoneNodes != null && !phoneNodes.isEmpty()) {
+                        // Gom nhóm các số theo tọa độ Y (mỗi đơn hàng cách nhau một khoảng chiều cao)
+                        // Hoặc chọn lọc các số có khoảng cách hợp lý. 
+                        // Ở đây ta lọc lấy các số nằm trong tầm nhìn hợp lệ và loại bỏ các số trùng lặp/số shop ở trên.
+                        // Thông thường trong 1 màn hình danh sách đơn, mỗi đơn có 2 số (trên là shop, dưới là khách).
+                        // Ta sẽ phân loại các node theo tọa độ màn hình (bounds.top).
+                        
+                        List<PhoneItem> validNodeList = new ArrayList<>();
+                        for (AccessibilityNodeInfo node : phoneNodes) {
+                            if (node != null && node.getText() != null) {
+                                Rect bounds = new Rect();
+                                node.getBoundsInScreen(bounds);
                                 
-                                // Kiểm tra container có hiển thị thực tế trên màn hình không
-                                if (containerBounds.top >= 0 && containerBounds.bottom > 0 && containerBounds.top < 2400) {
-                                    // Tìm tất cả các số điện thoại bên trong khung đơn hàng này
-                                    List<AccessibilityNodeInfo> phoneNodes = container.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
-                                    
-                                    if (phoneNodes != null && !phoneNodes.isEmpty()) {
-                                        AccessibilityNodeInfo targetPhoneNode = null;
-                                        int maxTop = -1;
-                                        
-                                        // Lọc lấy số nằm ở vị trí thấp nhất trong thẻ đơn (số của người nhận)
-                                        for (AccessibilityNodeInfo pNode : phoneNodes) {
-                                            if (pNode != null) {
-                                                Rect pBounds = new Rect();
-                                                pNode.getBoundsInScreen(pBounds);
-                                                if (pBounds.top > maxTop) {
-                                                    maxTop = pBounds.top;
-                                                    targetPhoneNode = pNode;
-                                                }
-                                            }
-                                        }
-                                        
-                                        if (targetPhoneNode != null && targetPhoneNode.getText() != null) {
-                                            String phone = targetPhoneNode.getText().toString().trim();
-                                            if (isValidPhoneNumber(phone)) {
-                                                collectedPhones.add(phone);
-                                            }
-                                        }
-                                        
-                                        // Giải phóng bộ nhớ node
-                                        for (AccessibilityNodeInfo pNode : phoneNodes) {
-                                            if (pNode != null) pNode.recycle();
-                                        }
+                                // Nằm trong khung nhìn thực tế của màn hình danh sách
+                                if (bounds.top > 150 && bounds.bottom < 2300 && bounds.top < bounds.bottom) {
+                                    String phone = node.getText().toString().trim();
+                                    if (isValidPhoneNumber(phone)) {
+                                        validNodeList.add(new PhoneItem(phone, bounds.top));
                                     }
                                 }
-                                container.recycle();
+                            }
+                            if (node != null) node.recycle();
+                        }
+
+                        // Sắp xếp các số theo tọa độ từ trên xuống dưới trên màn hình
+                        validNodeList.sort((a, b) -> Integer.compare(a.top, b.top));
+
+                        // Lọc thông minh: Nếu thấy các số xuất hiện, ta nhận diện khoảng cách đơn hàng.
+                        // Thông thường mỗi thẻ đơn hàng cao khoảng 300-500 pixel. 
+                        // Số của người nhận luôn nằm ở gần đáy thẻ (tọa độ top lớn hơn trong cùng một thẻ).
+                        // Cách tối ưu đơn giản và chính xác nhất cho danh sách cuộn: 
+                        // Lấy các số cách nhau hoặc gom theo cụm đơn. 
+                        // Hoặc ta có thể quy ước: Trong mỗi thẻ đơn, số của khách nằm ở nửa dưới của thẻ đó.
+                        
+                        // Để chắc chắn lấy đúng số khách hàng (số thứ 2 trong mỗi cặp đơn):
+                        // Ta duyệt danh sách, nếu 2 số nằm quá gần nhau (cùng 1 thẻ đơn, cách nhau < 150 pixel), 
+                        // thì số nằm dưới (tọa độ lớn hơn) chính là số khách hàng cần lấy.
+                        for (int i = 0; i < validNodeList.size(); i++) {
+                            PhoneItem current = validNodeList.get(i);
+                            boolean isShopNumber = false;
+                            
+                            // Kiểm tra xem có số nào nằm ngay phía dưới (trong khoảng 150 pixel) thuộc cùng một đơn không
+                            for (int j = 0; j < validNodeList.size(); j++) {
+                                PhoneItem other = validNodeList.get(j);
+                                // Nếu có số khác nằm dưới số hiện tại trong khoảng 30 đến 160 pixel -> số hiện tại là số shop (bỏ qua)
+                                if (other.top > current.top && (other.top - current.top) < 160) {
+                                    isShopNumber = true;
+                                    break;
+                                }
+                            }
+                            
+                            // Nếu không bị phát hiện là số shop nằm trên, hoặc nó là số cuối cùng của trang -> lấy
+                            if (!isShopNumber) {
+                                collectedPhones.add(current.phone);
                             }
                         }
                     }
@@ -148,6 +161,16 @@ public class AutoScrapeService extends AccessibilityService {
         };
 
         handler.post(scrapeRunnable);
+    }
+
+    // Helper class để lưu thông tin số và tọa độ Y
+    private static class PhoneItem {
+        String phone;
+        int top;
+        public PhoneItem(String phone, int top) {
+            this.phone = phone;
+            this.top = top;
+        }
     }
 
     private boolean isValidPhoneNumber(String phone) {
@@ -252,26 +275,6 @@ public class AutoScrapeService extends AccessibilityService {
 
     private void moveToNextCodeAfterDelay() {
         handler.postDelayed(this::executeNextCallStep, 1000);
-    }
-
-    private void loadExistingPhones() {
-        collectedPhones.clear();
-        try {
-            File file = new File(getExternalFilesDir(null), "DanhSachSoDienThoai.txt");
-            if (file.exists()) {
-                BufferedReader reader = new BufferedReader(new FileReader(file));
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    String trimmed = line.trim();
-                    if (!trimmed.isEmpty()) {
-                        collectedPhones.add(trimmed);
-                    }
-                }
-                reader.close();
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 
     private void savePhonesToFile() {
