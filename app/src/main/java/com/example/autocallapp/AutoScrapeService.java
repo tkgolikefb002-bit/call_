@@ -239,7 +239,6 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     private void performClipboardPasteAndSearch(String phoneNumber) {
-        // Đưa số điện thoại vào Clipboard hệ thống
         ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
         ClipData clip = ClipData.newPlainText("Phone", phoneNumber);
         if (clipboard != null) {
@@ -264,7 +263,6 @@ public class AutoScrapeService extends AccessibilityService {
         clickAtCoordinates(500, 150);
         Log.d(TAG, "Đã dán số: " + phoneNumber + ", chờ 1s để app lọc kết quả...");
 
-        // Đã chỉnh thời gian chờ xuống còn 1000ms (1 giây)
         handler.postDelayed(() -> verifyAndClickCallButton(phoneNumber), 1000);
     }
 
@@ -305,17 +303,19 @@ public class AutoScrapeService extends AccessibilityService {
         if (rootNode != null) {
             boolean clicked = false;
             
+            // Tìm chính xác node số điện thoại theo ID chuẩn xác trong XML: com.best.android.vietcourier:id/tvPhoneNub
             List<AccessibilityNodeInfo> phoneNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
             if (phoneNodes != null && !phoneNodes.isEmpty()) {
                 for (AccessibilityNodeInfo node : phoneNodes) {
                     if (node != null && node.getText() != null && node.getText().toString().contains(phoneNumber)) {
                         if (node.isVisibleToUser()) {
-                            AccessibilityNodeInfo clickableNode = findClickableParent(node);
-                            if (clickableNode != null) {
-                                clicked = clickableNode.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                                clickableNode.recycle();
-                            } else {
-                                clicked = node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                            Rect rect = new Rect();
+                            node.getBoundsInScreen(rect);
+                            if (rect.width() > 0 && rect.height() > 0) {
+                                // Thay vì dùng performAction(ACTION_CLICK) dễ dính sự kiện cha nhảy trang,
+                                // ta sử dụng tọa độ màn hình chính xác của text số điện thoại (rect.centerX(), rect.centerY()) để click
+                                clickAtCoordinates(rect.centerX(), rect.centerY());
+                                clicked = true;
                             }
                         }
                         node.recycle();
@@ -326,16 +326,12 @@ public class AutoScrapeService extends AccessibilityService {
                 }
             }
 
-            if (!clicked) {
-                clicked = searchAndClickRecursive(rootNode, phoneNumber);
-            }
-
             rootNode.recycle();
 
             if (clicked) {
                 Toast.makeText(this, "Đang gọi: " + phoneNumber, Toast.LENGTH_SHORT).show();
             } else {
-                Log.w(TAG, "Không tìm thấy nút gọi cho số: " + phoneNumber + ", chuyển sang số tiếp theo.");
+                Log.w(TAG, "Không tìm thấy nút số điện thoại cho số: " + phoneNumber + ", chuyển sang số tiếp theo.");
                 handler.postDelayed(this::executeNextCallStep, 400);
             }
         } else {
@@ -343,53 +339,9 @@ public class AutoScrapeService extends AccessibilityService {
         }
     }
 
-    private boolean searchAndClickRecursive(AccessibilityNodeInfo node, String targetPhone) {
-        if (node == null) return false;
-
-        CharSequence text = node.getText();
-        if (text != null && text.toString().contains(targetPhone)) {
-            AccessibilityNodeInfo current = node;
-            for (int i = 0; i < 4; i++) {
-                if (current == null) break;
-                if (current.isClickable()) {
-                    boolean success = current.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                    if (success) return true;
-                }
-                AccessibilityNodeInfo parent = current.getParent();
-                if (current != node) current.recycle();
-                current = parent;
-            }
-        }
-
-        for (int i = 0; i < node.getChildCount(); i++) {
-            AccessibilityNodeInfo child = node.getChild(i);
-            if (searchAndClickRecursive(child, targetPhone)) {
-                if (child != null) child.recycle();
-                return true;
-            }
-            if (child != null) child.recycle();
-        }
-        return false;
-    }
-
     public void onCallFinished() {
         if (!isCallingProcessActive) return;
         handler.postDelayed(this::executeNextCallStep, 1000);
-    }
-
-    private AccessibilityNodeInfo findClickableParent(AccessibilityNodeInfo node) {
-        AccessibilityNodeInfo current = node;
-        for (int i = 0; i < 3; i++) {
-            if (current == null) break;
-            if (current.isClickable()) {
-                if (current != node) return current;
-            }
-            AccessibilityNodeInfo parent = current.getParent();
-            if (current != node) current.recycle();
-            current = parent;
-        }
-        if (current != null && current != node) current.recycle();
-        return null;
     }
 
     public void stopAutoCallingSequence() {
