@@ -1,7 +1,9 @@
 package com.example.autocallapp;
 
 import android.accessibilityservice.AccessibilityService;
+import android.accessibilityservice.GestureDescription;
 import android.content.Intent;
+import android.graphics.Path;
 import android.net.Uri;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.os.Handler;
@@ -49,7 +51,7 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // QUÉT TỐC ĐỘ CAO 100MS: SỬ DỤNG SCROLL FORWARD TRỰC TIẾP TRÊN RECYCLERVIEW
+    // QUÉT TỐC ĐỘ CAO VỚI VUỐT DỌC CHUẨN XÁC (KHÔNG BỊ NHẢY TAB)
     // =========================================================================
     public void startScraping() {
         if (isScraping) {
@@ -61,9 +63,9 @@ public class AutoScrapeService extends AccessibilityService {
         isScraping = true;
         updatePopupProgress(0);
         
-        Toast.makeText(this, "Bắt đầu quét tốc độ cao 100ms...", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Bắt đầu quét danh sách đơn hàng...", Toast.LENGTH_SHORT).show();
 
-        Runnable ultraFastRunnable = new Runnable() {
+        Runnable scanRunnable = new Runnable() {
             int noNewDataCount = 0;
             
             @Override
@@ -74,7 +76,7 @@ public class AutoScrapeService extends AccessibilityService {
                 int previousSize = collectedPhones.size();
                 
                 if (rootNode != null) {
-                    // 1. Quét toàn bộ số điện thoại đang hiển thị
+                    // Quét toàn bộ số điện thoại đang hiển thị trên màn hình
                     List<AccessibilityNodeInfo> phoneNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
                     if (phoneNodes != null && !phoneNodes.isEmpty()) {
                         for (AccessibilityNodeInfo phoneNode : phoneNodes) {
@@ -84,27 +86,18 @@ public class AutoScrapeService extends AccessibilityService {
                             if (phoneNode != null) phoneNode.recycle();
                         }
                     }
-
-                    // 2. Tìm container danh sách (RecyclerView hoặc ScrollView) để ra lệnh cuộn trực tiếp
-                    AccessibilityNodeInfo scrollableContainer = findScrollableNode(rootNode);
-                    if (scrollableContainer != null) {
-                        scrollableContainer.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD);
-                        scrollableContainer.recycle();
-                    }
-                    
                     rootNode.recycle();
                 }
 
                 updatePopupProgress(collectedPhones.size());
 
-                // Kiểm tra tiến độ dữ liệu tăng lên
                 if (collectedPhones.size() > previousSize) {
                     noNewDataCount = 0;
                 } else {
                     noNewDataCount++;
                 }
 
-                // Nếu quét liên tục mà 4 nhịp không còn tăng số mới -> Đã chạm đáy
+                // Nếu quét liên tục mà 4 nhịp không tăng số mới -> Đã đến cuối trang
                 if (noNewDataCount >= 4) {
                     isScraping = false;
                     savePhonesToFile();
@@ -113,30 +106,42 @@ public class AutoScrapeService extends AccessibilityService {
                     return;
                 }
 
-                // Độ trễ siêu tốc 100ms đúng như các app auto chuyên nghiệp
-                handler.postDelayed(this, 1000); // Bạn có thể giảm xuống 100ms nếu máy và app mượt
+                // Thực hiện vuốt dọc màn hình chính xác để cuộn danh sách (tránh chạm tab trên)
+                performVerticalSwipe(handler, this);
             }
         };
 
-        handler.post(ultraFastRunnable);
+        handler.post(scanRunnable);
     }
 
-    // Hàm đệ quy tìm khung cuộn (RecyclerView / ScrollView)
-    private AccessibilityNodeInfo findScrollableNode(AccessibilityNodeInfo root) {
-        if (root == null) return null;
-        if (root.isScrollable()) {
-            return root;
+    private void performVerticalSwipe(Handler handler, Runnable nextRunnable) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+            Path path = new Path();
+            // Vuốt từ dưới lên trên ở chính giữa màn hình (tránh xa vùng tab phía trên)
+            path.moveTo(500, 1400);
+            path.lineTo(500, 500);
+            
+            GestureDescription.Builder builder = new GestureDescription.Builder();
+            // Tốc độ vuốt nhanh (200ms) để tối ưu thời gian
+            builder.addStroke(new GestureDescription.StrokeDescription(path, 0, 200));
+            
+            dispatchGesture(builder.build(), new GestureResultCallback() {
+                @Override
+                public void onCompleted(GestureDescription gestureDescription) {
+                    super.onCompleted(gestureDescription);
+                    // Độ trễ ngắn 300ms để danh sách load kịp đơn cuối cùng bị khuất
+                    handler.postDelayed(nextRunnable, 300);
+                }
+
+                @Override
+                public void onCancelled(GestureDescription gestureDescription) {
+                    super.onCancelled(gestureDescription);
+                    handler.postDelayed(nextRunnable, 300);
+                }
+            }, null);
+        } else {
+            handler.postDelayed(nextRunnable, 400);
         }
-        for (int i = 0; i < root.getChildCount(); i++) {
-            AccessibilityNodeInfo child = root.getChild(i);
-            AccessibilityNodeInfo result = findScrollableNode(child);
-            if (result != null) {
-                if (child != result) child.recycle();
-                return result;
-            }
-            if (child != null) child.recycle();
-        }
-        return null;
     }
 
     private void extractAndAddPhone(String text) {
