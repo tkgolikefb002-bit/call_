@@ -57,12 +57,14 @@ public class AutoScrapeService extends AccessibilityService {
             Toast.makeText(this, "Đang trong quá trình quét số điện thoại...", Toast.LENGTH_SHORT).show();
             return;
         }
+        
+        // Tự động xóa sạch danh sách cũ ngay khi bắt đầu quét mới
+        clearSavedData();
+        
         isScraping = true;
+        updatePopupProgress(0);
         
-        loadExistingPhones();
-        updatePopupProgress(collectedPhones.size());
-        
-        Toast.makeText(this, "Bắt đầu quét danh sách số điện thoại...", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Bắt đầu quét danh sách số điện thoại mới...", Toast.LENGTH_SHORT).show();
 
         Runnable scrapeRunnable = new Runnable() {
             int scrollAttempts = 0;
@@ -84,8 +86,7 @@ public class AutoScrapeService extends AccessibilityService {
                                 Rect bounds = new Rect();
                                 node.getBoundsInScreen(bounds);
                                 
-                                // CHỈ LẤY SỐ NẾU NÓ NẰM TRONG KHUNG NHÌN THẤY THỰC TẾ TRÊN MÀN HÌNH 
-                                // (Loại bỏ các view cũ/view ảo nằm ngoài tầm nhìn)
+                                // CHỈ LẤY SỐ NẾU NÓ NẰM TRONG KHUNG NHÌN THẤY THỰC TẾ TRÊN MÀN HÌNH
                                 if (bounds.top > 100 && bounds.bottom < 2400 && bounds.top < bounds.bottom) {
                                     String phone = node.getText().toString().trim();
                                     if (isValidPhoneNumber(phone)) {
