@@ -20,7 +20,6 @@ public class LicenseActivity extends AppCompatActivity {
     private EditText etKey;
     private Button btnCheckKey;
     
-    // Đường dẫn Cloudflare Worker bản quyền của bạn
     private static final String WORKER_URL = "https://autocall-license.tkgolikefb002.workers.dev/?key=";
 
     @Override
@@ -58,7 +57,7 @@ public class LicenseActivity extends AppCompatActivity {
 
             @Override
             public void onResponse(Call call, Response response) throws IOException {
-                if (response.isSuccessful()) {
+                if (response.isSuccessful() && response.body() != null) {
                     String responseData = response.body().string();
                     if (responseData.contains("VALID") || responseData.contains("success") || responseData.contains("true")) {
                         runOnUiThread(() -> {
