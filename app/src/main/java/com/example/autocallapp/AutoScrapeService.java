@@ -49,9 +49,6 @@ public class AutoScrapeService extends AccessibilityService {
         isCallingProcessActive = false;
     }
 
-    // =========================================================================
-    // PHẦN 1: TIẾN TRÌNH QUÉT MÃ
-    // =========================================================================
     public void startScraping() {
         if (isScraping) {
             Toast.makeText(this, "Đang trong quá trình quét mã, vui lòng đợi...", Toast.LENGTH_SHORT).show();
@@ -106,9 +103,6 @@ public class AutoScrapeService extends AccessibilityService {
         handler.post(scrapeRunnable);
     }
 
-    // =========================================================================
-    // PHẦN 2: TIẾN TRÌNH TỰ ĐỘNG GỌI 
-    // =========================================================================
     public void startAutoCallingSequence() {
         if (isCallingProcessActive) return;
 
@@ -189,14 +183,12 @@ public class AutoScrapeService extends AccessibilityService {
         if (searchNodes != null && !searchNodes.isEmpty()) {
             AccessibilityNodeInfo searchBox = searchNodes.get(0);
 
-            // BƯỚC 1: Đưa mã đơn vào Clipboard hệ thống
             android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
             android.content.ClipData clip = android.content.ClipData.newPlainText("SubCode", targetCode);
             if (clipboard != null) {
                 clipboard.setPrimaryClip(clip);
             }
 
-            // BƯỚC 2: Lấy tọa độ ô tìm kiếm và dùng hàm clickAtCoordinates để bấm chọn thực tế
             Rect bounds = new Rect();
             searchBox.getBoundsInScreen(bounds);
             
@@ -206,23 +198,19 @@ public class AutoScrapeService extends AccessibilityService {
                 searchBox.performAction(AccessibilityNodeInfo.ACTION_CLICK);
             }
 
-            // BƯỚC 3: Sau 300ms, thực hiện gán text / dán nội dung vào ô tìm kiếm
             handler.postDelayed(() -> {
                 searchBox.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
                 
-                // Thử gán text trực tiếp bằng API
                 Bundle arguments = new Bundle();
                 arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, targetCode);
                 boolean textSet = searchBox.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
 
                 if (!textSet) {
-                    // Nếu bị chặn, dùng ACTION_PASTE từ Clipboard
                     searchBox.performAction(AccessibilityNodeInfo.ACTION_PASTE);
                 }
 
                 Log.d(TAG, "Đã điền mã: " + targetCode);
 
-                // BƯỚC 4: Đợi 1200ms để app lọc kết quả rồi tiến hành lấy SĐT gọi
                 handler.postDelayed(this::findAndCallFilteredPhoneNumber, 1200);
             }, 300);
 
@@ -232,7 +220,6 @@ public class AutoScrapeService extends AccessibilityService {
         }
     }
 
-    // Hàm mô phỏng chạm vào tọa độ màn hình bằng Gesture
     private void clickAtCoordinates(int x, int y) {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
             Path path = new Path();
