@@ -19,6 +19,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class AutoScrapeService extends AccessibilityService {
     private static final String TAG = "AutoScrapeService";
@@ -49,7 +51,7 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // QUÉT SỐ ĐIỆN THOẠI DỰA TRÊN VIEW ID CỦA APP KẾT HỢP TỰ ĐỘNG CUỘN
+    // PHẦN 1: QUÉT SỐ ĐIỆN THOẠI BẰNG REGEX VÀ QUÉT ĐỒNG THỜI TEXT / DESCRIPTION
     // =========================================================================
     public void startScraping() {
         if (isScraping) {
@@ -74,21 +76,8 @@ public class AutoScrapeService extends AccessibilityService {
                 if (rootNode != null) {
                     int previousSize = collectedPhones.size();
                     
-                    // Tìm trực tiếp các node mang ID số điện thoại của app
-                    List<AccessibilityNodeInfo> phoneNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
-                    
-                    if (phoneNodes != null && !phoneNodes.isEmpty()) {
-                        for (AccessibilityNodeInfo node : phoneNodes) {
-                            if (node != null && node.getText() != null) {
-                                String text = node.getText().toString().trim();
-                                String cleanedPhone = extractPhoneNumber(text);
-                                if (cleanedPhone != null) {
-                                    collectedPhones.add(cleanedPhone);
-                                }
-                            }
-                            if (node != null) node.recycle();
-                        }
-                    }
+                    // Duyệt toàn bộ cây giao diện màn hình hiện tại
+                    traverseAndExtractPhones(rootNode);
 
                     if (collectedPhones.size() > previousSize) {
                         scrollAttempts = 0; 
@@ -115,13 +104,43 @@ public class AutoScrapeService extends AccessibilityService {
         handler.post(scrapeRunnable);
     }
 
-    private String extractPhoneNumber(String text) {
-        if (text == null) return null;
-        String cleaned = text.replaceAll("[^0-9]", "");
-        if (cleaned.startsWith("0") && cleaned.length() >= 9 && cleaned.length() <= 11) {
-            return cleaned;
+    // Hàm đệ quy duyệt qua tất cả các node để tìm số điện thoại ẩn trong Text hoặc ContentDescription
+    private void traverseAndExtractPhones(AccessibilityNodeInfo node) {
+        if (node == null) return;
+
+        // Kiểm tra qua getText()
+        if (node.getText() != null) {
+            extractAndAddPhones(node.getText().toString());
         }
-        return null;
+
+        // Kiểm tra qua getContentDescription() (Rất nhiều app render chữ ở đây)
+        if (node.getContentDescription() != null) {
+            extractAndAddPhones(node.getContentDescription().toString());
+        }
+
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo child = node.getChild(i);
+            if (child != null) {
+                traverseAndExtractPhones(child);
+                child.recycle();
+            }
+        }
+    }
+
+    // Sử dụng Regex Pattern để quét tìm mọi chuỗi số điện thoại hợp lệ bên trong văn bản
+    private void extractAndAddPhones(String text) {
+        if (text == null || text.isEmpty()) return;
+        
+        // Biểu thức chính quy tìm số điện thoại Việt Nam bắt đầu bằng số 0, theo sau là 9 hoặc 10 chữ số tiếp theo
+        Pattern pattern = Pattern.compile("0\\d{9,10}");
+        Matcher matcher = pattern.matcher(text);
+        
+        while (matcher.find()) {
+            String phone = matcher.group();
+            if (phone != null && phone.length() >= 10 && phone.length() <= 11) {
+                collectedPhones.add(phone);
+            }
+        }
     }
 
     // =========================================================================
