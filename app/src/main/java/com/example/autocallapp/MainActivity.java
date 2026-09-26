@@ -1,8 +1,6 @@
 package com.example.autocallapp;
 
 import android.Manifest;
-import android.content.ClipData;
-import android.content.ClipboardManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -17,7 +15,6 @@ import android.telecom.TelecomManager;
 import android.widget.Button;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -45,18 +42,6 @@ public class MainActivity extends AppCompatActivity {
             btnOpenDefaultSettings.setOnClickListener(v -> openDefaultAppsSettings());
         }
 
-        // Nút 1: KHÔI PHỤC / RESET NHANH QUYỀN MẶC ĐỊNH
-        Button btnResetRole = findViewById(R.id.btnResetRole);
-        if (btnResetRole != null) {
-            btnResetRole.setOnClickListener(v -> resetAndClearTelecomState());
-        }
-
-        // Nút 2: HIỂN THỊ VÀ COPY LỆNH ADB NHANH
-        Button btnShowAdbCommand = findViewById(R.id.btnShowAdbCommand);
-        if (btnShowAdbCommand != null) {
-            btnShowAdbCommand.setOnClickListener(v -> showAdbCommandDialog());
-        }
-
         // Nút mở bảng điều khiển popup nổi Auto
         Button btnStartPopup = findViewById(R.id.btnStartPopup);
         if (btnStartPopup != null) {
@@ -78,9 +63,7 @@ public class MainActivity extends AppCompatActivity {
             });
         }
 
-        // =========================================================================
-        // THÊM MỚI: Nút bấm mở thẳng cài đặt Trợ năng (Accessibility)
-        // =========================================================================
+        // Nút bấm mở thẳng cài đặt Trợ năng (Accessibility)
         Button btnOpenAccessibility = findViewById(R.id.btnOpenAccessibility);
         if (btnOpenAccessibility != null) {
             btnOpenAccessibility.setOnClickListener(v -> openAccessibilitySettings());
@@ -99,55 +82,6 @@ public class MainActivity extends AppCompatActivity {
             e.printStackTrace();
             Toast.makeText(this, "Không thể mở cài đặt Trợ năng!", Toast.LENGTH_SHORT).show();
         }
-    }
-
-    /**
-     * Hàm tự động làm sạch trạng thái Telecom và đăng ký lại từ đầu để gỡ treo quyền
-     */
-    private void resetAndClearTelecomState() {
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                TelecomManager telecomManager = (TelecomManager) getSystemService(Context.TELECOM_SERVICE);
-                if (telecomManager != null) {
-                    ComponentName componentName = new ComponentName(this, MyInCallService.class);
-                    PhoneAccountHandle handle = new PhoneAccountHandle(componentName, "MyCustomDialerId");
-                    
-                    telecomManager.unregisterPhoneAccount(handle);
-                    
-                    PhoneAccount account = PhoneAccount.builder(handle, "AutoCallApp")
-                            .setCapabilities(PhoneAccount.CAPABILITY_CALL_PROVIDER | PhoneAccount.CAPABILITY_CONNECTION_MANAGER)
-                            .build();
-                    telecomManager.registerPhoneAccount(account);
-                }
-            }
-            Toast.makeText(this, "Đã làm mới cấu hình Telecom thành công! Hãy vào chọn lại ứng dụng mặc định.", Toast.LENGTH_LONG).show();
-            openDefaultAppsSettings();
-        } catch (Exception e) {
-            e.printStackTrace();
-            Toast.makeText(this, "Lỗi reset: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    /**
-     * Hiển thị bảng thông báo chứa sẵn câu lệnh ADB để copy nhanh
-     */
-    private void showAdbCommandDialog() {
-        String packageName = getPackageName();
-        String adbCommand = "adb shell telecom set-default-dialer " + packageName;
-
-        new AlertDialog.Builder(this)
-                .setTitle("Lệnh ADB Gán Nhanh")
-                .setMessage("Vì Android bảo mật không cho phép ứng dụng tự chạy lệnh ADB, bạn hãy copy lệnh sau và dán vào Terminal trên máy tính:\n\n" + adbCommand)
-                .setPositiveButton("Copy Lệnh", (dialog, which) -> {
-                    ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-                    ClipData clip = ClipData.newPlainText("ADB Command", adbCommand);
-                    if (clipboard != null) {
-                        clipboard.setPrimaryClip(clip);
-                        Toast.makeText(this, "Đã copy lệnh vào bộ nhớ tạm!", Toast.LENGTH_SHORT).show();
-                    }
-                })
-                .setNegativeButton("Đóng", null)
-                .show();
     }
 
     private void requestAllRequiredPermissions() {
