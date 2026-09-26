@@ -30,7 +30,7 @@ public class AutoScrapeService extends AccessibilityService {
     private final Set<String> collectedPhones = new LinkedHashSet<>();
     private final List<String> callQueueList = new ArrayList<>();
     private int currentCallIndex = 0;
-    private Handler handler = new Handler(Looper.getMainLocate() != null ? Looper.getMainLooper() : Looper.getMainLooper());
+    private Handler handler = new Handler(Looper.getMainLooper());
 
     @Override
     public void onServiceConnected() {
@@ -50,7 +50,7 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // PHẦN 1: QUÉT VÀ LƯU SỐ ĐIỆN THOẠI TRỰC TIẾP (ĐÃ FIX LỖI TÁI SỬ DỤNG VIEW)
+    // PHẦN 1: QUÉT VÀ LƯU SỐ ĐIỆN THOẠI TRỰC TIẾP THEO CONTAINER
     // =========================================================================
     public void startScraping() {
         if (isScraping) {
@@ -75,19 +75,18 @@ public class AutoScrapeService extends AccessibilityService {
                 if (rootNode != null) {
                     int previousSize = collectedPhones.size();
                     
-                    // Tìm tất cả các container chứa thông tin đơn hàng dưới cùng (llBottomParent)
+                    // Tìm tất cả các khung container đơn hàng (llBottomParent)
                     List<AccessibilityNodeInfo> containerNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/llBottomParent");
                     
                     if (containerNodes != null && !containerNodes.isEmpty()) {
                         for (AccessibilityNodeInfo container : containerNodes) {
                             if (container != null) {
-                                // Kiểm tra xem container có thực sự hiển thị trên màn hình không
+                                // Kiểm tra tọa độ hiển thị thực tế trên màn hình để loại bỏ view ảo/ẩn
                                 Rect outBounds = new Rect();
                                 container.getBoundsInScreen(outBounds);
                                 
-                                // Nếu container nằm trong khoảng chiều cao màn hình hợp lệ (tránh các view ẩn ngoài màn hình)
                                 if (outBounds.top >= 0 && outBounds.bottom > 0 && outBounds.top < 2500) {
-                                    // Tìm số điện thoại tvPhoneNub NỘI BỘ bên trong container này
+                                    // Lấy số điện thoại bên trong container này
                                     List<AccessibilityNodeInfo> phoneNodes = container.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvPhoneNub");
                                     if (phoneNodes != null) {
                                         for (AccessibilityNodeInfo pNode : phoneNodes) {
@@ -111,7 +110,7 @@ public class AutoScrapeService extends AccessibilityService {
                         updatePopupProgress(collectedPhones.size());
                     } else {
                         scrollAttempts++;
-                        // Nếu cuộn qua 2 lần liên tiếp không tìm thấy thêm số mới -> Dừng quét
+                        // Nếu cuộn 2 lần không thấy số mới thì dừng quét và lưu file
                         if (scrollAttempts >= 2) {
                             isScraping = false;
                             savePhonesToFile();
