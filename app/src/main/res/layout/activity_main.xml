@@ -3,11 +3,10 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:gravity="center"
     android:padding="24dp"
     android:background="#F5F5F5">
 
-    <!-- TIÊU ĐỀ ỨNG DỤNG (Đã được căn giữa) -->
+    <!-- TIÊU ĐỀ ỨNG DỤNG -->
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -19,56 +18,60 @@
         android:layout_marginTop="12dp"
         android:layout_marginBottom="32dp"/>
 
-    <!-- Nút cấp quyền -->
-    <Button
-        android:id="@+id/btnGrantPermissions"
+    <!-- KHUNG CHỨA CÁC NÚT BẤM (Đã gom chung vào 1 LinearLayout hợp lệ) -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Cấp quyền ứng dụng &amp; Mặc định"
-        android:backgroundTint="#00796B"
-        android:textColor="#FFFFFF"
-        android:layout_marginBottom="12dp"/>
+        android:orientation="vertical">
 
-    <!-- Nút mở cài đặt ứng dụng mặc định -->
-    <Button
-        android:id="@+id/btnOpenDefaultSettings"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Mở Cài đặt Ứng dụng Mặc định"
-        android:backgroundTint="#00796B"
-        android:textColor="#FFFFFF"
-        android:layout_marginBottom="12dp"/>
+        <!-- Nút cấp quyền -->
+        <Button
+            android:id="@+id/btnGrantPermissions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Cấp quyền ứng dụng &amp; Mặc định"
+            android:backgroundTint="#00796B"
+            android:textColor="#FFFFFF"
+            android:layout_marginBottom="12dp"/>
 
-    
+        <!-- Nút mở cài đặt ứng dụng mặc định -->
+        <Button
+            android:id="@+id/btnOpenDefaultSettings"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Mở Cài đặt Ứng dụng Mặc định"
+            android:backgroundTint="#00796B"
+            android:textColor="#FFFFFF"
+            android:layout_marginBottom="12dp"/>
 
-    <!-- Nút mở cài đặt trợ năng -->
-    <Button
-        android:id="@+id/btnOpenAccessibility"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Mở Cài đặt Trợ năng (Accessibility)"
-        android:backgroundTint="#1976D2"
-        android:textColor="#FFFFFF"/>
+        <!-- Nút mở cài đặt trợ năng -->
+        <Button
+            android:id="@+id/btnOpenAccessibility"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Mở Cài đặt Trợ năng (Accessibility)"
+            android:backgroundTint="#1976D2"
+            android:textColor="#FFFFFF"
+            android:layout_marginBottom="12dp"/>
 
-    <!-- Nút mở bảng điều khiển popup nổi -->
-    <Button
-        android:id="@+id/btnStartPopup"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Bật Bảng Điều Khiển Auto"
-        android:backgroundTint="#D32F2F"
-        android:textColor="#FFFFFF"
-        android:layout_marginBottom="12dp"/>
+        <!-- Nút mở bảng điều khiển popup nổi -->
+        <Button
+            android:id="@+id/btnStartPopup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Bật Bảng Điều Khiển Auto"
+            android:backgroundTint="#D32F2F"
+            android:textColor="#FFFFFF"/>
 
     </LinearLayout>
 
-    <!-- THẺ NÀY ĐÓNG VAI TRÒ ĐẨY KHOẢNG TRỐNG, GIÚP HSD RƠI XUỐNG DƯỚI CÙNG -->
+    <!-- THẺ ĐẨY KHOẢNG TRỐNG ĐỂ HẠN SỬ DỤNG RƠI XUỐNG DƯỚI CÙNG -->
     <View
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"/>
 
-    <!-- HIỂN THỊ HẠN SỬ DỤNG (Nằm góc dưới cùng bên trái, chữ nghiêng) -->
+    <!-- HIỂN THỊ HẠN SỬ DỤNG (Nằm góc dưới bên trái) -->
     <TextView
         android:id="@+id/txtExpiry"
         android:layout_width="wrap_content"
