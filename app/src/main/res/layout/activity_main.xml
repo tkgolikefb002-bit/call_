@@ -7,7 +7,17 @@
     android:padding="24dp"
     android:background="#F5F5F5">
 
-    
+    <!-- TIÊU ĐỀ ỨNG DỤNG (Đã được căn giữa) -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="AUTO CALLOG"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:textColor="#00796B"
+        android:gravity="center"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="32dp"/>
 
     <!-- Nút cấp quyền -->
     <Button
