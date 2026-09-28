@@ -39,17 +39,20 @@ public class LicenseActivity extends AppCompatActivity {
         
         boolean isActivated = prefs.getBoolean(KEY_ACTIVATED, false);
         String savedKey = prefs.getString(KEY_SAVED, "");
+        String savedExpiry = prefs.getString(KEY_EXPIRY, "Vĩnh viễn");
 
-        // TRƯỜNG HỢP 1: Đã lưu key sẵn trong máy -> Verify bình thường
+        // TRƯỜNG HỢP 1: Đã lưu key sẵn trong máy -> Cho vào thẳng app luôn không cần check mạng rườm rà
         if (isActivated && !savedKey.isEmpty()) {
-            verifyKey(BASE_URL + "verify?key=" + savedKey + "&device_id=" + deviceId, true);
+            Intent intent = new Intent(LicenseActivity.this, MainActivity.class);
+            intent.putExtra("EXPIRY_DATE", savedExpiry);
+            startActivity(intent);
+            finish();
             return;
         }
 
-        // TRƯỜNG HỢP 2: Vừa mới gỡ app cài lại (mất sạch dữ liệu) -> Tự động gọi API khôi phục theo device_id
+        // TRƯỜNG HỢP 2: Chưa có key trong máy (hoặc vừa cài đè mất dữ liệu) -> Tự động gọi API khôi phục theo device_id
         recoverKeyAutomatically(deviceId);
     }
-
     private void recoverKeyAutomatically(String deviceId) {
         OkHttpClient client = new OkHttpClient();
         Request request = new Request.Builder().url(BASE_URL + "recover?device_id=" + deviceId).build();
