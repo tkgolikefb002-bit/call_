@@ -113,7 +113,7 @@ public class LicenseActivity extends AppCompatActivity {
         });
     }
 
-    private void verifyKey(String url, boolean isAutoLogin) {
+    private void verifyKey(String url, boolean isAutoLogin, String rawKey) {
         OkHttpClient client = new OkHttpClient();
         Request request = new Request.Builder().url(url).build();
 
@@ -137,12 +137,12 @@ public class LicenseActivity extends AppCompatActivity {
                         if (status.equalsIgnoreCase("success") || status.equalsIgnoreCase("active")) {
                             String expiryDate = json.optString("expiry_date", "Đang cập nhật");
                             
-                            // Lấy lại key từ URL nếu đang ở chế độ auto verify
-                            String currentKey = url.contains("key=") ? url.split("key=")[1].split("&")[0] : "";
-
+                            // LƯU TRỮ AN TOÀN: Dùng trực tiếp rawKey truyền vào, không đi cắt chuỗi URL nữa
                             SharedPreferences.Editor editor = getSharedPreferences(PREF_NAME, MODE_PRIVATE).edit();
                             editor.putBoolean(KEY_ACTIVATED, true);
-                            if (!currentKey.isEmpty()) editor.putString(KEY_SAVED, currentKey);
+                            if (rawKey != null && !rawKey.isEmpty()) {
+                                editor.putString(KEY_SAVED, rawKey);
+                            }
                             editor.putString(KEY_EXPIRY, expiryDate);
                             editor.apply();
 
@@ -158,6 +158,7 @@ public class LicenseActivity extends AppCompatActivity {
                         } else {
                             String message = json.optString("message", "Key không hợp lệ!");
                             if (isAutoLogin) {
+                                // Nếu key bị hết hạn hoặc lỗi, lúc này mới xóa trắng để bắt nhập lại
                                 SharedPreferences.Editor editor = getSharedPreferences(PREF_NAME, MODE_PRIVATE).edit();
                                 editor.clear();
                                 editor.apply();
