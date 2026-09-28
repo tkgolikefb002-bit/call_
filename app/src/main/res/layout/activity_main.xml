@@ -50,16 +50,24 @@
         android:textColor="#FFFFFF"
         android:layout_marginBottom="12dp"/>
 
-    <!-- Hiển thị hạn sử dụng bản quyền -->
+    </LinearLayout>
+
+    <!-- THẺ NÀY ĐÓNG VAI TRÒ ĐẨY KHOẢNG TRỐNG, GIÚP HSD RƠI XUỐNG DƯỚI CÙNG -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"/>
+
+    <!-- HIỂN THỊ HẠN SỬ DỤNG (Nằm góc dưới cùng bên trái, chữ nghiêng) -->
     <TextView
         android:id="@+id/txtExpiry"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Hạn sử dụng đến ngày: Đang cập nhật..."
-        android:textSize="16sp"
-        android:textStyle="bold"
-        android:textColor="#333333"
-        android:gravity="center"
-        android:layout_marginBottom="24dp"/>
+        android:text="HSD: 30/09/2026"
+        android:textSize="14sp"
+        android:textStyle="italic"
+        android:textColor="#555555"
+        android:gravity="start"
+        android:layout_marginBottom="8dp"/>
 
 </LinearLayout>
