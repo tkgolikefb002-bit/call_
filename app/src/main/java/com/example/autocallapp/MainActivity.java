@@ -215,6 +215,8 @@ public class MainActivity extends AppCompatActivity {
                 HttpURLConnection connection = (HttpURLConnection) url.openConnection();
                 connection.setRequestMethod("GET");
                 connection.setRequestProperty("Accept", "application/vnd.github.v3+json");
+                // Thêm User-Agent để tránh GitHub API từ chối kết nối
+                connection.setRequestProperty("User-Agent", "Android-App");
 
                 if (connection.getResponseCode() == 200) {
                     java.util.Scanner scanner = new java.util.Scanner(connection.getInputStream()).useDelimiter("\\A");
@@ -224,8 +226,8 @@ public class MainActivity extends AppCompatActivity {
                     // Lấy tag phiên bản mới trên GitHub (ví dụ: "v1.0.1")
                     String latestTag = json.getString("tag_name"); 
 
-                    // Đường dẫn trỏ đến trang Releases
-                    String downloadUrl = "https://github.com/tkgolikefb002-bit/call_/releases/latest";
+                    // --- ĐÃ SỬA: Trỏ thẳng vào file APK trực tiếp của phiên bản mới ---
+                    String downloadUrl = "https://github.com/tkgolikefb002-bit/call_/releases/download/" + latestTag + "/app-debug.apk";
 
                     // SỐ PHIÊN BẢN HIỆN TẠI CỦA APP (Bạn nhớ cập nhật lại chuỗi này mỗi khi làm bản mới)
                     String currentVersion = "v1.0.0"; 
@@ -242,6 +244,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showUpdateDialog(String version, String updateUrl) {
+        if (isFinishing()) return; // Tránh crash nếu Activity đang đóng
+
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Đã có phiên bản mới!");
         builder.setMessage("Ứng dụng đã có phiên bản " + version + ". Hãy cập nhật ngay để trải nghiệm tính năng mới nhé.");
