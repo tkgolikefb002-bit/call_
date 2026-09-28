@@ -1,5 +1,10 @@
 package com.example.autocallapp;
 
+import android.app.AlertDialog;
+import org.json.JSONObject;
+import java.net.HttpURLConnection;
+import java.net.URL;
+
 import android.Manifest;
 import android.content.ComponentName;
 import android.content.Context;
@@ -79,6 +84,9 @@ public class MainActivity extends AppCompatActivity {
         if (btnOpenAccessibility != null) {
             btnOpenAccessibility.setOnClickListener(v -> openAccessibilitySettings());
         }
+
+        // Tự động kiểm tra cập nhật mới từ GitHub ngay khi mở ứng dụng
+        checkForUpdates();
     }
 
     private void openAccessibilitySettings() {
@@ -197,5 +205,56 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }
+    }
+
+    // --- CÁC HÀM XỬ LÝ TỰ ĐỘNG KIỂM TRA CẬP NHẬT TỪ GITHUB ---
+    private void checkForUpdates() {
+        new Thread(() -> {
+            try {
+                URL url = new URL("https://api.github.com/repos/tkgolikefb002-bit/call_/releases/latest");
+                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("GET");
+                connection.setRequestProperty("Accept", "application/vnd.github.v3+json");
+
+                if (connection.getResponseCode() == 200) {
+                    java.util.Scanner scanner = new java.util.Scanner(connection.getInputStream()).useDelimiter("\\A");
+                    String response = scanner.hasNext() ? scanner.next() : "";
+                    JSONObject json = new JSONObject(response);
+                    
+                    // Lấy tag phiên bản mới trên GitHub (ví dụ: "v1.0.1")
+                    String latestTag = json.getString("tag_name"); 
+
+                    // Đường dẫn trỏ đến trang Releases
+                    String downloadUrl = "https://github.com/tkgolikefb002-bit/call_/releases/latest";
+
+                    // SỐ PHIÊN BẢN HIỆN TẠI CỦA APP (Bạn nhớ cập nhật lại chuỗi này mỗi khi làm bản mới)
+                    String currentVersion = "v1.0.0"; 
+
+                    // Nếu phiên bản trên GitHub khác bản hiện tại, hiện bảng thông báo
+                    if (!latestTag.equals(currentVersion)) {
+                        runOnUiThread(() -> showUpdateDialog(latestTag, downloadUrl));
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }).start();
+    }
+
+    private void showUpdateDialog(String version, String updateUrl) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Đã có phiên bản mới!");
+        builder.setMessage("Ứng dụng đã có phiên bản " + version + ". Hãy cập nhật ngay để trải nghiệm tính năng mới nhé.");
+        
+        builder.setPositiveButton("Cập nhật ngay", (dialog, which) -> {
+            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(updateUrl));
+            startActivity(intent);
+            dialog.dismiss();
+        });
+        
+        builder.setNegativeButton("Để sau", (dialog, which) -> dialog.dismiss());
+        
+        builder.setCancelable(false);
+        builder.show();
     }
 }
