@@ -108,7 +108,7 @@ public class LicenseActivity extends AppCompatActivity {
                     return;
                 }
                 String deviceId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
-                verifyKey(BASE_URL + "verify?key=" + key + "&device_id=" + deviceId, false);
+                verifyKey(BASE_URL + "verify?key=" + key + "&device_id=" + deviceId, false, key);
             });
         });
     }
