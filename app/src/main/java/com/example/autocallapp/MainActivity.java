@@ -17,13 +17,15 @@ import android.provider.Settings;
 import android.telecom.PhoneAccount;
 import android.telecom.PhoneAccountHandle;
 import android.telecom.TelecomManager;
-import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+
+// Đã nhập thêm thư viện MaterialButton
+import com.google.android.material.button.MaterialButton;
 
 public class MainActivity extends AppCompatActivity {
     private static final int REQUEST_CODE_PERMISSIONS = 100;
@@ -46,20 +48,20 @@ public class MainActivity extends AppCompatActivity {
         // Đăng ký PhoneAccount ngầm
         registerPhoneAccount();
 
-        // Nút cấp tất cả quyền và đặt làm mặc định
-        Button btnGrant = findViewById(R.id.btnGrantPermissions);
+        // Nút cấp tất cả quyền và đặt làm mặc định (Đổi sang MaterialButton)
+        MaterialButton btnGrant = findViewById(R.id.btnGrantPermissions);
         if (btnGrant != null) {
             btnGrant.setOnClickListener(v -> requestAllRequiredPermissions());
         }
 
-        // Nút bấm mở trực tiếp màn hình "Default Apps" (Ứng dụng mặc định) hệ thống
-        Button btnOpenDefaultSettings = findViewById(R.id.btnOpenDefaultSettings);
+        // Nút bấm mở trực tiếp màn hình "Default Apps" (Ứng dụng mặc định) hệ thống (Đổi sang MaterialButton)
+        MaterialButton btnOpenDefaultSettings = findViewById(R.id.btnOpenDefaultSettings);
         if (btnOpenDefaultSettings != null) {
             btnOpenDefaultSettings.setOnClickListener(v -> openDefaultAppsSettings());
         }
 
-        // Nút mở bảng điều khiển popup nổi Auto
-        Button btnStartPopup = findViewById(R.id.btnStartPopup);
+        // Nút mở bảng điều khiển popup nổi Auto (Đổi sang MaterialButton)
+        MaterialButton btnStartPopup = findViewById(R.id.btnStartPopup);
         if (btnStartPopup != null) {
             btnStartPopup.setOnClickListener(v -> {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
@@ -79,8 +81,8 @@ public class MainActivity extends AppCompatActivity {
             });
         }
 
-        // Nút bấm mở thẳng cài đặt Trợ năng (Accessibility)
-        Button btnOpenAccessibility = findViewById(R.id.btnOpenAccessibility);
+        // Nút bấm mở thẳng cài đặt Trợ năng (Accessibility) (Đổi sang MaterialButton)
+        MaterialButton btnOpenAccessibility = findViewById(R.id.btnOpenAccessibility);
         if (btnOpenAccessibility != null) {
             btnOpenAccessibility.setOnClickListener(v -> openAccessibilitySettings());
         }
@@ -215,7 +217,6 @@ public class MainActivity extends AppCompatActivity {
                 HttpURLConnection connection = (HttpURLConnection) url.openConnection();
                 connection.setRequestMethod("GET");
                 connection.setRequestProperty("Accept", "application/vnd.github.v3+json");
-                // Thêm User-Agent để tránh GitHub API từ chối kết nối
                 connection.setRequestProperty("User-Agent", "Android-App");
 
                 if (connection.getResponseCode() == 200) {
@@ -223,16 +224,10 @@ public class MainActivity extends AppCompatActivity {
                     String response = scanner.hasNext() ? scanner.next() : "";
                     JSONObject json = new JSONObject(response);
                     
-                    // Lấy tag phiên bản mới trên GitHub (ví dụ: "v1.0.1")
                     String latestTag = json.getString("tag_name"); 
-
-                    // --- ĐÃ SỬA: Trỏ thẳng vào file APK trực tiếp của phiên bản mới ---
                     String downloadUrl = "https://github.com/tkgolikefb002-bit/call_/releases/download/" + latestTag + "/app-debug.apk";
-
-                    // SỐ PHIÊN BẢN HIỆN TẠI CỦA APP (Bạn nhớ cập nhật lại chuỗi này mỗi khi làm bản mới)
                     String currentVersion = "v1.0.0"; 
 
-                    // Nếu phiên bản trên GitHub khác bản hiện tại, hiện bảng thông báo
                     if (!latestTag.equals(currentVersion)) {
                         runOnUiThread(() -> showUpdateDialog(latestTag, downloadUrl));
                     }
@@ -244,7 +239,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showUpdateDialog(String version, String updateUrl) {
-        if (isFinishing()) return; // Tránh crash nếu Activity đang đóng
+        if (isFinishing()) return;
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Đã có phiên bản mới!");
