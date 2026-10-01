@@ -1,86 +1,160 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="24dp"
-    android:background="#F5F5F5">
+    android:background="#F5F5F5"
+    android:fillViewport="true"
+    android:padding="24dp">
 
-    <!-- TIÊU ĐỀ ỨNG DỤNG -->
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="AUTO CALLOG"
-        android:textSize="24sp"
-        android:textStyle="bold"
-        android:textColor="#33FF00"
-        android:gravity="center"
-        android:layout_marginTop="12dp"
-        android:layout_marginBottom="32dp"/>
-
-    <!-- KHUNG CHỨA CÁC NÚT BẤM (Đã gom chung vào 1 LinearLayout hợp lệ) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <!-- Nút cấp quyền -->
-        <Button
-            android:id="@+id/btnGrantPermissions"
+        <!-- TIÊU ĐỀ ỨNG DỤNG -->
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Cấp quyền ứng dụng &amp; Mặc định"
-            android:backgroundTint="#00796B"
-            android:textColor="#FFFFFF"
-            android:layout_marginBottom="12dp"/>
+            android:text="AUTO CALLOG"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:textColor="#2E7D32"
+            android:gravity="center"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="24dp"/>
 
-        <!-- Nút mở cài đặt ứng dụng mặc định -->
-        <Button
-            android:id="@+id/btnOpenDefaultSettings"
+        <!-- KHUNG CHỨA CÁC NÚT BẤM VÀ HƯỚNG DẪN -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Mở Cài đặt Ứng dụng Mặc định"
-            android:backgroundTint="#00796B"
-            android:textColor="#FFFFFF"
-            android:layout_marginBottom="12dp"/>
+            android:orientation="vertical">
 
-        <!-- Nút mở cài đặt trợ năng -->
-        <Button
-            android:id="@+id/btnOpenAccessibility"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Mở Cài đặt Trợ năng (Accessibility)"
-            android:backgroundTint="#1976D2"
-            android:textColor="#FFFFFF"
-            android:layout_marginBottom="12dp"/>
+            <!-- Nút 1: Cấp quyền -->
+            <Button
+                android:id="@+id/btnGrantPermissions"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="Cấp quyền ứng dụng &amp; mặc định"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:backgroundTint="#00796B"
+                android:textColor="#FFFFFF"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:stateListAnimator="@null"
+                android:layout_marginBottom="4dp"/>
 
-        <!-- Nút mở bảng điều khiển popup nổi -->
-        <Button
-            android:id="@+id/btnStartPopup"
+            <!-- Hướng dẫn nút 1 -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Sau khi cấp 2 quyền &quot;cho phép&quot;, bật thêm quyền &quot;xuất hiện trên cùng&quot; của ứng dụng"
+                android:textSize="12sp"
+                android:textColor="#666666"
+                android:layout_marginBottom="12dp"
+                android:paddingHorizontal="4dp"/>
+
+            <!-- Nút 2: Mở cài đặt ứng dụng mặc định -->
+            <Button
+                android:id="@+id/btnOpenDefaultSettings"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="Bật ứng dụng đt làm mặc định"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:backgroundTint="#00796B"
+                android:textColor="#FFFFFF"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:stateListAnimator="@null"
+                android:layout_marginBottom="12dp"/>
+
+            <!-- Nút 3: Mở cài đặt trợ năng -->
+            <Button
+                android:id="@+id/btnOpenAccessibility"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="Bật quyền trợ năng cho ứng dụng"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:backgroundTint="#1976D2"
+                android:textColor="#FFFFFF"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:stateListAnimator="@null"
+                android:layout_marginBottom="12dp"/>
+
+            <!-- Nút 4: Bật bảng điều khiển auto -->
+            <Button
+                android:id="@+id/btnStartPopup"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="Bật bảng điều khiển auto"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:backgroundTint="#D32F2F"
+                android:textColor="#FFFFFF"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:stateListAnimator="@null"
+                android:layout_marginBottom="16dp"/>
+
+            <!-- PHẦN HƯỚNG DẪN SỬ DỤNG BÊN DƯỚI -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="#EFEFEF"
+                android:padding="12dp"
+                android:layout_marginBottom="24dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Hướng dẫn sử dụng"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:textColor="#333333"
+                    android:layout_marginBottom="6dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="* Thêm quyền khác (tùy dòng máy):\nNhiều máy yêu cầu thêm phần &quot;quay số&quot;. Vào ứng dụng chọn ứng dụng mặc định => chọn autocallapp làm mặc định là dùng được."
+                    android:textSize="12sp"
+                    android:textColor="#444444"
+                    android:layout_marginBottom="8dp"
+                    android:lineSpacingExtra="3dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="* Cách chạy:\n1 - Chạy hàng loạt:\n   - Bật bảng auto => Vào app chạy phần chứa mã đơn cần gọi => Bấm nút tìm kiếm (kính lúp) để lưu tất cả đơn.\n   - Bấm nút bắt đầu (nút play giữa) chờ chạy xong => Bấm dừng hoặc dấu x nếu không dùng đến.\n2 - Chạy thủ công từng mã:\n   - Chỉ cần bấm vào nút gọi của đơn hàng là auto tự hoạt động."
+                    android:textSize="12sp"
+                    android:textColor="#444444"
+                    android:lineSpacingExtra="3dp" />
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- THẺ ĐẨY KHOẢNG TRỐNG ĐỂ HẠN SỬ DỤNG RƠI XUỐNG DƯỚI CÙNG -->
+        <View
             android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"/>
+
+        <!-- HIỂN THỊ HẠN SỬ DỤNG (Nằm góc dưới bên trái) -->
+        <TextView
+            android:id="@+id/txtExpiry"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Bật Bảng Điều Khiển Auto"
-            android:backgroundTint="#D32F2F"
-            android:textColor="#FFFFFF"/>
+            android:text="Hạn sử dụng đến ngày: 03.10.2026"
+            android:textSize="12sp"
+            android:textStyle="italic"
+            android:textColor="#555555"
+            android:gravity="start"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="8dp"/>
 
     </LinearLayout>
-
-    <!-- THẺ ĐẨY KHOẢNG TRỐNG ĐỂ HẠN SỬ DỤNG RƠI XUỐNG DƯỚI CÙNG -->
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"/>
-
-    <!-- HIỂN THỊ HẠN SỬ DỤNG (Nằm góc dưới bên trái) -->
-    <TextView
-        android:id="@+id/txtExpiry"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="HSD: 30/09/2026"
-        android:textSize="14sp"
-        android:textStyle="italic"
-        android:textColor="#555555"
-        android:gravity="start"
-        android:layout_marginBottom="8dp"/>
-
-</LinearLayout>
+</ScrollView>
