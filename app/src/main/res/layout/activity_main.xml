@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#F5F5F5"
@@ -11,14 +12,14 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <!-- TIÊU ĐỀ ỨNG DỤNG -->
+        <!-- TIÊU ĐỀ ỨNG DỤNG (Đã chỉnh lại màu xanh sáng như yêu cầu) -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="AUTO CALLOG"
             android:textSize="24sp"
             android:textStyle="bold"
-            android:textColor="#2E7D32"
+            android:textColor="#33FF00"
             android:gravity="center"
             android:layout_marginTop="12dp"
             android:layout_marginBottom="24dp"/>
@@ -30,7 +31,7 @@
             android:orientation="vertical">
 
             <!-- Nút 1: Cấp quyền -->
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnGrantPermissions"
                 android:layout_width="match_parent"
                 android:layout_height="56dp"
@@ -39,9 +40,7 @@
                 android:textStyle="bold"
                 android:backgroundTint="#00796B"
                 android:textColor="#FFFFFF"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:stateListAnimator="@null"
+                app:cornerRadius="28dp"
                 android:layout_marginBottom="4dp"/>
 
             <!-- Hướng dẫn nút 1 -->
@@ -55,7 +54,7 @@
                 android:paddingHorizontal="4dp"/>
 
             <!-- Nút 2: Mở cài đặt ứng dụng mặc định -->
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnOpenDefaultSettings"
                 android:layout_width="match_parent"
                 android:layout_height="56dp"
@@ -64,13 +63,11 @@
                 android:textStyle="bold"
                 android:backgroundTint="#00796B"
                 android:textColor="#FFFFFF"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:stateListAnimator="@null"
+                app:cornerRadius="28dp"
                 android:layout_marginBottom="12dp"/>
 
             <!-- Nút 3: Mở cài đặt trợ năng -->
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnOpenAccessibility"
                 android:layout_width="match_parent"
                 android:layout_height="56dp"
@@ -79,13 +76,11 @@
                 android:textStyle="bold"
                 android:backgroundTint="#1976D2"
                 android:textColor="#FFFFFF"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:stateListAnimator="@null"
+                app:cornerRadius="28dp"
                 android:layout_marginBottom="12dp"/>
 
             <!-- Nút 4: Bật bảng điều khiển auto -->
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnStartPopup"
                 android:layout_width="match_parent"
                 android:layout_height="56dp"
@@ -94,9 +89,7 @@
                 android:textStyle="bold"
                 android:backgroundTint="#D32F2F"
                 android:textColor="#FFFFFF"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:stateListAnimator="@null"
+                app:cornerRadius="28dp"
                 android:layout_marginBottom="16dp"/>
 
             <!-- PHẦN HƯỚNG DẪN SỬ DỤNG BÊN DƯỚI -->
@@ -148,8 +141,8 @@
             android:id="@+id/txtExpiry"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Hạn sử dụng đến ngày: 03.10.2026"
-            android:textSize="12sp"
+            android:text="HSD: 30/09/2026"
+            android:textSize="14sp"
             android:textStyle="italic"
             android:textColor="#555555"
             android:gravity="start"
