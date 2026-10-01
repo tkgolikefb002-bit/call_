@@ -71,16 +71,17 @@
             android:layout_marginBottom="12dp"
             style="?android:attr/borderlessButtonStyle"/>
 
-        <!-- Nút Mua API Key (Mở link Zalo) -->
+        <!-- Nút Mua API Key phong cách Hồng Neon -->
         <Button
             android:id="@+id/btnBuyKey"
             android:layout_width="match_parent"
-            android:layout_height="50dp"
+            android:layout_height="52dp"
             android:text="MUA API KEY"
-            android:textColor="#FF4081"
+            android:textColor="#FF80AB"
             android:textStyle="bold"
             android:textSize="15sp"
-            android:background="@drawable/bg_btn_outline"
+            android:letterSpacing="0.05"
+            android:background="@drawable/bg_btn_neon_pink"
             style="?android:attr/borderlessButtonStyle"/>
 
     </LinearLayout>
