@@ -17,15 +17,13 @@ import android.provider.Settings;
 import android.telecom.PhoneAccount;
 import android.telecom.PhoneAccountHandle;
 import android.telecom.TelecomManager;
+import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-
-// Đã nhập thêm thư viện MaterialButton
-import com.google.android.material.button.MaterialButton;
 
 public class MainActivity extends AppCompatActivity {
     private static final int REQUEST_CODE_PERMISSIONS = 100;
@@ -48,20 +46,20 @@ public class MainActivity extends AppCompatActivity {
         // Đăng ký PhoneAccount ngầm
         registerPhoneAccount();
 
-        // Nút cấp tất cả quyền và đặt làm mặc định (Đổi sang MaterialButton)
-        MaterialButton btnGrant = findViewById(R.id.btnGrantPermissions);
+        // Nút cấp tất cả quyền và đặt làm mặc định
+        Button btnGrant = findViewById(R.id.btnGrantPermissions);
         if (btnGrant != null) {
             btnGrant.setOnClickListener(v -> requestAllRequiredPermissions());
         }
 
-        // Nút bấm mở trực tiếp màn hình "Default Apps" (Ứng dụng mặc định) hệ thống (Đổi sang MaterialButton)
-        MaterialButton btnOpenDefaultSettings = findViewById(R.id.btnOpenDefaultSettings);
+        // Nút bấm mở trực tiếp màn hình "Default Apps" (Ứng dụng mặc định) hệ thống
+        Button btnOpenDefaultSettings = findViewById(R.id.btnOpenDefaultSettings);
         if (btnOpenDefaultSettings != null) {
             btnOpenDefaultSettings.setOnClickListener(v -> openDefaultAppsSettings());
         }
 
-        // Nút mở bảng điều khiển popup nổi Auto (Đổi sang MaterialButton)
-        MaterialButton btnStartPopup = findViewById(R.id.btnStartPopup);
+        // Nút mở bảng điều khiển popup nổi Auto
+        Button btnStartPopup = findViewById(R.id.btnStartPopup);
         if (btnStartPopup != null) {
             btnStartPopup.setOnClickListener(v -> {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
@@ -81,8 +79,8 @@ public class MainActivity extends AppCompatActivity {
             });
         }
 
-        // Nút bấm mở thẳng cài đặt Trợ năng (Accessibility) (Đổi sang MaterialButton)
-        MaterialButton btnOpenAccessibility = findViewById(R.id.btnOpenAccessibility);
+        // Nút bấm mở thẳng cài đặt Trợ năng (Accessibility)
+        Button btnOpenAccessibility = findViewById(R.id.btnOpenAccessibility);
         if (btnOpenAccessibility != null) {
             btnOpenAccessibility.setOnClickListener(v -> openAccessibilitySettings());
         }
