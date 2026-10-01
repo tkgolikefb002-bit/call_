@@ -96,6 +96,13 @@ public class LicenseActivity extends AppCompatActivity {
             setContentView(R.layout.activity_check_key);
             etKey = findViewById(R.id.etKey);
             btnCheckKey = findViewById(R.id.btnCheckKey);
+            
+            // Thêm ánh xạ và sự kiện cho nút Mua API Key mở Zalo
+            Button btnBuyKey = findViewById(R.id.btnBuyKey);
+            btnBuyKey.setOnClickListener(v -> {
+                Intent zaloIntent = new Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://zalo.me/0876002224"));
+                startActivity(zaloIntent);
+            });
 
             btnCheckKey.setOnClickListener(v -> {
                 String key = etKey.getText().toString().trim();
