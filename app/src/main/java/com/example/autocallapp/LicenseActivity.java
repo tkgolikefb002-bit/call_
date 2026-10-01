@@ -117,9 +117,22 @@ public class LicenseActivity extends AppCompatActivity {
             @Override
             public void onFailure(Call call, IOException e) {
                 if (!isAutoLogin) {
+                    // Kiểm tra thủ công mà lỗi mạng -> Báo toast lỗi
                     runOnUiThread(() -> Toast.makeText(LicenseActivity.this, "Lỗi kết nối mạng!", Toast.LENGTH_SHORT).show());
                 } else {
-                    showInputScreen();
+                    // Tự động đăng nhập mà mất mạng: 
+                    // Cho phép vào app dùng tạm bằng dữ liệu đã lưu trong máy để tránh phiền toái khi rớt mạng tạm thời,
+                    // hoặc nếu bạn muốn bắt buộc phải có mạng mới cho vào thì đổi lại thành showInputScreen();
+                    SharedPreferences prefs = getSharedPreferences(PREF_NAME, MODE_PRIVATE);
+                    String savedExpiry = prefs.getString(KEY_EXPIRY, "Đang cập nhật");
+
+                    runOnUiThread(() -> {
+                        Toast.makeText(LicenseActivity.this, "Không có kết nối mạng, đang dùng chế độ ngoại tuyến.", Toast.LENGTH_SHORT).show();
+                        Intent intent = new Intent(LicenseActivity.this, MainActivity.class);
+                        intent.putExtra("EXPIRY_DATE", savedExpiry);
+                        startActivity(intent);
+                        finish();
+                    });
                 }
             }
 
@@ -130,10 +143,10 @@ public class LicenseActivity extends AppCompatActivity {
                         JSONObject json = new JSONObject(response.body().string());
                         String status = json.optString("status");
 
+                        // Trường hợp Key HỢP LỆ / CÒN HẠN
                         if (status.equalsIgnoreCase("success") || status.equalsIgnoreCase("active")) {
                             String expiryDate = json.optString("expiry_date", "Đang cập nhật");
                             
-                            // LƯU TRỮ AN TOÀN: Dùng trực tiếp rawKey truyền vào, không đi cắt chuỗi URL nữa
                             SharedPreferences.Editor editor = getSharedPreferences(PREF_NAME, MODE_PRIVATE).edit();
                             editor.putBoolean(KEY_ACTIVATED, true);
                             if (rawKey != null && !rawKey.isEmpty()) {
@@ -151,23 +164,30 @@ public class LicenseActivity extends AppCompatActivity {
                                 startActivity(intent);
                                 finish();
                             });
-                        } else {
-                            String message = json.optString("message", "Key không hợp lệ!");
-                            if (isAutoLogin) {
-                                // Nếu key bị hết hạn hoặc lỗi, lúc này mới xóa trắng để bắt nhập lại
-                                SharedPreferences.Editor editor = getSharedPreferences(PREF_NAME, MODE_PRIVATE).edit();
-                                editor.clear();
-                                editor.apply();
+                        } 
+                        // Trường hợp Key HẾT HẠN hoặc BỊ KHÓA (Server trả về lỗi)
+                        else {
+                            String message = json.optString("message", "Key đã hết hạn sử dụng!");
+                            
+                            // Xóa sạch dữ liệu trong máy để khóa app lại lập tức
+                            SharedPreferences.Editor editor = getSharedPreferences(PREF_NAME, MODE_PRIVATE).edit();
+                            editor.clear();
+                            editor.apply();
+
+                            runOnUiThread(() -> {
                                 showInputScreen();
-                            } else {
-                                runOnUiThread(() -> Toast.makeText(LicenseActivity.this, message, Toast.LENGTH_LONG).show());
-                            }
+                                Toast.makeText(LicenseActivity.this, message, Toast.LENGTH_LONG).show();
+                            });
                         }
                     } catch (Exception e) {
-                        if (isAutoLogin) showInputScreen();
+                        if (isAutoLogin) {
+                            runOnUiThread(() -> showInputScreen());
+                        }
                     }
                 } else {
-                    if (isAutoLogin) showInputScreen();
+                    if (isAutoLogin) {
+                        runOnUiThread(() -> showInputScreen());
+                    }
                 }
             }
         });
