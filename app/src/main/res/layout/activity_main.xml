@@ -11,6 +11,18 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
+        <!-- HIỂN THỊ HẠN SỬ DỤNG (Nằm ở trên cùng bên trái, chữ màu đỏ) -->
+        <TextView
+            android:id="@+id/txtExpiry"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="HSD: 30/09/2026"
+            android:textSize="14sp"
+            android:textStyle="bold|italic"
+            android:textColor="#D32F2F"
+            android:gravity="start"
+            android:layout_marginBottom="8dp"/>
+
         <!-- TIÊU ĐỀ ỨNG DỤNG -->
         <TextView
             android:layout_width="match_parent"
@@ -20,8 +32,7 @@
             android:textStyle="bold"
             android:textColor="#33FF00"
             android:gravity="center"
-            android:layout_marginTop="12dp"
-            android:layout_marginBottom="24dp"/>
+            android:layout_marginBottom="20dp"/>
 
         <!-- KHUNG CHỨA CÁC NÚT BẤM VÀ HƯỚNG DẪN -->
         <LinearLayout
@@ -158,25 +169,6 @@
             </LinearLayout>
 
         </LinearLayout>
-
-        <!-- THẺ ĐẨY KHOẢNG TRỐNG ĐỂ HẠN SỬ DỤNG RƠI XUỐNG DƯỚI CÙNG -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"/>
-
-        <!-- HIỂN THỊ HẠN SỬ DỤNG (Nằm góc dưới bên trái) -->
-        <TextView
-            android:id="@+id/txtExpiry"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="HSD: 30/09/2026"
-            android:textSize="14sp"
-            android:textStyle="italic"
-            android:textColor="#555555"
-            android:gravity="start"
-            android:layout_marginTop="8dp"
-            android:layout_marginBottom="8dp"/>
 
     </LinearLayout>
 </ScrollView>
