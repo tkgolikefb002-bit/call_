@@ -1,19 +1,46 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Hiệu ứng viền sáng mờ phía sau (Glow effect) -->
-    <item>
-        <shape android:shape="rectangle">
-            <solid android:color="#223366FF"/>
-            <corners android:radius="12dp"/>
-        </shape>
-    </item>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
     
-    <!-- Lớp nền chính của nút (Màu tối bo góc) -->
-    <item android:top="1dp" android:bottom="1dp" android:left="1dp" android:right="1dp">
-        <shape android:shape="rectangle">
-            <solid android:color="#1A1A24"/>
-            <corners android:radius="10dp"/>
-            <stroke android:width="1dp" android:color="#3A4A7A"/>
-        </shape>
+    <!-- TRẠNG THÁI KHI ĐANG BẤM VÀO (PRESSED): Sáng hơn, có chiều sâu thụt xuống -->
+    <item android:state_pressed="true">
+        <layer-list>
+            <!-- Viền hào quang sáng rực hơn khi nhấn -->
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="#445588FF"/>
+                    <corners android:radius="12dp"/>
+                </shape>
+            </item>
+            <!-- Lớp nền thụt vào trong (tạo cảm giác chiều sâu) và sáng màu hơn -->
+            <item android:top="2dp" android:bottom="0dp" android:left="1dp" android:right="1dp">
+                <shape android:shape="rectangle">
+                    <solid android:color="#242438"/>
+                    <corners android:radius="10dp"/>
+                    <stroke android:width="1.5dp" android:color="#5577FF"/>
+                </shape>
+            </item>
+        </layer-list>
     </item>
-</layer-list>
+
+    <!-- TRẠNG THÁI BÌNH THƯỜNG (DEFAULT) -->
+    <item>
+        <layer-list>
+            <!-- Hào quang mờ phía sau -->
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="#223366FF"/>
+                    <corners android:radius="12dp"/>
+                </shape>
+            </item>
+            <!-- Nền tối chính -->
+            <item android:top="1dp" android:bottom="1dp" android:left="1dp" android:right="1dp">
+                <shape android:shape="rectangle">
+                    <solid android:color="#1A1A24"/>
+                    <corners android:radius="10dp"/>
+                    <stroke android:width="1dp" android:color="#3A4A7A"/>
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+
+</selector>
