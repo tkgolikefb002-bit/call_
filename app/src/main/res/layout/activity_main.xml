@@ -13,7 +13,7 @@
         android:text="AUTO CALLOG"
         android:textSize="24sp"
         android:textStyle="bold"
-        android:textColor="#00796B"
+        android:textColor="#33FF00"
         android:gravity="center"
         android:layout_marginTop="12dp"
         android:layout_marginBottom="32dp"/>
