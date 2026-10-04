@@ -42,6 +42,8 @@ public class MainActivity extends AppCompatActivity {
                 txtExpiry.setText("Hạn sử dụng đến ngày: " + expiryDate);
             }
         }
+    } // Đóng hàm onCreate
+} // Đóng class MainActivity
 
         // Đăng ký PhoneAccount ngầm
         registerPhoneAccount();
