@@ -43,7 +43,7 @@
             android:textColor="#DDDDDD"
             android:layout_marginBottom="8dp"/>
 
-        <!-- Ô nhập Key (Giữ nguyên ID là etKey để khớp với code Java cũ của bạn) -->
+        <!-- Ô nhập Key -->
         <EditText
             android:id="@+id/etKey"
             android:layout_width="match_parent"
@@ -57,7 +57,7 @@
             android:singleLine="true"
             android:layout_marginBottom="20dp"/>
 
-        <!-- Nút Đăng Nhập phong cách Launch Now -->
+        <!-- Nút Đăng Nhập -->
         <Button
             android:id="@+id/btnCheckKey"
             android:layout_width="match_parent"
@@ -71,7 +71,7 @@
             android:layout_marginBottom="12dp"
             style="?android:attr/borderlessButtonStyle"/>
 
-        <!-- Nút Mua API Key phong cách Hồng Neon -->
+        <!-- Nút Mua API Key (Liên kết đến trang web mua key) -->
         <Button
             android:id="@+id/btnBuyKey"
             android:layout_width="match_parent"
