@@ -25,7 +25,7 @@
         android:id="@+id/txtPhoneNumber"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="0989452550"
+        android:text="19001031"
         android:textColor="#FFFFFF"
         android:textSize="28sp"
         android:textStyle="bold"
