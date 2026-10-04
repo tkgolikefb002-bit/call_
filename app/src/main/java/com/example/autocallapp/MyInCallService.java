@@ -2,6 +2,7 @@ package com.example.autocallapp;
 
 import android.content.ContentValues;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Handler;
@@ -18,50 +19,62 @@ public class MyInCallService extends InCallService {
     private static final String TAG = "MyInCallService";
 
     @Override
-    public void onCallAdded(Call call) {
-        super.onCallAdded(call);
-        activeCall = call;
-        isHandled = false;
+public void onCallAdded(Call call) {
+    super.onCallAdded(call);
 
-        // 1. Bật ngay màn hình giao diện ảo lên để che đậy
-        Intent intent = new Intent(this, CallActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        startActivity(intent);
+    // --- BỔ SUNG: Kiểm tra xem người dùng có đang bật tính năng gọi ảo hay không ---
+    SharedPreferences prefs = getSharedPreferences("AppPrefs", MODE_PRIVATE);
+    boolean isCallActive = prefs.getBoolean("is_call_active", true); // Mặc định là true
 
-        call.registerCallback(new Call.Callback() {
-            @Override
-            public void onStateChanged(Call call, int state) {
-                super.onStateChanged(call, state);
-                
-                if (!isHandled && (state == Call.STATE_DIALING || state == Call.STATE_CONNECTING || state == Call.STATE_ACTIVE)) {
-                    isHandled = true;
-
-                    // Sinh thời gian ngẫu nhiên từ 20 đến 35 giây cho CallLog
-                    int randomDuration = new Random().nextInt(16) + 20;
-
-                    // 2. CHỜ ĐÚNG 700ms RỒI NGẮT LUÔN CUỘC GỌI
-                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                        try {
-                            if (call != null) {
-                                call.disconnect(); // Tắt cuộc gọi trong 700ms
-                            }
-                        } catch (Exception e) {
-                            Log.e(TAG, "Lỗi khi ngắt cuộc gọi: " + e.getMessage());
-                        }
-
-                        // 3. Cập nhật lịch sử cuộc gọi (CallLog) thành thời lượng ngẫu nhiên 20s - 35s
-                        new Thread(() -> {
-                            updateLatestCallLogDuration(randomDuration);
-                            if (AutoScrapeService.instance != null) {
-                                AutoScrapeService.instance.onCallFinished();
-                            }
-                        }).start();
-
-                    }, 700); 
-                }
-            }
-        });
+    if (!isCallActive) {
+        // Nếu người dùng đã tắt tính năng trong app, tuyệt đối không can thiệp, 
+        // không mở CallActivity, nhường toàn bộ quyền xử lý cho app gọi điện gốc của máy.
+        return;
     }
+    // --------------------------------------------------------------------------
+
+    activeCall = call;
+    isHandled = false;
+
+    // 1. Bật ngay màn hình giao diện ảo lên để che đậy
+    Intent intent = new Intent(this, CallActivity.class);
+    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+    startActivity(intent);
+
+    call.registerCallback(new Call.Callback() {
+        @Override
+        public void onStateChanged(Call call, int state) {
+            super.onStateChanged(call, state);
+            
+            if (!isHandled && (state == Call.STATE_DIALING || state == Call.STATE_CONNECTING || state == Call.STATE_ACTIVE)) {
+                isHandled = true;
+
+                // Sinh thời gian ngẫu nhiên từ 20 đến 35 giây cho CallLog
+                int randomDuration = new Random().nextInt(16) + 20;
+
+                // 2. CHỜ ĐÚNG 700ms RỒI NGẮT LUÔN CUỘC GỌI
+                new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                    try {
+                        if (call != null) {
+                            call.disconnect(); // Tắt cuộc gọi trong 700ms
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Lỗi khi ngắt cuộc gọi: " + e.getMessage());
+                    }
+
+                    // 3. Cập nhật lịch sử cuộc gọi (CallLog) thành thời lượng ngẫu nhiên 20s - 35s
+                    new Thread(() -> {
+                        updateLatestCallLogDuration(randomDuration);
+                        if (AutoScrapeService.instance != null) {
+                            AutoScrapeService.instance.onCallFinished();
+                        }
+                    }).start();
+
+                }, 700); 
+            }
+        }
+    });
+}
 
     @Override
     public void onCallRemoved(Call call) {
