@@ -89,14 +89,16 @@
         <Button
             android:id="@+id/btnContactZalo"
             android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:text="LIÊN HỆ ZALO (HỖ TRỢ)"
+            android:layout_height="50dp"
+            android:text="💬 LIÊN HỆ ZALO HỖ TRỢ"
             android:textColor="#00B0FF"
             android:textStyle="bold"
-            android:textSize="15sp"
+            android:textSize="14sp"
             android:letterSpacing="0.05"
-            android:background="@drawable/bg_btn_neon_pink" 
-            style="?android:attr/borderlessButtonStyle"/>
+            android:background="@drawable/bg_edit_text"
+            android:layout_marginBottom="12dp"
+            android:elevation="4dp"
+            style="?android:attr/buttonStyle"/>
 
     </LinearLayout>
 
