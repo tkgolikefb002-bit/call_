@@ -22,21 +22,26 @@ public class MyInCallService extends InCallService {
 public void onCallAdded(Call call) {
     super.onCallAdded(call);
 
-    // --- BỔ SUNG: Kiểm tra xem người dùng có đang bật tính năng gọi ảo hay không ---
-    SharedPreferences prefs = getSharedPreferences("AppPrefs", MODE_PRIVATE);
-    boolean isCallActive = prefs.getBoolean("is_call_active", true); // Mặc định là true
+    // 1. Kiểm tra xem app có thực sự đang giữ quyền Default Dialer của hệ thống không
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+        android.app.role.RoleManager roleManager = getSystemService(android.app.role.RoleManager.class);
+        if (roleManager != null && !roleManager.isRoleHeld(android.app.role.RoleManager.ROLE_DIALER)) {
+            // Nếu người dùng đã đổi app mặc định ra ngoài, lập tức thoát và không làm gì cả
+            return;
+        }
+    }
 
+    // 2. Kiểm tra thêm cờ SharedPreferences trong app của bạn
+    SharedPreferences prefs = getSharedPreferences("AppPrefs", MODE_PRIVATE);
+    boolean isCallActive = prefs.getBoolean("is_call_active", true); 
     if (!isCallActive) {
-        // Nếu người dùng đã tắt tính năng trong app, tuyệt đối không can thiệp, 
-        // không mở CallActivity, nhường toàn bộ quyền xử lý cho app gọi điện gốc của máy.
         return;
     }
-    // --------------------------------------------------------------------------
 
     activeCall = call;
     isHandled = false;
 
-    // 1. Bật ngay màn hình giao diện ảo lên để che đậy
+    // Mở giao diện ảo
     Intent intent = new Intent(this, CallActivity.class);
     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
     startActivity(intent);
