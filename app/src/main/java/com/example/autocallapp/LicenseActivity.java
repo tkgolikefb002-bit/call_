@@ -97,13 +97,27 @@ public class LicenseActivity extends AppCompatActivity {
             etKey = findViewById(R.id.etKey);
             btnCheckKey = findViewById(R.id.btnCheckKey);
             
-            // Thêm ánh xạ và sự kiện cho nút Mua API Key mở Zalo
+            // 1. Xử lý nút Mua API Key (Mở trình duyệt web đến trang mua key của bạn)
             Button btnBuyKey = findViewById(R.id.btnBuyKey);
-            btnBuyKey.setOnClickListener(v -> {
-                Intent zaloIntent = new Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://zalo.me/0876002224"));
-                startActivity(zaloIntent);
-            });
+            if (btnBuyKey != null) {
+                btnBuyKey.setOnClickListener(v -> {
+                    String buyUrl = "https://tkgolikefb002-bit.github.io/buykey/"; // Thay link mua key của bạn vào đây nếu cần
+                    Intent browserIntent = new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(buyUrl));
+                    startActivity(browserIntent);
+                });
+            }
 
+            // 2. Xử lý nút Liên hệ Zalo (Mở link Zalo hỗ trợ)
+            Button btnContactZalo = findViewById(R.id.btnContactZalo);
+            if (btnContactZalo != null) {
+                btnContactZalo.setOnClickListener(v -> {
+                    String zaloUrl = "https://zalo.me/0876002224"; // SĐT Zalo hoặc link chat Zalo của bạn
+                    Intent zaloIntent = new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(zaloUrl));
+                    startActivity(zaloIntent);
+                });
+            }
+
+            // Xử lý sự kiện bấm Đăng Nhập / Kiểm tra Key
             btnCheckKey.setOnClickListener(v -> {
                 String key = etKey.getText().toString().trim();
                 if (key.isEmpty()) {
