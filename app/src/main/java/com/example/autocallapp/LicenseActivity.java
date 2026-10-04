@@ -86,8 +86,8 @@ public class LicenseActivity extends AppCompatActivity {
                     this,
                     PREF_NAME,
                     masterKey,
-                    EncryptedSharedPreferences.KeyEncryptionScheme.AES256_GCM,
-                    EncryptedSharedPreferences.ValueEncryptionScheme.AES256_GCM
+                    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             );
         } catch (Exception e) {
             e.printStackTrace();
