@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Khi đang bấm giữ (Pressed) -> Đổi sang màu hồng cực sáng hoặc chói hơn -->
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#FF4081"/> <!-- Màu hồng sáng rực khi nhấn -->
+            <corners android:radius="8dp"/>
+        </shape>
+    </item>
+    <!-- Trạng thái bình thường -> Dùng lại màu hồng gốc của bạn -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#C2185B"/> <!-- Hoặc màu sắc từ file bg_btn_neon_pink cũ của bạn -->
+            <corners android:radius="8dp"/>
+        </shape>
+    </item>
+</selector>
