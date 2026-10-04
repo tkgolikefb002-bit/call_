@@ -1,14 +1,12 @@
 package com.example.autocallapp;
 
-import android.app.AlertDialog;
-import org.json.JSONObject;
-import java.net.HttpURLConnection;
-import java.net.URL;
-
 import android.Manifest;
+import android.app.AlertDialog;
+import android.app.role.RoleManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
@@ -20,10 +18,16 @@ import android.telecom.TelecomManager;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+
+import org.json.JSONObject;
+
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 public class MainActivity extends AppCompatActivity {
     private static final int REQUEST_CODE_PERMISSIONS = 100;
@@ -33,7 +37,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         
-        // Nhận và hiển thị chính xác ngày hết hạn bản quyền được truyền từ LicenseActivity sang
+        // 1. Nhận và hiển thị chính xác ngày hết hạn bản quyền được truyền từ LicenseActivity sang
         TextView txtExpiry = findViewById(R.id.txtExpiry);
         Intent intent = getIntent();
         if (intent != null && intent.hasExtra("EXPIRY_DATE")) {
@@ -42,25 +46,23 @@ public class MainActivity extends AppCompatActivity {
                 txtExpiry.setText("Hạn sử dụng đến ngày: " + expiryDate);
             }
         }
-    } // Đóng hàm onCreate
-} // Đóng class MainActivity
 
-        // Đăng ký PhoneAccount ngầm
+        // 2. Đăng ký PhoneAccount ngầm
         registerPhoneAccount();
 
-        // Nút cấp tất cả quyền và đặt làm mặc định
+        // 3. Nút cấp tất cả quyền và đặt làm mặc định
         Button btnGrant = findViewById(R.id.btnGrantPermissions);
         if (btnGrant != null) {
             btnGrant.setOnClickListener(v -> requestAllRequiredPermissions());
         }
 
-        // Nút bấm mở trực tiếp màn hình "Default Apps" (Ứng dụng mặc định) hệ thống
+        // 4. Nút bấm mở trực tiếp màn hình "Default Apps" (Ứng dụng mặc định) hệ thống
         Button btnOpenDefaultSettings = findViewById(R.id.btnOpenDefaultSettings);
         if (btnOpenDefaultSettings != null) {
             btnOpenDefaultSettings.setOnClickListener(v -> openDefaultAppsSettings());
         }
 
-        // Nút mở bảng điều khiển popup nổi Auto
+        // 5. Nút mở bảng điều khiển popup nổi Auto
         Button btnStartPopup = findViewById(R.id.btnStartPopup);
         if (btnStartPopup != null) {
             btnStartPopup.setOnClickListener(v -> {
@@ -81,15 +83,15 @@ public class MainActivity extends AppCompatActivity {
             });
         }
 
-        // Nút bấm mở thẳng cài đặt Trợ năng (Accessibility)
+        // 6. Nút bấm mở thẳng cài đặt Trợ năng (Accessibility)
         Button btnOpenAccessibility = findViewById(R.id.btnOpenAccessibility);
         if (btnOpenAccessibility != null) {
             btnOpenAccessibility.setOnClickListener(v -> openAccessibilitySettings());
         }
 
-        // Tự động kiểm tra cập nhật mới từ GitHub ngay khi mở ứng dụng
+        // 7. Tự động kiểm tra cập nhật mới từ GitHub ngay khi mở ứng dụng
         checkForUpdates();
-    }
+    } // --- KẾT THÚC HÀM onCreate ---
 
     private void openAccessibilitySettings() {
         try {
@@ -136,10 +138,10 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            android.app.role.RoleManager roleManager = (android.app.role.RoleManager) getSystemService(Context.ROLE_SERVICE);
-            if (roleManager != null && roleManager.isRoleAvailable(android.app.role.RoleManager.ROLE_DIALER)) {
-                if (!roleManager.isRoleHeld(android.app.role.RoleManager.ROLE_DIALER)) {
-                    Intent intent = roleManager.createRequestRoleIntent(android.app.role.RoleManager.ROLE_DIALER);
+            RoleManager roleManager = (RoleManager) getSystemService(Context.ROLE_SERVICE);
+            if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_DIALER)) {
+                if (!roleManager.isRoleHeld(RoleManager.ROLE_DIALER)) {
+                    Intent intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER);
                     startActivityForResult(intent, 123);
                 } else {
                     Toast.makeText(this, "Ứng dụng đã là Trình gọi điện mặc định!", Toast.LENGTH_SHORT).show();
@@ -206,6 +208,30 @@ public class MainActivity extends AppCompatActivity {
                     e.printStackTrace();
                 }
             }
+        }
+    }
+
+    // Hàm lưu trạng thái bật/tắt tính năng gọi ảo
+    private void saveFeatureToggle(boolean isEnabled) {
+        SharedPreferences prefs = getSharedPreferences("AppPrefs", MODE_PRIVATE);
+        prefs.edit().putBoolean("is_call_active", isEnabled).apply();
+    }
+
+    // Hàm gọi để trả quyền về cho máy (mở cài đặt mặc định)
+    private void resetDefaultDialer() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            RoleManager roleManager = (RoleManager) getSystemService(Context.ROLE_SERVICE);
+            if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_DIALER)) {
+                if (!roleManager.isRoleHeld(RoleManager.ROLE_DIALER)) {
+                    saveFeatureToggle(false);
+                    return;
+                }
+                Intent intent = new Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS);
+                startActivity(intent);
+            }
+        } else {
+            Intent intent = new Intent(Settings.ACTION_SETTINGS);
+            startActivity(intent);
         }
     }
 
