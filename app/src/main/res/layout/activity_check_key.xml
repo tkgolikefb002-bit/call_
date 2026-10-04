@@ -75,17 +75,19 @@
         <Button
             android:id="@+id/btnBuyKey"
             android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:text="MUA API KEY"
-            android:textColor="#FF80AB"
+            android:layout_height="50dp"
+            android:text="🛒 MUA API KEY NGAY"
+            android:textColor="#FFFFFF"
             android:textStyle="bold"
-            android:textSize="15sp"
+            android:textSize="14sp"
             android:letterSpacing="0.05"
             android:background="@drawable/bg_btn_neon_pink"
-            android:layout_marginBottom="12dp"
-            style="?android:attr/borderlessButtonStyle"/>
+            android:foreground="?android:attr/selectableItemBackground"
+            android:layout_marginBottom="10dp"
+            android:elevation="4dp"
+            style="?android:attr/buttonStyle"/>
 
-        <!-- Nút Liên Hệ Zalo mới thêm -->
+        <!-- Nút Liên Hệ Zalo -->
         <Button
             android:id="@+id/btnContactZalo"
             android:layout_width="match_parent"
@@ -96,6 +98,7 @@
             android:textSize="14sp"
             android:letterSpacing="0.05"
             android:background="@drawable/bg_edit_text"
+            android:foreground="?android:attr/selectableItemBackground"
             android:layout_marginBottom="12dp"
             android:elevation="4dp"
             style="?android:attr/buttonStyle"/>
