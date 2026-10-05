@@ -423,11 +423,7 @@ public class FloatingWidgetService extends Service {
                 clickNodeByTextWithRetry(rootNode, "Khách không đặt hàng", 3, 1000);
                 Thread.sleep(1500);
 
-                // --- BƯỚC 7: Click ô thêm ảnh (`multiImageAdd`) và gọi Intent hệ thống nạp ảnh động[cite: 1] ---
-                rootNode = AutoScrapeService.instance.getRootInActiveWindow();
-                clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/multiImageAdd", 3, 1000);
-                Thread.sleep(1000);
-
+                // --- BƯỚC 7: Nạp trực tiếp ảnh động qua Intent hệ thống (Không click multiImageAdd để tránh bật camera) ---
                 try {
                     Intent shareIntent = new Intent(Intent.ACTION_SEND);
                     shareIntent.setType("image/jpeg");
@@ -436,13 +432,27 @@ public class FloatingWidgetService extends Service {
                     }
                     shareIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                     shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    
+                    // Ép gửi thẳng vào app BEST Courier
+                    shareIntent.setPackage("com.best.android.vietcourier");
                     startActivity(shareIntent);
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    try {
+                        Intent fallbackIntent = new Intent(Intent.ACTION_SEND);
+                        fallbackIntent.setType("image/jpeg");
+                        if (imageUri != null) {
+                            fallbackIntent.putExtra(Intent.EXTRA_STREAM, imageUri);
+                        }
+                        fallbackIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        fallbackIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        startActivity(fallbackIntent);
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    }
                 }
-                Thread.sleep(2500);
+                Thread.sleep(3000); // Chờ hệ thống nhận diện và nạp ảnh vào form
 
-                // --- BƯỚC 8: Click nút "Thêm" (`vAdd`) để hoàn tất[cite: 1] ---
+                // --- BƯỚC 8: Click nút "Thêm" (`vAdd`) để hoàn tất ---
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 boolean clickedAddButton = clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/vAdd", 3, 1000);
                 if (!clickedAddButton) {
