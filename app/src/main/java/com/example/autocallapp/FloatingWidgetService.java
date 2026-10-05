@@ -178,6 +178,26 @@ public class FloatingWidgetService extends Service {
                 });
             }
 
+            // ===== 2 NÚT MỚI BỔ SUNG =====
+
+            // 1. Nút Gắn Ảnh (🖼 Gắn Ảnh)
+            Button btnAttachImages = floatingView.findViewById(R.id.btnAttachImages);
+            if (btnAttachImages != null) {
+                btnAttachImages.setOnClickListener(v -> {
+                    Toast.makeText(this, "Đang thực hiện gắn ảnh quang cảnh...", Toast.LENGTH_SHORT).show();
+                    // Thêm logic xử lý ảnh quang cảnh tại đây nếu cần
+                });
+            }
+
+            // 2. Nút Chọn Kiện (📦 Chọn Kiện)
+            Button btnSelectParcel = floatingView.findViewById(R.id.btnSelectParcel);
+            if (btnSelectParcel != null) {
+                btnSelectParcel.setOnClickListener(v -> {
+                    // Gọi trực tiếp hàm tự động xử lý sửa số trên ảnh kiện hàng
+                    handleParcelAutomation();
+                });
+            }
+
         } catch (Exception e) {
             e.printStackTrace();
             Toast.makeText(this, "Lỗi khởi tạo popup: " + e.getMessage(), Toast.LENGTH_LONG).show();
