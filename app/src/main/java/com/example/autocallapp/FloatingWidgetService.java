@@ -406,22 +406,22 @@ public class FloatingWidgetService extends Service {
                 // --- BƯỚC 3: Click chọn checkbox của mã vận đơn (`ivSelect`)[cite: 1] ---
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/ivSelect", 3, 1000);
-                Thread.sleep(1200);
+                Thread.sleep(1000);
 
                 // --- BƯỚC 4: Click nút "Kiện vấn đề" (`tvDeliveryFailed`)[cite: 1] ---
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/tvDeliveryFailed", 3, 1000);
-                Thread.sleep(1500);
+                Thread.sleep(1000);
 
                 // --- BƯỚC 5: Chọn lý do "Người nhận không nhận kiện hàng"[cite: 1] ---
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByTextWithRetry(rootNode, "Người nhận không nhận kiện hàng", 3, 1000);
-                Thread.sleep(1500);
+                Thread.sleep(1000);
 
                 // --- BƯỚC 6: Chọn phân loại "Khách không đặt hàng"[cite: 1] ---
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByTextWithRetry(rootNode, "Khách không đặt hàng", 3, 1000);
-                Thread.sleep(1500);
+                Thread.sleep(1000);
 
                 // --- BƯỚC 7: Bỏ qua hoàn toàn việc click mở camera, truyền thẳng Uri ảnh vào ContentResolver của app ---
                 try {
