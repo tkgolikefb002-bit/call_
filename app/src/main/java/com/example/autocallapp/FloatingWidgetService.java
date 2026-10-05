@@ -423,39 +423,84 @@ public class FloatingWidgetService extends Service {
                 clickNodeByTextWithRetry(rootNode, "Khách không đặt hàng", 3, 1000);
                 Thread.sleep(1000);
 
-                // --- BƯỚC 7: Đưa bức ảnh đã gắn mã vận đơn vào MediaStore trước, sau đó mới bấm chọn ---
-                try {
-                    Intent mediaScanIntent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
-                    mediaScanIntent.setData(imageUri);
-                    sendBroadcast(mediaScanIntent);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-                Thread.sleep(500);
-
-                // Click ô thêm ảnh
+                // --- BƯỚC 7: Mở camera, chụp và đánh tráo ảnh bằng ảnh mã vận đơn ---
+                
+                // 1. Click mở ô thêm ảnh
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/multiImageAdd", 3, 1000);
                 Thread.sleep(1000);
 
-                // Bấm "Chụp ảnh" trên popup
+                // 2. Bấm "Chụp ảnh" trên popup
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByTextWithRetry(rootNode, "Chụp ảnh", 3, 1000);
-                Thread.sleep(1500);
+                Thread.sleep(1500); // Chờ giao diện camera mở lên
 
-                // Thay vì chụp thật, ta dùng Intent gửi Uri bức ảnh đã chuẩn bị sẵn vào activity camera đang mở
+                // 3. Tự động bấm nút chụp (shutter) ở giữa đáy màn hình
                 try {
-                    Intent targetIntent = new Intent(Intent.ACTION_VIEW);
-                    targetIntent.setDataAndType(imageUri, "image/*");
-                    targetIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                    targetIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    targetIntent.setPackage("com.best.android.vietcourier");
-                    startActivity(targetIntent);
+                    android.util.DisplayMetrics metrics = getResources().getDisplayMetrics();
+                    float shutterX = metrics.widthPixels / 2f;
+                    float shutterY = metrics.heightPixels * 0.75f;
+
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                        android.accessibilityservice.AccessibilityService.GestureDescription.Builder builder = new android.accessibilityservice.AccessibilityService.GestureDescription.Builder();
+                        android.graphics.Path path = new android.graphics.Path();
+                        path.moveTo(shutterX, shutterY);
+                        builder.addStroke(new android.accessibilityservice.AccessibilityService.GestureDescription.StrokeDescription(path, 0, 50));
+                        AutoScrapeService.instance.dispatchGesture(builder.build(), null, null);
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                
+                Thread.sleep(1200); // Đợi máy vừa chụp và lưu file tạm xong
+
+                // 4. [QUAN TRỌNG] Copy đè file ảnh mã vận đơn của bạn vào file ảnh mới nhất của hệ thống camera
+                try {
+                    // Giả sử đường dẫn file ảnh mã vận đơn bạn đã tạo sẵn nằm ở biến: preparedImageFile (File)
+                    // Ta tìm file ảnh mới nhất trong thư mục DCIM/Camera hoặc cache để ghi đè
+                    java.io.File cameraDir = new java.io.File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DCIM), "Camera");
+                    if (cameraDir.exists() && cameraDir.isDirectory()) {
+                        java.io.File[] files = cameraDir.listFiles();
+                        if (files != null && files.length > 0) {
+                            // Sắp xếp lấy file mới chụp gần nhất
+                            java.util.Arrays.sort(files, (f1, f2) -> Long.compare(f2.lastModified(), f1.lastModified()));
+                            java.io.File latestPhoto = files[0]; // File ảnh vừa chụp bàn phím
+                            
+                            // Thực hiện copy đè nội dung từ file mã vận đơn của bạn (preparedImageFile) sang file này
+                            if (preparedImageFile != null && preparedImageFile.exists()) {
+                                java.nio.file.Files.copy(preparedImageFile.toPath(), latestPhoto.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                                
+                                // Ép hệ thống cập nhật lại Index của file ảnh
+                                Intent scanIntent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
+                                scanIntent.setData(android.net.Uri.fromFile(latestPhoto));
+                                sendBroadcast(scanIntent);
+                            }
+                        }
+                    }
                 } catch (Exception ex) {
                     ex.printStackTrace();
                 }
-                
-                Thread.sleep(3000);
+
+                Thread.sleep(800); // Chờ hệ thống nhận diện file đã thay đổi
+
+                // 5. Tự động bấm vào nút Dấu tích (✔) để xác nhận ảnh
+                try {
+                    android.util.DisplayMetrics metrics = getResources().getDisplayMetrics();
+                    float checkX = metrics.widthPixels * 0.75f;
+                    float checkY = metrics.heightPixels * 0.75f;
+
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                        android.accessibilityservice.AccessibilityService.GestureDescription.Builder builder = new android.accessibilityservice.AccessibilityService.GestureDescription.Builder();
+                        android.graphics.Path path = new android.graphics.Path();
+                        path.moveTo(checkX, checkY);
+                        builder.addStroke(new android.accessibilityservice.AccessibilityService.GestureDescription.StrokeDescription(path, 0, 50));
+                        AutoScrapeService.instance.dispatchGesture(builder.build(), null, null);
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
+                Thread.sleep(2000);
 
                 // --- BƯỚC 8: Click nút "Thêm" (`vAdd`) để hoàn tất ---
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
