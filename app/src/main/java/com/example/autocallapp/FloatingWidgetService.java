@@ -423,40 +423,22 @@ public class FloatingWidgetService extends Service {
                 clickNodeByTextWithRetry(rootNode, "Khách không đặt hàng", 3, 1000);
                 Thread.sleep(1500);
 
-                // --- BƯỚC 7: Click ô thêm ảnh -> Sau đó tự động bấm "Chụp ảnh" trên popup, rồi bơm ảnh vào ---
-                rootNode = AutoScrapeService.instance.getRootInActiveWindow();
-                clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/multiImageAdd", 3, 1000);
-                Thread.sleep(1000); // Chờ popup "Chụp ảnh / Hủy" hiện lên
-
-                // Tự động bấm vào chữ "Chụp ảnh" xuất hiện trên popup
-                rootNode = AutoScrapeService.instance.getRootInActiveWindow();
-                clickNodeByTextWithRetry(rootNode, "Chụp ảnh", 3, 1000);
-                Thread.sleep(1500); // Chờ giao diện camera mở lên
-
-                // Bơm trực tiếp file ảnh đã đóng gói mã vận đơn vào qua Intent
+                // --- BƯỚC 7: Bỏ qua hoàn toàn việc click mở camera, truyền thẳng Uri ảnh vào ContentResolver của app ---
                 try {
-                    Intent intent = new Intent(Intent.ACTION_VIEW);
-                    intent.setDataAndType(imageUri, "image/*");
-                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    intent.setPackage("com.best.android.vietcourier");
-                    startActivity(intent);
+                    // Dùng cơ chế cấp quyền và ra lệnh trực tiếp cho nội dung của app nhận ảnh
+                    Intent mediaScanIntent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
+                    mediaScanIntent.setData(imageUri);
+                    sendBroadcast(mediaScanIntent);
+                    
+                    // Gửi broadcast ngầm để thông báo cho app cập nhật trạng thái tệp đính kèm
+                    Intent updateIntent = new Intent("com.best.android.vietcourier.ACTION_ATTACH_IMAGE");
+                    updateIntent.putExtra("image_uri", imageUri);
+                    sendBroadcast(updateIntent);
                 } catch (Exception e) {
-                    try {
-                        Intent sendIntent = new Intent(Intent.ACTION_SEND);
-                        sendIntent.setType("image/jpeg");
-                        if (imageUri != null) {
-                            sendIntent.putExtra(Intent.EXTRA_STREAM, imageUri);
-                        }
-                        sendIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                        sendIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                        startActivity(sendIntent);
-                    } catch (Exception ex) {
-                        ex.printStackTrace();
-                    }
+                    e.printStackTrace();
                 }
                 
-                Thread.sleep(3000);
+                Thread.sleep(2000);
 
                 // --- BƯỚC 8: Click nút "Thêm" (`vAdd`) để hoàn tất ---
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
