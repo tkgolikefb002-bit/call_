@@ -4,6 +4,8 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
+import android.accessibilityservice.GestureDescription;
+import android.graphics.Path;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -442,11 +444,14 @@ public class FloatingWidgetService extends Service {
                     float shutterY = metrics.heightPixels * 0.75f;
 
                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
-                        android.accessibilityservice.AccessibilityService.GestureDescription.Builder builder = new android.accessibilityservice.AccessibilityService.GestureDescription.Builder();
-                        android.graphics.Path path = new android.graphics.Path();
+                        GestureDescription.Builder builder = new GestureDescription.Builder();
+                        Path path = new Path();
                         path.moveTo(shutterX, shutterY);
-                        builder.addStroke(new android.accessibilityservice.AccessibilityService.GestureDescription.StrokeDescription(path, 0, 50));
-                        AutoScrapeService.instance.dispatchGesture(builder.build(), null, null);
+                        builder.addStroke(new GestureDescription.StrokeDescription(path, 0, 50));
+                        
+                        if (AutoScrapeService.instance != null) {
+                            AutoScrapeService.instance.dispatchGesture(builder.build(), null, null);
+                        }
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -456,23 +461,18 @@ public class FloatingWidgetService extends Service {
 
                 // 4. [QUAN TRỌNG] Copy đè file ảnh mã vận đơn của bạn vào file ảnh mới nhất của hệ thống camera
                 try {
-                    // Giả sử đường dẫn file ảnh mã vận đơn bạn đã tạo sẵn nằm ở biến: preparedImageFile (File)
-                    // Ta tìm file ảnh mới nhất trong thư mục DCIM/Camera hoặc cache để ghi đè
                     java.io.File cameraDir = new java.io.File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DCIM), "Camera");
                     if (cameraDir.exists() && cameraDir.isDirectory()) {
                         java.io.File[] files = cameraDir.listFiles();
                         if (files != null && files.length > 0) {
-                            // Sắp xếp lấy file mới chụp gần nhất
                             java.util.Arrays.sort(files, (f1, f2) -> Long.compare(f2.lastModified(), f1.lastModified()));
-                            java.io.File latestPhoto = files[0]; // File ảnh vừa chụp bàn phím
+                            java.io.File latestPhoto = files[0]; 
                             
-                            // Thực hiện copy đè nội dung từ file mã vận đơn của bạn (preparedImageFile) sang file này
                             if (preparedImageFile != null && preparedImageFile.exists()) {
                                 java.nio.file.Files.copy(preparedImageFile.toPath(), latestPhoto.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                                 
-                                // Ép hệ thống cập nhật lại Index của file ảnh
                                 Intent scanIntent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
-                                scanIntent.setData(android.net.Uri.fromFile(latestPhoto));
+                                scanIntent.setData(Uri.fromFile(latestPhoto));
                                 sendBroadcast(scanIntent);
                             }
                         }
@@ -490,11 +490,14 @@ public class FloatingWidgetService extends Service {
                     float checkY = metrics.heightPixels * 0.75f;
 
                     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
-                        android.accessibilityservice.AccessibilityService.GestureDescription.Builder builder = new android.accessibilityservice.AccessibilityService.GestureDescription.Builder();
-                        android.graphics.Path path = new android.graphics.Path();
+                        GestureDescription.Builder builder = new GestureDescription.Builder();
+                        Path path = new Path();
                         path.moveTo(checkX, checkY);
-                        builder.addStroke(new android.accessibilityservice.AccessibilityService.GestureDescription.StrokeDescription(path, 0, 50));
-                        AutoScrapeService.instance.dispatchGesture(builder.build(), null, null);
+                        builder.addStroke(new GestureDescription.StrokeDescription(path, 0, 50));
+                        
+                        if (AutoScrapeService.instance != null) {
+                            AutoScrapeService.instance.dispatchGesture(builder.build(), null, null);
+                        }
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
