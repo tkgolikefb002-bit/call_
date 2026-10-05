@@ -423,11 +423,17 @@ public class FloatingWidgetService extends Service {
                 clickNodeByTextWithRetry(rootNode, "Khách không đặt hàng", 3, 1000);
                 Thread.sleep(1500);
 
-                // --- BƯỚC 7: Click ô thêm ảnh để kích hoạt giao diện, sau đó bơm Intent ảnh đơn sàn ---
+                // --- BƯỚC 7: Click ô thêm ảnh -> Sau đó tự động bấm "Chụp ảnh" trên popup, rồi bơm ảnh vào ---
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/multiImageAdd", 3, 1000);
-                Thread.sleep(1500); 
+                Thread.sleep(1000); // Chờ popup "Chụp ảnh / Hủy" hiện lên
 
+                // Tự động bấm vào chữ "Chụp ảnh" xuất hiện trên popup
+                rootNode = AutoScrapeService.instance.getRootInActiveWindow();
+                clickNodeByTextWithRetry(rootNode, "Chụp ảnh", 3, 1000);
+                Thread.sleep(1500); // Chờ giao diện camera mở lên
+
+                // Bơm trực tiếp file ảnh đã đóng gói mã vận đơn vào qua Intent
                 try {
                     Intent intent = new Intent(Intent.ACTION_VIEW);
                     intent.setDataAndType(imageUri, "image/*");
