@@ -432,25 +432,42 @@ public class FloatingWidgetService extends Service {
                 clickNodeByTextWithRetry(rootNode, "Khách không đặt hàng", 3, 1000);
                 Thread.sleep(1000);
 
-                // --- BƯỚC 7: Mở camera ảo và tự động nạp ảnh mã vận đơn ---
+                // --- BƯỚC 7: Mở camera, chụp tự động, đánh tráo ảnh và bấm xác nhận ---
                 
                 // 1. Click mở ô thêm ảnh trên app BEST
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/multiImageAdd", 3, 1000);
                 Thread.sleep(1000);
 
-                // 2. Bấm "Chụp ảnh" trên popup của app BEST
+                // 2. Bấm "Chụp ảnh" trên popup
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByTextWithRetry(rootNode, "Chụp ảnh", 3, 1000);
-                Thread.sleep(1500); // Lúc này VirtualCameraActivity của bạn sẽ tự động hiện lên thay cho camera thật
+                Thread.sleep(1500); // Chờ giao diện camera Oplus mở lên
 
-                // 3. Tự động click vào nút "Chụp ảnh mã vận đơn (Ảo)" trên Activity của bạn vừa bật lên
+                // 3. Tự động tìm và bấm vào nút chụp chuẩn `com.oplus.camera:id/shutter_button`
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
-                clickNodeByTextWithRetry(rootNode, "Chụp ảnh mã vận đơn (Ảo)", 3, 1000);
+                boolean clickedShutter = clickNodeByIdWithRetry(rootNode, "com.oplus.camera:id/shutter_button", 3, 1000);
                 
-                Thread.sleep(1500);
+                // Fallback phòng hờ: Nếu không tìm thấy node ID thì dùng tọa độ tâm nút chụp [282,1272][438,1428]
+                if (!clickedShutter) {
+                    try {
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                            GestureDescription.Builder builder = new GestureDescription.Builder();
+                            Path path = new Path();
+                            path.moveTo(360f, 1350f); // Tâm giữa của nút chụp
+                            builder.addStroke(new GestureDescription.StrokeDescription(path, 0, 50));
+                            if (AutoScrapeService.instance != null) {
+                                AutoScrapeService.instance.dispatchGesture(builder.build(), null, null);
+                            }
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+                
+                Thread.sleep(1500); // Đợi máy chụp và lưu file tạm xong
 
-                // 4. [QUAN TRỌNG] Copy đè file ảnh mã vận đơn của bạn vào file ảnh mới nhất của hệ thống camera
+                // 4. [QUAN TRỌNG] Copy đè file ảnh mã vận đơn (`ma_van_don.jpg`) vào file ảnh mới nhất của hệ thống camera
                 try {
                     java.io.File cameraDir = new java.io.File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DCIM), "Camera");
                     if (cameraDir.exists() && cameraDir.isDirectory()) {
@@ -459,7 +476,8 @@ public class FloatingWidgetService extends Service {
                             java.util.Arrays.sort(files, (f1, f2) -> Long.compare(f2.lastModified(), f1.lastModified()));
                             java.io.File latestPhoto = files[0]; 
                             
-                            if (preparedImageFile != null && preparedImageFile.exists()) {
+                            java.io.File preparedImageFile = new java.io.File(getFilesDir(), "ma_van_don.jpg");
+                            if (preparedImageFile.exists()) {
                                 java.nio.file.Files.copy(preparedImageFile.toPath(), latestPhoto.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                                 
                                 Intent scanIntent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
@@ -472,26 +490,27 @@ public class FloatingWidgetService extends Service {
                     ex.printStackTrace();
                 }
 
-                Thread.sleep(800); // Chờ hệ thống nhận diện file đã thay đổi
+                Thread.sleep(1000); // Chờ hệ thống nhận diện file đã thay đổi
 
-                // 5. Tự động bấm vào nút Dấu tích (✔) để xác nhận ảnh
-                try {
-                    android.util.DisplayMetrics metrics = getResources().getDisplayMetrics();
-                    float checkX = metrics.widthPixels * 0.75f;
-                    float checkY = metrics.heightPixels * 0.75f;
-
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
-                        GestureDescription.Builder builder = new GestureDescription.Builder();
-                        Path path = new Path();
-                        path.moveTo(checkX, checkY);
-                        builder.addStroke(new GestureDescription.StrokeDescription(path, 0, 50));
-                        
-                        if (AutoScrapeService.instance != null) {
-                            AutoScrapeService.instance.dispatchGesture(builder.build(), null, null);
+                // 5. Tự động bấm nút tích (✔) chuẩn `com.oplus.camera:id/done_button` để xác nhận ảnh
+                rootNode = AutoScrapeService.instance.getRootInActiveWindow();
+                boolean clickedDone = clickNodeByIdWithRetry(rootNode, "com.oplus.camera:id/done_button", 3, 1000);
+                
+                // Fallback nếu không tìm thấy node ID thì bấm theo tọa độ tâm nút `done_button` [540,1304][632,1396]
+                if (!clickedDone) {
+                    try {
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                            GestureDescription.Builder builder = new GestureDescription.Builder();
+                            Path path = new Path();
+                            path.moveTo(586f, 1350f); // Tâm giữa của nút done_button
+                            builder.addStroke(new GestureDescription.StrokeDescription(path, 0, 50));
+                            if (AutoScrapeService.instance != null) {
+                                AutoScrapeService.instance.dispatchGesture(builder.build(), null, null);
+                            }
                         }
+                    } catch (Exception e) {
+                        e.printStackTrace();
                     }
-                } catch (Exception e) {
-                    e.printStackTrace();
                 }
 
                 Thread.sleep(2000);
