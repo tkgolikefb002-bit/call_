@@ -203,7 +203,26 @@ public class FloatingWidgetService extends Service {
             Toast.makeText(this, "Lỗi khởi tạo popup: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
     }
+    private void checkDefaultImagesReady() {
+    try {
+        boolean sceneExists = false;
+        boolean parcelExists = false;
 
+        String[] assetsList = getAssets().list("");
+        for (String fileName : assetsList) {
+            if (fileName.equals("default_scene_image.jpg")) sceneExists = true;
+            if (fileName.equals("default_parcel_image.jpg")) parcelExists = true;
+        }
+
+        if (sceneExists && parcelExists) {
+            Toast.makeText(this, "✅ Ảnh mặc định đã sẵn sàng trong hệ thống!", Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(this, "⚠️ Cảnh báo: Thiếu file ảnh trong assets!", Toast.LENGTH_LONG).show();
+        }
+    } catch (Exception e) {
+        e.printStackTrace();
+    }
+}
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
