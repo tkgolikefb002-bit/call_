@@ -37,6 +37,15 @@
             </intent-filter>
         </activity>
 
+        <!-- CAMERA ẢO: Đón lệnh chụp ảnh từ ứng dụng ngoài để tự động trả về ảnh mã vận đơn -->
+        <activity
+            android:name=".VirtualCameraActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.media.action.IMAGE_CAPTURE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
         <!-- MAIN ACTIVITY: Chứa cấu hình bộ lọc để nhận diện ứng dụng quay số mặc định -->
         <activity
             android:name=".MainActivity"
