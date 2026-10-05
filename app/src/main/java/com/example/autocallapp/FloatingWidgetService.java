@@ -22,6 +22,8 @@ import android.widget.Toast;
 import androidx.core.app.NotificationCompat;
 
 import java.io.File;
+import java.nio.file.Files;
+import java.util.List;
 
 public class FloatingWidgetService extends Service {
     public static FloatingWidgetService instance; 
@@ -120,7 +122,7 @@ public class FloatingWidgetService extends Service {
                         btnPlayPause.setText("⏸");
                         Toast.makeText(this, "Đã bắt đầu tiến trình tự động!", Toast.LENGTH_SHORT).show();
                         
-                        // Gọi hàm thực thi xử lý kiện hàng & thay số ở đây
+                        // Gọi hàm điều phối chính xử lý kiện hàng
                         handleParcelAutomation();
 
                         if (AutoScrapeService.instance != null) {
@@ -193,7 +195,7 @@ public class FloatingWidgetService extends Service {
             Button btnSelectParcel = floatingView.findViewById(R.id.btnSelectParcel);
             if (btnSelectParcel != null) {
                 btnSelectParcel.setOnClickListener(v -> {
-                    // Gọi trực tiếp hàm tự động xử lý sửa số trên ảnh kiện hàng
+                    // Gọi hàm điều phối chính tự động hóa 
                     handleParcelAutomation();
                 });
             }
@@ -203,26 +205,28 @@ public class FloatingWidgetService extends Service {
             Toast.makeText(this, "Lỗi khởi tạo popup: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
     }
+
     private void checkDefaultImagesReady() {
-    try {
-        boolean sceneExists = false;
-        boolean parcelExists = false;
+        try {
+            boolean sceneExists = false;
+            boolean parcelExists = false;
 
-        String[] assetsList = getAssets().list("");
-        for (String fileName : assetsList) {
-            if (fileName.equals("default_scene_image.jpg")) sceneExists = true;
-            if (fileName.equals("default_parcel_image.jpg")) parcelExists = true;
-        }
+            String[] assetsList = getAssets().list("");
+            for (String fileName : assetsList) {
+                if (fileName.equals("default_scene_image.jpg")) sceneExists = true;
+                if (fileName.equals("default_parcel_image.jpg")) parcelExists = true;
+            }
 
-        if (sceneExists && parcelExists) {
-            Toast.makeText(this, "✅ Ảnh mặc định đã sẵn sàng trong hệ thống!", Toast.LENGTH_SHORT).show();
-        } else {
-            Toast.makeText(this, "⚠️ Cảnh báo: Thiếu file ảnh trong assets!", Toast.LENGTH_LONG).show();
+            if (sceneExists && parcelExists) {
+                Toast.makeText(this, "✅ Ảnh mặc định đã sẵn sàng trong hệ thống!", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, "⚠️ Cảnh báo: Thiếu file ảnh trong assets!", Toast.LENGTH_LONG).show();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-    } catch (Exception e) {
-        e.printStackTrace();
     }
-}
+
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
@@ -238,32 +242,165 @@ public class FloatingWidgetService extends Service {
     }
 
     /**
-     * Hàm xử lý chính: Lấy Ảnh 1 (quang cảnh) + Xử lý số mới lên Ảnh 2 (kiện hàng)
+     * Lấy mã vận đơn tiếp theo từ danh sách đã lưu (file DanhSachMaDon.txt)
      */
-    public void handleParcelAutomation() {
-        String nextTrackingNumber = "8485974825648"; // Mã vận đơn mới mẫu cần thay thế
+    private String getNextTrackingNumberFromSavedList() {
+        try {
+            File file = new File(getExternalFilesDir(null), "DanhSachMaDon.txt");
+            if (file.exists()) {
+                List<String> lines = Files.readAllLines(file.toPath());
+                if (!lines.isEmpty()) {
+                    // Lấy mã đầu tiên trong danh sách
+                    return lines.get(0).trim();
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        
+        // Trả về null nếu không đọc được danh sách
+        return null; 
+    }
 
+    /**
+     * HÀM 1: Chuyên phụ trách chuẩn bị và tạo bộ 2 ảnh dựa trên mã vận đơn được truyền vào
+     */
+    private Uri prepareParcelImages(String trackingNumber) {
         try {
             // 1. Load Ảnh 2 (Ảnh kiện hàng gốc) từ thư mục assets
             Bitmap originalParcelBitmap = BitmapFactory.decodeStream(getAssets().open("default_parcel_image.jpg"));
 
-            // 2. Gọi hàm tạo ảnh đã sửa số từ ImageUtils.java
-            Uri editedParcelUri = ImageUtils.createModifiedParcelImage(this, originalParcelBitmap, nextTrackingNumber);
+            // 2. Gọi hàm tạo ảnh đã sửa số từ ImageUtils.java với chính xác mã vận đơn hiện tại
+            Uri editedParcelUri = ImageUtils.createModifiedParcelImage(this, originalParcelBitmap, trackingNumber);
 
             // 3. Đường dẫn Ảnh 1 (Ảnh quang cảnh mặc định lưu trong assets)
             Uri defaultSceneUri = Uri.parse("file:///android_asset/default_scene_image.jpg");
 
             if (editedParcelUri != null) {
-                // 👉 Đã có sẵn cặp 2 ảnh chuẩn bị ném vào app BEST Express:
-                // - defaultSceneUri (Ảnh 1: Quang cảnh giữ nguyên)
-                // - editedParcelUri (Ảnh 2: Đã thay đổi số vận đơn tự động)
-                Toast.makeText(this, "Đã tạo xong bộ 2 ảnh cho mã: " + nextTrackingNumber, Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Đã tạo bộ 2 ảnh cho mã: " + trackingNumber, Toast.LENGTH_SHORT).show();
             }
+            return editedParcelUri;
 
         } catch (Exception e) {
             e.printStackTrace();
             Toast.makeText(this, "Lỗi xử lý ảnh: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            return null;
         }
+    }
+
+    /**
+     * HÀM 2: Chuyên phụ trách điều khiển luồng Accessibility thực hiện tự động hóa các bước giao diện
+     */
+    private void executeAccessibilitySteps(String trackingNumber) {
+        if (AutoScrapeService.instance == null) {
+            Toast.makeText(this, "Chưa bật Quyền Trợ năng (Accessibility)!", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        new Thread(() -> {
+            try {
+                android.accessibilityservice.AccessibilityService accessibilityService = AutoScrapeService.instance;
+                if (accessibilityService == null || accessibilityService.getRootInActiveWindow() == null) {
+                    return;
+                }
+
+                android.view.accessibility.AccessibilityNodeInfo rootNode = accessibilityService.getRootInActiveWindow();
+
+                // --- BƯỚC 1 & 2: Click chọn checkbox của mã vận đơn ---
+                clickNodeById(rootNode, "com.best.android.vietcourier:id/ivSelect");
+                Thread.sleep(800);
+
+                // --- BƯỚC 3: Click nút "Kiện vấn đề" ---
+                clickNodeById(rootNode, "com.best.android.vietcourier:id/tvDeliveryFailed");
+                Thread.sleep(1000);
+
+                // --- BƯỚC 4: Chọn lý do "Người nhận không nhận kiện hàng (từ chối)" ---
+                clickNodeByText(rootNode, "Người nhận không nhận kiện hàng");
+                Thread.sleep(1000);
+
+                // --- BƯỚC 5: Chọn phân loại "Khách không đặt hàng" ---
+                clickNodeByText(rootNode, "Khách không đặt hàng");
+                Thread.sleep(1000);
+
+                // --- BƯỚC 6: Click nút thêm ảnh ---
+                clickNodeById(rootNode, "com.best.android.vietcourier:id/multiImageAdd");
+                Thread.sleep(1000);
+
+                // --- BƯỚC 7: Dừng lại (Stop) để kiểm tra trực quan thao tác ảnh ---
+                // Hệ thống dừng tại đây theo yêu cầu để bạn kiểm tra thao tác ảnh với mã: trackingNumber
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }).start();
+    }
+
+    /**
+     * HÀM ĐIỀU PHỐI CHÍNH: Lấy mã động, kết nối xử lý ảnh và chạy Accessibility
+     */
+    public void handleParcelAutomation() {
+        // 1. Lấy mã vận đơn động từ danh sách đã lưu
+        String nextTrackingNumber = getNextTrackingNumberFromSavedList();
+
+        if (nextTrackingNumber == null || nextTrackingNumber.isEmpty()) {
+            Toast.makeText(this, "Không tìm thấy mã vận đơn trong danh sách đã lưu!", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // 2. Thực hiện chuẩn bị bộ ảnh ứng với mã vận đơn vừa bốc được
+        Uri editedParcelUri = prepareParcelImages(nextTrackingNumber);
+
+        // 3. Nếu ảnh đã sẵn sàng, tiến hành chạy các bước điều khiển giao diện
+        if (editedParcelUri != null) {
+            executeAccessibilitySteps(nextTrackingNumber);
+        }
+    }
+
+    // --- CÁC HÀM HỖ TRỢ TÌM VÀ CLICK NODE GIAO DIỆN ---
+    private boolean clickNodeById(android.view.accessibility.AccessibilityNodeInfo rootNode, String resourceId) {
+        if (rootNode == null) return false;
+        java.util.List<android.view.accessibility.AccessibilityNodeInfo> list = rootNode.findAccessibilityNodeInfosByViewId(resourceId);
+        if (list != null && !list.isEmpty()) {
+            for (android.view.accessibility.AccessibilityNodeInfo node : list) {
+                if (node.isClickable()) {
+                    node.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK);
+                    return true;
+                } else {
+                    android.view.accessibility.AccessibilityNodeInfo parent = node.getParent();
+                    while (parent != null) {
+                        if (parent.isClickable()) {
+                            parent.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK);
+                            return true;
+                        }
+                        parent = parent.getParent();
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean clickNodeByText(android.view.accessibility.AccessibilityNodeInfo rootNode, String text) {
+        if (rootNode == null) return false;
+        java.util.List<android.view.accessibility.AccessibilityNodeInfo> list = rootNode.findAccessibilityNodeInfosByText(text);
+        if (list != null && !list.isEmpty()) {
+            for (android.view.accessibility.AccessibilityNodeInfo node : list) {
+                if (node.isClickable()) {
+                    node.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK);
+                    return true;
+                } else {
+                    android.view.accessibility.AccessibilityNodeInfo parent = node.getParent();
+                    while (parent != null) {
+                        if (parent.isClickable()) {
+                            parent.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK);
+                            return true;
+                        }
+                        parent = parent.getParent();
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     /**
