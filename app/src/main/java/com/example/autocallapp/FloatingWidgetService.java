@@ -113,21 +113,21 @@ public class FloatingWidgetService extends Service {
                 btnClose.setOnClickListener(v -> stopSelf());
             }
 
-            // NÚT PLAY/PAUSE: Chỉ làm nhiệm vụ gán mã => bấm gọi
+            // NÚT PLAY/PAUSE (▶): Chạy HÀNG LOẠT (Loop toàn bộ danh sách mã đã lưu: Gán mã & Gọi điện)
             Button btnPlayPause = floatingView.findViewById(R.id.btnPlayPause);
             if (btnPlayPause != null) {
                 btnPlayPause.setOnClickListener(v -> {
                     isRunning = !isRunning;
                     if (isRunning) {
                         btnPlayPause.setText("⏸");
-                        Toast.makeText(this, "Đã bắt đầu tiến trình gán mã và gọi!", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, "Bắt đầu chạy hàng loạt: Gán mã & Gọi điện...", Toast.LENGTH_SHORT).show();
                         
                         if (AutoScrapeService.instance != null) {
                             AutoScrapeService.instance.startAutoCallingSequence();
                         }
                     } else {
                         btnPlayPause.setText("▶");
-                        Toast.makeText(this, "Đã tạm dừng tiến trình gọi!", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, "Đã tạm dừng tiến trình hàng loạt!", Toast.LENGTH_SHORT).show();
                         
                         if (AutoScrapeService.instance != null) {
                             AutoScrapeService.instance.stopAutoCallingSequence();
@@ -185,7 +185,7 @@ public class FloatingWidgetService extends Service {
                 });
             }
 
-            // NÚT CHỌN KIỆN (📦 Chọn Kiện): Chạy chuỗi đầy đủ (Gán mã -> Gọi -> Tích chọn -> Các bước sau với độ trễ an toàn)
+            // NÚT CHỌN KIỆN (📦 Chọn Kiện): Chạy ĐƠN LẺ toàn bộ 8 bước chuyên sâu
             Button btnSelectParcel = floatingView.findViewById(R.id.btnSelectParcel);
             if (btnSelectParcel != null) {
                 btnSelectParcel.setOnClickListener(v -> {
@@ -232,7 +232,7 @@ public class FloatingWidgetService extends Service {
     }
 
     /**
-     * Chuẩn bị và tạo bộ 2 ảnh dựa trên mã vận đơn động vừa lấy
+     * Chuẩn bị và tạo bộ ảnh dựa trên mã vận đơn động vừa lấy
      */
     private Uri prepareParcelImages(String trackingNumber) {
         try {
@@ -240,7 +240,7 @@ public class FloatingWidgetService extends Service {
             Uri editedParcelUri = ImageUtils.createModifiedParcelImage(this, originalParcelBitmap, trackingNumber);
 
             if (editedParcelUri != null) {
-                Toast.makeText(this, "Đã tạo bộ 2 ảnh cho mã: " + trackingNumber, Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Đã tạo bộ ảnh cho mã: " + trackingNumber, Toast.LENGTH_SHORT).show();
             }
             return editedParcelUri;
 
@@ -252,12 +252,17 @@ public class FloatingWidgetService extends Service {
     }
 
     /**
-     * Chuỗi quy trình đầy đủ khi bấm nút "Chọn Kiện":
-     * - Bước 1: Gán mã & Gọi (tương tự nút Play)
-     * - Bước 2: Tích chọn checkbox
-     * - Các bước tiếp theo với độ trễ lớn hơn và kiểm tra an toàn
+     * Chuỗi quy trình đầy đủ 8 bước khi bấm nút "Chọn Kiện":
+     * 1. Gán mã vận đơn
+     * 2. Bấm gọi điện
+     * 3. Tích chọn checkbox của mã
+     * 4. Click "Kiện vấn đề"
+     * 5. Chọn lý do "Người nhận không nhận kiện hàng"
+     * 6. Chọn phân loại "Khách không đặt hàng"
+     * 7. Click ô thêm ảnh -> Gọi Intent hệ thống mở Thư viện/Bộ sưu tập để nạp ảnh động
+     * 8. Click nút "Thêm" để hoàn tất
      */
-    private void executeFullAutomationSteps(String trackingNumber) {
+    private void executeFullAutomationSteps(String trackingNumber, Uri imageUri) {
         if (AutoScrapeService.instance == null) {
             Toast.makeText(this, "Chưa bật Quyền Trợ năng (Accessibility)!", Toast.LENGTH_SHORT).show();
             return;
@@ -265,16 +270,12 @@ public class FloatingWidgetService extends Service {
 
         new Thread(() -> {
             try {
-                // Tăng độ trễ ban đầu để hệ thống ổn định giao diện
                 Thread.sleep(1000);
 
-                // --- PHẦN 1: GÁN MÃ VÀ GỌI (Tương tự chức năng nút Play) ---
+                // --- BƯỚC 1 & 2: Gán mã và Gọi điện ---
                 if (AutoScrapeService.instance != null) {
-                    // Gọi hàm gán mã và kích hoạt gọi điện từ AutoScrapeService
-                    AutoScrapeService.instance.startAutoCallingSequence();
+                    AutoScrapeService.instance.startAutoCallingSequence(); 
                 }
-                
-                // Chờ tiến trình gán mã và gọi thực thi xong ổn định (độ trễ an toàn 2.5 giây)
                 Thread.sleep(2500);
 
                 android.accessibilityservice.AccessibilityService accessibilityService = AutoScrapeService.instance;
@@ -284,30 +285,52 @@ public class FloatingWidgetService extends Service {
 
                 android.view.accessibility.AccessibilityNodeInfo rootNode = accessibilityService.getRootInActiveWindow();
 
-                // --- BƯỚC 2: Click chọn checkbox của mã vận đơn (Có cơ chế chờ phần tử xuất hiện) ---
-                boolean clickedSelect = clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/ivSelect", 3, 1000);
-                Thread.sleep(1200); // Chờ chậm rãi, chắc ăn
+                // --- BƯỚC 3: Click chọn checkbox của mã vận đơn ---
+                clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/ivSelect", 3, 1000);
+                Thread.sleep(1200);
 
-                // --- BƯỚC 3: Click nút "Kiện vấn đề" ---
+                // --- BƯỚC 4: Click nút "Kiện vấn đề" ---
+                rootNode = accessibilityService.getRootInActiveWindow();
                 clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/tvDeliveryFailed", 3, 1000);
                 Thread.sleep(1500);
 
-                // --- BƯỚC 4: Chọn lý do "Người nhận không nhận kiện hàng (từ chối)" ---
-                rootNode = accessibilityService.getRootInActiveWindow(); // Refresh lại node sau khi chuyển trang
+                // --- BƯỚC 5: Chọn lý do "Người nhận không nhận kiện hàng" ---
+                rootNode = accessibilityService.getRootInActiveWindow();
                 clickNodeByTextWithRetry(rootNode, "Người nhận không nhận kiện hàng", 3, 1000);
                 Thread.sleep(1500);
 
-                // --- BƯỚC 5: Chọn phân loại "Khách không đặt hàng" ---
+                // --- BƯỚC 6: Chọn phân loại "Khách không đặt hàng" ---
                 rootNode = accessibilityService.getRootInActiveWindow();
                 clickNodeByTextWithRetry(rootNode, "Khách không đặt hàng", 3, 1000);
                 Thread.sleep(1500);
 
-                // --- BƯỚC 6: Click nút thêm ảnh ---
+                // --- BƯỚC 7: Click vào ô chứa ảnh (multiImageAdd) và gọi Intent hệ thống để chọn ảnh thay vì bị kẹt chụp ảnh ---
                 rootNode = accessibilityService.getRootInActiveWindow();
                 clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/multiImageAdd", 3, 1000);
-                Thread.sleep(1500);
+                Thread.sleep(1000);
 
-                // --- BƯỚC 7: Dừng lại (Stop) để kiểm tra trực quan thao tác ảnh với mã hiện tại ---
+                try {
+                    Intent pickIntent = new Intent(Intent.ACTION_GET_CONTENT);
+                    pickIntent.setType("image/*");
+                    pickIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    pickIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    if (imageUri != null) {
+                        pickIntent.putExtra(Intent.EXTRA_STREAM, imageUri);
+                    }
+                    startActivity(pickIntent);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                Thread.sleep(2500); // Chờ hệ thống nạp ảnh
+
+                // --- BƯỚC 8: Click nút "Thêm" để hoàn tất ---
+                rootNode = accessibilityService.getRootInActiveWindow();
+                boolean clickedAddButton = clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/vAdd", 3, 1000);
+                if (!clickedAddButton) {
+                    clickNodeByTextWithRetry(rootNode, "Thêm", 3, 1000);
+                }
+                
+                Toast.makeText(this, "Đã hoàn tất 8 bước xử lý kiện hàng!", Toast.LENGTH_SHORT).show();
 
             } catch (Exception e) {
                 e.printStackTrace();
@@ -316,7 +339,7 @@ public class FloatingWidgetService extends Service {
     }
 
     /**
-     * HÀM ĐIỀU PHỐI CHÍNH CHO NÚT CHỌN KIỆN
+     * HÀM ĐIỀU PHỐI CHO NÚT CHỌN KIỆN
      */
     public void handleParcelAutomationFullSequence() {
         String nextTrackingNumber = getNextTrackingNumberFromSavedList();
@@ -326,16 +349,16 @@ public class FloatingWidgetService extends Service {
             return;
         }
 
-        // 1. Tạo bộ ảnh ứng với mã vận đơn vừa bốc được
+        // 1. Tạo bộ ảnh ứng với mã vận đơn vừa bốc
         Uri editedParcelUri = prepareParcelImages(nextTrackingNumber);
 
-        // 2. Chạy chuỗi tự động hóa đầy đủ nếu ảnh đã sẵn sàng
+        // 2. Chạy chuỗi tự động hóa đơn lẻ 8 bước
         if (editedParcelUri != null) {
-            executeFullAutomationSteps(nextTrackingNumber);
+            executeFullAutomationSteps(nextTrackingNumber, editedParcelUri);
         }
     }
 
-    // --- CÁC HÀM HỖ TRỢ CLICK AN TOÀN CÓ CƠ CHẾ THỬ LẠI (RETRY) ĐỂ KHÔNG CHẠY QUÁ NHANH ---
+    // --- CÁC HÀM HỖ TRỢ CLICK AN TOÀN CÓ CƠ CHẾ THỬ LẠI (RETRY) ---
     
     private boolean clickNodeByIdWithRetry(android.view.accessibility.AccessibilityNodeInfo rootNode, String resourceId, int maxRetries, long delayMs) {
         for (int i = 0; i < maxRetries; i++) {
@@ -360,7 +383,6 @@ public class FloatingWidgetService extends Service {
             }
             try {
                 Thread.sleep(delayMs);
-                // Cập nhật lại rootNode sau mỗi lần chờ
                 if (AutoScrapeService.instance != null) {
                     rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 }
