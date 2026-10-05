@@ -5,7 +5,10 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.PixelFormat;
+import android.net.Uri;
 import android.os.Build;
 import android.os.IBinder;
 import android.view.Gravity;
@@ -17,6 +20,8 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.core.app.NotificationCompat;
+
+import java.io.File;
 
 public class FloatingWidgetService extends Service {
     public static FloatingWidgetService instance; 
@@ -113,18 +118,17 @@ public class FloatingWidgetService extends Service {
                     isRunning = !isRunning;
                     if (isRunning) {
                         btnPlayPause.setText("⏸");
-                        Toast.makeText(this, "Đã bắt đầu tiến trình gọi tự động!", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, "Đã bắt đầu tiến trình tự động!", Toast.LENGTH_SHORT).show();
                         
+                        // Gọi hàm thực thi xử lý kiện hàng & thay số ở đây
+                        handleParcelAutomation();
+
                         if (AutoScrapeService.instance != null) {
                             AutoScrapeService.instance.startAutoCallingSequence();
-                        } else {
-                            Toast.makeText(this, "Vui lòng bật Quyền Trợ năng (Accessibility) trước!", Toast.LENGTH_LONG).show();
-                            isRunning = false;
-                            btnPlayPause.setText("▶");
                         }
                     } else {
                         btnPlayPause.setText("▶");
-                        Toast.makeText(this, "Đã tạm dừng tiến trình gọi!", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, "Đã tạm dừng tiến trình!", Toast.LENGTH_SHORT).show();
                         
                         if (AutoScrapeService.instance != null) {
                             AutoScrapeService.instance.stopAutoCallingSequence();
@@ -160,7 +164,7 @@ public class FloatingWidgetService extends Service {
                         }
                     } else {
                         try {
-                            java.io.File file = new java.io.File(getExternalFilesDir(null), "DanhSachMaDon.txt");
+                            File file = new File(getExternalFilesDir(null), "DanhSachMaDon.txt");
                             if (file.exists() && file.delete()) {
                                 updateProgress(0);
                                 Toast.makeText(this, "Đã xóa file dữ liệu thành công!", Toast.LENGTH_SHORT).show();
@@ -191,6 +195,35 @@ public class FloatingWidgetService extends Service {
             if (manager != null) {
                 manager.createNotificationChannel(channel);
             }
+        }
+    }
+
+    /**
+     * Hàm xử lý chính: Lấy Ảnh 1 (quang cảnh) + Xử lý số mới lên Ảnh 2 (kiện hàng)
+     */
+    public void handleParcelAutomation() {
+        String nextTrackingNumber = "8485974825648"; // Mã vận đơn mới mẫu cần thay thế
+
+        try {
+            // 1. Load Ảnh 2 (Ảnh kiện hàng gốc) từ thư mục assets
+            Bitmap originalParcelBitmap = BitmapFactory.decodeStream(getAssets().open("default_parcel_image.jpg"));
+
+            // 2. Gọi hàm tạo ảnh đã sửa số từ ImageUtils.java
+            Uri editedParcelUri = ImageUtils.createModifiedParcelImage(this, originalParcelBitmap, nextTrackingNumber);
+
+            // 3. Đường dẫn Ảnh 1 (Ảnh quang cảnh mặc định lưu trong assets)
+            Uri defaultSceneUri = Uri.parse("file:///android_asset/default_scene_image.jpg");
+
+            if (editedParcelUri != null) {
+                // 👉 Đã có sẵn cặp 2 ảnh chuẩn bị ném vào app BEST Express:
+                // - defaultSceneUri (Ảnh 1: Quang cảnh giữ nguyên)
+                // - editedParcelUri (Ảnh 2: Đã thay đổi số vận đơn tự động)
+                Toast.makeText(this, "Đã tạo xong bộ 2 ảnh cho mã: " + nextTrackingNumber, Toast.LENGTH_SHORT).show();
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            Toast.makeText(this, "Lỗi xử lý ảnh: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
     }
 
