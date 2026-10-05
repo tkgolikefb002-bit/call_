@@ -249,7 +249,13 @@ public class FloatingWidgetService extends Service {
     private Uri prepareParcelImages(String trackingNumber) {
         try {
             Bitmap originalParcelBitmap = BitmapFactory.decodeStream(getAssets().open("default_parcel_image.jpg"));
+            // Lưu trực tiếp file vào thư mục nội bộ app để Camera ảo đọc
+            File cacheFile = new File(getFilesDir(), "ma_van_don.jpg");
+            
+            // Gọi hàm tạo ảnh của bạn và lưu vào cacheFile
+            // (Hoặc nếu ImageUtils trả về Uri, bạn có thể copy nội dung sang cacheFile này)
             Uri editedParcelUri = ImageUtils.createModifiedParcelImage(this, originalParcelBitmap, trackingNumber);
+            
             return editedParcelUri;
         } catch (Exception e) {
             e.printStackTrace();
@@ -426,39 +432,23 @@ public class FloatingWidgetService extends Service {
                 clickNodeByTextWithRetry(rootNode, "Khách không đặt hàng", 3, 1000);
                 Thread.sleep(1000);
 
-                // --- BƯỚC 7: Mở camera, chụp và đánh tráo ảnh bằng ảnh mã vận đơn ---
+                // --- BƯỚC 7: Mở camera ảo và tự động nạp ảnh mã vận đơn ---
                 
-                // 1. Click mở ô thêm ảnh
+                // 1. Click mở ô thêm ảnh trên app BEST
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/multiImageAdd", 3, 1000);
                 Thread.sleep(1000);
 
-                // 2. Bấm "Chụp ảnh" trên popup
+                // 2. Bấm "Chụp ảnh" trên popup của app BEST
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByTextWithRetry(rootNode, "Chụp ảnh", 3, 1000);
-                Thread.sleep(1500); // Chờ giao diện camera mở lên
+                Thread.sleep(1500); // Lúc này VirtualCameraActivity của bạn sẽ tự động hiện lên thay cho camera thật
 
-                // 3. Tự động bấm nút chụp (shutter) ở giữa đáy màn hình
-                try {
-                    android.util.DisplayMetrics metrics = getResources().getDisplayMetrics();
-                    float shutterX = metrics.widthPixels / 2f;
-                    float shutterY = metrics.heightPixels * 0.75f;
-
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
-                        GestureDescription.Builder builder = new GestureDescription.Builder();
-                        Path path = new Path();
-                        path.moveTo(shutterX, shutterY);
-                        builder.addStroke(new GestureDescription.StrokeDescription(path, 0, 50));
-                        
-                        if (AutoScrapeService.instance != null) {
-                            AutoScrapeService.instance.dispatchGesture(builder.build(), null, null);
-                        }
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
+                // 3. Tự động click vào nút "Chụp ảnh mã vận đơn (Ảo)" trên Activity của bạn vừa bật lên
+                rootNode = AutoScrapeService.instance.getRootInActiveWindow();
+                clickNodeByTextWithRetry(rootNode, "Chụp ảnh mã vận đơn (Ảo)", 3, 1000);
                 
-                Thread.sleep(1200); // Đợi máy vừa chụp và lưu file tạm xong
+                Thread.sleep(1500);
 
                 // 4. [QUAN TRỌNG] Copy đè file ảnh mã vận đơn của bạn vào file ảnh mới nhất của hệ thống camera
                 try {
