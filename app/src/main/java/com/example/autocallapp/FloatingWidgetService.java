@@ -468,37 +468,48 @@ public class FloatingWidgetService extends Service {
                     }
                 }
                 
-                // 4. [QUAN TRỌNG] Vòng lặp chờ tối đa 3 giây để đảm bảo camera đã ghi xong file ảnh mới nhất vào thư mục DCIM
+                // 4. Chờ camera đóng luồng ghi file hoàn toàn (thêm lệnh ép đồng bộ luồng)
                 java.io.File targetPhoto = null;
-                for (int i = 0; i < 30; i++) {
+                for (int i = 0; i < 40; i++) { // Tăng thời gian chờ lên 4 giây
                     try {
                         java.io.File cameraDir = new java.io.File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DCIM), "Camera");
-                        if (cameraDir.exists() && cameraDir.isDirectory()) {
+                        if (cameraDir.exists()) {
                             java.io.File[] files = cameraDir.listFiles();
                             if (files != null && files.length > 0) {
                                 java.util.Arrays.sort(files, (f1, f2) -> Long.compare(f2.lastModified(), f1.lastModified()));
                                 java.io.File latest = files[0];
-                                // Kiểm tra xem file này có được tạo ra SAU thời điểm chúng ta bấm chụp hay không
-                                if (latest.lastModified() >= (captureStartTime - 500)) {
-                                    targetPhoto = latest;
-                                    break;
+                                if (latest.lastModified() >= (captureStartTime - 200)) {
+                                    // Kiểm tra thêm kích thước file để đảm bảo camera đã viết xong dữ liệu (khác 0 bytes)
+                                    if (latest.length() > 1024) {
+                                        targetPhoto = latest;
+                                        break;
+                                    }
                                 }
                             }
                         }
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
-                    Thread.sleep(100); // Thử lại sau mỗi 100ms
+                    Thread.sleep(100);
                 }
 
-                // 5. Tiến hành copy đè file `ma_van_don.jpg` vào đúng file ảnh vừa chụp
+                // 5. Tiến hành copy đè và đóng luồng stream an toàn
                 if (targetPhoto != null) {
                     try {
                         java.io.File preparedImageFile = new java.io.File(getFilesDir(), "ma_van_don.jpg");
                         if (preparedImageFile.exists()) {
-                            java.nio.file.Files.copy(preparedImageFile.toPath(), targetPhoto.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                            
-                            // Báo cho hệ thống media scan lại để cập nhật hình ảnh hiển thị mới
+                            // Dùng InputStream/OutputStream truyền thống để ép buộc ghi đè sạch sẽ buffer
+                            try (java.io.InputStream in = new java.io.FileInputStream(preparedImageFile);
+                                 java.io.OutputStream out = new java.io.FileOutputStream(targetPhoto, false)) {
+                                byte[] buffer = new byte[1024];
+                                int read;
+                                while ((read = in.read(buffer)) != -1) {
+                                    out.write(buffer, 0, read);
+                                }
+                                out.flush();
+                            }
+
+                            // Quét lại Media Store
                             Intent scanIntent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
                             scanIntent.setData(Uri.fromFile(targetPhoto));
                             sendBroadcast(scanIntent);
@@ -508,7 +519,7 @@ public class FloatingWidgetService extends Service {
                     }
                 }
 
-                Thread.sleep(800); // Ổn định sau khi ghi đè
+                Thread.sleep(1500); // Đợi giao diện review cập nhật lại thumbnail ảnh mới đè
 
                 // 6. Tự động bấm nút tích (✔) chuẩn `com.oplus.camera:id/done_button` để xác nhận ảnh
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
