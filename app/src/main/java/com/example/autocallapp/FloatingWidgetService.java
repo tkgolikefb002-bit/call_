@@ -30,7 +30,8 @@ import java.nio.file.Files;
 import java.util.List;
 
 public class FloatingWidgetService extends Service {
-    public static FloatingWidgetService instance; 
+    public static FloatingWidgetService instance;
+    private File preparedImageFile;
     private WindowManager windowManager;
     private View floatingView;
     private boolean isRunning = false;  
