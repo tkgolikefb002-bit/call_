@@ -57,7 +57,7 @@ public class FloatingWidgetService extends Service {
             startForeground(NOTIFICATION_ID, notification);
 
             // 2. Khởi tạo giao diện popup nổi từ XML
-            floatingView = LayoutInflater.from(this).inflate(R.layout.layout_floating_popup, null);
+            floatingView = LayoutInflater.from(this).inflate(R.layout.layout_layout_floating_popup, null); // Hoặc layout_floating_popup tùy project của bạn
             tvProgress = floatingView.findViewById(R.id.tvProgress);
 
             int LAYOUT_FLAG;
@@ -107,30 +107,27 @@ public class FloatingWidgetService extends Service {
                 }
             });
 
-            // NÚT ĐÓNG (✕) - DUY NHẤT NÚT NÀY MỚI TẮT POPUP
+            // NÚT ĐÓNG (✕)
             Button btnClose = floatingView.findViewById(R.id.btnClose);
             if (btnClose != null) {
                 btnClose.setOnClickListener(v -> stopSelf());
             }
 
-            // Xử lý nút Chạy / Dừng (Nút Play/Pause ở giữa)
+            // NÚT PLAY/PAUSE: Chỉ làm nhiệm vụ gán mã => bấm gọi
             Button btnPlayPause = floatingView.findViewById(R.id.btnPlayPause);
             if (btnPlayPause != null) {
                 btnPlayPause.setOnClickListener(v -> {
                     isRunning = !isRunning;
                     if (isRunning) {
                         btnPlayPause.setText("⏸");
-                        Toast.makeText(this, "Đã bắt đầu tiến trình tự động!", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, "Đã bắt đầu tiến trình gán mã và gọi!", Toast.LENGTH_SHORT).show();
                         
-                        // Gọi hàm điều phối chính xử lý kiện hàng
-                        handleParcelAutomation();
-
                         if (AutoScrapeService.instance != null) {
                             AutoScrapeService.instance.startAutoCallingSequence();
                         }
                     } else {
                         btnPlayPause.setText("▶");
-                        Toast.makeText(this, "Đã tạm dừng tiến trình!", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, "Đã tạm dừng tiến trình gọi!", Toast.LENGTH_SHORT).show();
                         
                         if (AutoScrapeService.instance != null) {
                             AutoScrapeService.instance.stopAutoCallingSequence();
@@ -147,7 +144,7 @@ public class FloatingWidgetService extends Service {
                         updateProgress(0);
                         AutoScrapeService.instance.startScraping();
                     } else {
-                        Toast.makeText(this, "Vui lòng bật Quyền Trợ năng (Accessibility) cho ứng dụng trước!", Toast.LENGTH_LONG).show();
+                        Toast.makeText(this, "Vui lòng bật Quyền Trợ năng (Accessibility) trước!", Toast.LENGTH_LONG).show();
                     }
                 });
             }
@@ -160,9 +157,9 @@ public class FloatingWidgetService extends Service {
                         boolean cleared = AutoScrapeService.instance.clearSavedData();
                         if (cleared) {
                             updateProgress(0);
-                            Toast.makeText(this, "Đã xóa toàn bộ dữ liệu đơn hàng đã lưu!", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(this, "Đã xóa toàn bộ dữ liệu!", Toast.LENGTH_SHORT).show();
                         } else {
-                            Toast.makeText(this, "Không có dữ liệu hoặc file chưa tồn tại.", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(this, "Không có dữ liệu để xóa.", Toast.LENGTH_SHORT).show();
                         }
                     } else {
                         try {
@@ -171,7 +168,7 @@ public class FloatingWidgetService extends Service {
                                 updateProgress(0);
                                 Toast.makeText(this, "Đã xóa file dữ liệu thành công!", Toast.LENGTH_SHORT).show();
                             } else {
-                                Toast.makeText(this, "Không tìm thấy file dữ liệu để xóa.", Toast.LENGTH_SHORT).show();
+                                Toast.makeText(this, "Không tìm thấy file dữ liệu.", Toast.LENGTH_SHORT).show();
                             }
                         } catch (Exception e) {
                             Toast.makeText(this, "Lỗi khi xóa: " + e.getMessage(), Toast.LENGTH_SHORT).show();
@@ -180,50 +177,25 @@ public class FloatingWidgetService extends Service {
                 });
             }
 
-            // ===== 2 NÚT MỚI BỔ SUNG =====
-
-            // 1. Nút Gắn Ảnh (🖼 Gắn Ảnh)
+            // NÚT GẮN ẢNH (🖼 Gắn Ảnh)
             Button btnAttachImages = floatingView.findViewById(R.id.btnAttachImages);
             if (btnAttachImages != null) {
                 btnAttachImages.setOnClickListener(v -> {
                     Toast.makeText(this, "Đang thực hiện gắn ảnh quang cảnh...", Toast.LENGTH_SHORT).show();
-                    // Thêm logic xử lý ảnh quang cảnh tại đây nếu cần
                 });
             }
 
-            // 2. Nút Chọn Kiện (📦 Chọn Kiện)
+            // NÚT CHỌN KIỆN (📦 Chọn Kiện): Chạy chuỗi đầy đủ (Gán mã -> Gọi -> Tích chọn -> Các bước sau với độ trễ an toàn)
             Button btnSelectParcel = floatingView.findViewById(R.id.btnSelectParcel);
             if (btnSelectParcel != null) {
                 btnSelectParcel.setOnClickListener(v -> {
-                    // Gọi hàm điều phối chính tự động hóa 
-                    handleParcelAutomation();
+                    handleParcelAutomationFullSequence();
                 });
             }
 
         } catch (Exception e) {
             e.printStackTrace();
             Toast.makeText(this, "Lỗi khởi tạo popup: " + e.getMessage(), Toast.LENGTH_LONG).show();
-        }
-    }
-
-    private void checkDefaultImagesReady() {
-        try {
-            boolean sceneExists = false;
-            boolean parcelExists = false;
-
-            String[] assetsList = getAssets().list("");
-            for (String fileName : assetsList) {
-                if (fileName.equals("default_scene_image.jpg")) sceneExists = true;
-                if (fileName.equals("default_parcel_image.jpg")) parcelExists = true;
-            }
-
-            if (sceneExists && parcelExists) {
-                Toast.makeText(this, "✅ Ảnh mặc định đã sẵn sàng trong hệ thống!", Toast.LENGTH_SHORT).show();
-            } else {
-                Toast.makeText(this, "⚠️ Cảnh báo: Thiếu file ảnh trong assets!", Toast.LENGTH_LONG).show();
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
         }
     }
 
@@ -250,31 +222,22 @@ public class FloatingWidgetService extends Service {
             if (file.exists()) {
                 List<String> lines = Files.readAllLines(file.toPath());
                 if (!lines.isEmpty()) {
-                    // Lấy mã đầu tiên trong danh sách
                     return lines.get(0).trim();
                 }
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
-        
-        // Trả về null nếu không đọc được danh sách
         return null; 
     }
 
     /**
-     * HÀM 1: Chuyên phụ trách chuẩn bị và tạo bộ 2 ảnh dựa trên mã vận đơn được truyền vào
+     * Chuẩn bị và tạo bộ 2 ảnh dựa trên mã vận đơn động vừa lấy
      */
     private Uri prepareParcelImages(String trackingNumber) {
         try {
-            // 1. Load Ảnh 2 (Ảnh kiện hàng gốc) từ thư mục assets
             Bitmap originalParcelBitmap = BitmapFactory.decodeStream(getAssets().open("default_parcel_image.jpg"));
-
-            // 2. Gọi hàm tạo ảnh đã sửa số từ ImageUtils.java với chính xác mã vận đơn hiện tại
             Uri editedParcelUri = ImageUtils.createModifiedParcelImage(this, originalParcelBitmap, trackingNumber);
-
-            // 3. Đường dẫn Ảnh 1 (Ảnh quang cảnh mặc định lưu trong assets)
-            Uri defaultSceneUri = Uri.parse("file:///android_asset/default_scene_image.jpg");
 
             if (editedParcelUri != null) {
                 Toast.makeText(this, "Đã tạo bộ 2 ảnh cho mã: " + trackingNumber, Toast.LENGTH_SHORT).show();
@@ -289,9 +252,12 @@ public class FloatingWidgetService extends Service {
     }
 
     /**
-     * HÀM 2: Chuyên phụ trách điều khiển luồng Accessibility thực hiện tự động hóa các bước giao diện
+     * Chuỗi quy trình đầy đủ khi bấm nút "Chọn Kiện":
+     * - Bước 1: Gán mã & Gọi (tương tự nút Play)
+     * - Bước 2: Tích chọn checkbox
+     * - Các bước tiếp theo với độ trễ lớn hơn và kiểm tra an toàn
      */
-    private void executeAccessibilitySteps(String trackingNumber) {
+    private void executeFullAutomationSteps(String trackingNumber) {
         if (AutoScrapeService.instance == null) {
             Toast.makeText(this, "Chưa bật Quyền Trợ năng (Accessibility)!", Toast.LENGTH_SHORT).show();
             return;
@@ -299,6 +265,18 @@ public class FloatingWidgetService extends Service {
 
         new Thread(() -> {
             try {
+                // Tăng độ trễ ban đầu để hệ thống ổn định giao diện
+                Thread.sleep(1000);
+
+                // --- PHẦN 1: GÁN MÃ VÀ GỌI (Tương tự chức năng nút Play) ---
+                if (AutoScrapeService.instance != null) {
+                    // Gọi hàm gán mã và kích hoạt gọi điện từ AutoScrapeService
+                    AutoScrapeService.instance.startAutoCallingSequence();
+                }
+                
+                // Chờ tiến trình gán mã và gọi thực thi xong ổn định (độ trễ an toàn 2.5 giây)
+                Thread.sleep(2500);
+
                 android.accessibilityservice.AccessibilityService accessibilityService = AutoScrapeService.instance;
                 if (accessibilityService == null || accessibilityService.getRootInActiveWindow() == null) {
                     return;
@@ -306,28 +284,30 @@ public class FloatingWidgetService extends Service {
 
                 android.view.accessibility.AccessibilityNodeInfo rootNode = accessibilityService.getRootInActiveWindow();
 
-                // --- BƯỚC 1 & 2: Click chọn checkbox của mã vận đơn ---
-                clickNodeById(rootNode, "com.best.android.vietcourier:id/ivSelect");
-                Thread.sleep(800);
+                // --- BƯỚC 2: Click chọn checkbox của mã vận đơn (Có cơ chế chờ phần tử xuất hiện) ---
+                boolean clickedSelect = clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/ivSelect", 3, 1000);
+                Thread.sleep(1200); // Chờ chậm rãi, chắc ăn
 
                 // --- BƯỚC 3: Click nút "Kiện vấn đề" ---
-                clickNodeById(rootNode, "com.best.android.vietcourier:id/tvDeliveryFailed");
-                Thread.sleep(1000);
+                clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/tvDeliveryFailed", 3, 1000);
+                Thread.sleep(1500);
 
                 // --- BƯỚC 4: Chọn lý do "Người nhận không nhận kiện hàng (từ chối)" ---
-                clickNodeByText(rootNode, "Người nhận không nhận kiện hàng");
-                Thread.sleep(1000);
+                rootNode = accessibilityService.getRootInActiveWindow(); // Refresh lại node sau khi chuyển trang
+                clickNodeByTextWithRetry(rootNode, "Người nhận không nhận kiện hàng", 3, 1000);
+                Thread.sleep(1500);
 
                 // --- BƯỚC 5: Chọn phân loại "Khách không đặt hàng" ---
-                clickNodeByText(rootNode, "Khách không đặt hàng");
-                Thread.sleep(1000);
+                rootNode = accessibilityService.getRootInActiveWindow();
+                clickNodeByTextWithRetry(rootNode, "Khách không đặt hàng", 3, 1000);
+                Thread.sleep(1500);
 
                 // --- BƯỚC 6: Click nút thêm ảnh ---
-                clickNodeById(rootNode, "com.best.android.vietcourier:id/multiImageAdd");
-                Thread.sleep(1000);
+                rootNode = accessibilityService.getRootInActiveWindow();
+                clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/multiImageAdd", 3, 1000);
+                Thread.sleep(1500);
 
-                // --- BƯỚC 7: Dừng lại (Stop) để kiểm tra trực quan thao tác ảnh ---
-                // Hệ thống dừng tại đây theo yêu cầu để bạn kiểm tra thao tác ảnh với mã: trackingNumber
+                // --- BƯỚC 7: Dừng lại (Stop) để kiểm tra trực quan thao tác ảnh với mã hiện tại ---
 
             } catch (Exception e) {
                 e.printStackTrace();
@@ -336,10 +316,9 @@ public class FloatingWidgetService extends Service {
     }
 
     /**
-     * HÀM ĐIỀU PHỐI CHÍNH: Lấy mã động, kết nối xử lý ảnh và chạy Accessibility
+     * HÀM ĐIỀU PHỐI CHÍNH CHO NÚT CHỌN KIỆN
      */
-    public void handleParcelAutomation() {
-        // 1. Lấy mã vận đơn động từ danh sách đã lưu
+    public void handleParcelAutomationFullSequence() {
         String nextTrackingNumber = getNextTrackingNumberFromSavedList();
 
         if (nextTrackingNumber == null || nextTrackingNumber.isEmpty()) {
@@ -347,65 +326,84 @@ public class FloatingWidgetService extends Service {
             return;
         }
 
-        // 2. Thực hiện chuẩn bị bộ ảnh ứng với mã vận đơn vừa bốc được
+        // 1. Tạo bộ ảnh ứng với mã vận đơn vừa bốc được
         Uri editedParcelUri = prepareParcelImages(nextTrackingNumber);
 
-        // 3. Nếu ảnh đã sẵn sàng, tiến hành chạy các bước điều khiển giao diện
+        // 2. Chạy chuỗi tự động hóa đầy đủ nếu ảnh đã sẵn sàng
         if (editedParcelUri != null) {
-            executeAccessibilitySteps(nextTrackingNumber);
+            executeFullAutomationSteps(nextTrackingNumber);
         }
     }
 
-    // --- CÁC HÀM HỖ TRỢ TÌM VÀ CLICK NODE GIAO DIỆN ---
-    private boolean clickNodeById(android.view.accessibility.AccessibilityNodeInfo rootNode, String resourceId) {
-        if (rootNode == null) return false;
-        java.util.List<android.view.accessibility.AccessibilityNodeInfo> list = rootNode.findAccessibilityNodeInfosByViewId(resourceId);
-        if (list != null && !list.isEmpty()) {
-            for (android.view.accessibility.AccessibilityNodeInfo node : list) {
-                if (node.isClickable()) {
-                    node.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK);
-                    return true;
-                } else {
-                    android.view.accessibility.AccessibilityNodeInfo parent = node.getParent();
-                    while (parent != null) {
-                        if (parent.isClickable()) {
-                            parent.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK);
-                            return true;
+    // --- CÁC HÀM HỖ TRỢ CLICK AN TOÀN CÓ CƠ CHẾ THỬ LẠI (RETRY) ĐỂ KHÔNG CHẠY QUÁ NHANH ---
+    
+    private boolean clickNodeByIdWithRetry(android.view.accessibility.AccessibilityNodeInfo rootNode, String resourceId, int maxRetries, long delayMs) {
+        for (int i = 0; i < maxRetries; i++) {
+            if (rootNode == null) return false;
+            java.util.List<android.view.accessibility.AccessibilityNodeInfo> list = rootNode.findAccessibilityNodeInfosByViewId(resourceId);
+            if (list != null && !list.isEmpty()) {
+                for (android.view.accessibility.AccessibilityNodeInfo node : list) {
+                    if (node.isClickable()) {
+                        node.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK);
+                        return true;
+                    } else {
+                        android.view.accessibility.AccessibilityNodeInfo parent = node.getParent();
+                        while (parent != null) {
+                            if (parent.isClickable()) {
+                                parent.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK);
+                                return true;
+                            }
+                            parent = parent.getParent();
                         }
-                        parent = parent.getParent();
                     }
                 }
+            }
+            try {
+                Thread.sleep(delayMs);
+                // Cập nhật lại rootNode sau mỗi lần chờ
+                if (AutoScrapeService.instance != null) {
+                    rootNode = AutoScrapeService.instance.getRootInActiveWindow();
+                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
         }
         return false;
     }
 
-    private boolean clickNodeByText(android.view.accessibility.AccessibilityNodeInfo rootNode, String text) {
-        if (rootNode == null) return false;
-        java.util.List<android.view.accessibility.AccessibilityNodeInfo> list = rootNode.findAccessibilityNodeInfosByText(text);
-        if (list != null && !list.isEmpty()) {
-            for (android.view.accessibility.AccessibilityNodeInfo node : list) {
-                if (node.isClickable()) {
-                    node.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK);
-                    return true;
-                } else {
-                    android.view.accessibility.AccessibilityNodeInfo parent = node.getParent();
-                    while (parent != null) {
-                        if (parent.isClickable()) {
-                            parent.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK);
-                            return true;
+    private boolean clickNodeByTextWithRetry(android.view.accessibility.AccessibilityNodeInfo rootNode, String text, int maxRetries, long delayMs) {
+        for (int i = 0; i < maxRetries; i++) {
+            if (rootNode == null) return false;
+            java.util.List<android.view.accessibility.AccessibilityNodeInfo> list = rootNode.findAccessibilityNodeInfosByText(text);
+            if (list != null && !list.isEmpty()) {
+                for (android.view.accessibility.AccessibilityNodeInfo node : list) {
+                    if (node.isClickable()) {
+                        node.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK);
+                        return true;
+                    } else {
+                        android.view.accessibility.AccessibilityNodeInfo parent = node.getParent();
+                        while (parent != null) {
+                            if (parent.isClickable()) {
+                                parent.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK);
+                                return true;
+                            }
+                            parent = parent.getParent();
                         }
-                        parent = parent.getParent();
                     }
                 }
+            }
+            try {
+                Thread.sleep(delayMs);
+                if (AutoScrapeService.instance != null) {
+                    rootNode = AutoScrapeService.instance.getRootInActiveWindow();
+                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
         }
         return false;
     }
 
-    /**
-     * Hàm cập nhật tiến độ lên giao diện popup khớp định dạng yêu cầu
-     */
     public void updateProgress(int count) {
         if (tvProgress != null) {
             tvProgress.post(() -> tvProgress.setText("Tiến độ: " + count + " đơn"));
