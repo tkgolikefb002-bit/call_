@@ -115,7 +115,7 @@ public class FloatingWidgetService extends Service {
                 btnClose.setOnClickListener(v -> stopSelf());
             }
 
-            // NÚT PLAY/PAUSE (▶): Chạy HÀNG LOẠT vòng lặp (Bốc mã -> Dán mã -> Gọi điện cho toàn bộ danh sách)
+            // NÚT PLAY/PAUSE (▶): Chạy HÀNG LOẠT vòng lặp (Bốc mã -> Dán mã -> Gọi điện)
             Button btnPlayPause = floatingView.findViewById(R.id.btnPlayPause);
             if (btnPlayPause != null) {
                 btnPlayPause.setOnClickListener(v -> {
@@ -123,8 +123,6 @@ public class FloatingWidgetService extends Service {
                     if (isRunning) {
                         btnPlayPause.setText("⏸");
                         Toast.makeText(this, "Bắt đầu chạy hàng loạt: Dán mã & Gọi điện...", Toast.LENGTH_SHORT).show();
-                        
-                        // Chạy tiến trình vòng lặp hàng loạt
                         startBatchLoopAutomation();
                     } else {
                         btnPlayPause.setText("▶");
@@ -210,9 +208,6 @@ public class FloatingWidgetService extends Service {
         }
     }
 
-    /**
-     * Lấy danh sách toàn bộ mã vận đơn từ file DanhSachMaDon.txt
-     */
     private List<String> getAllTrackingNumbers() {
         try {
             File file = new File(getExternalFilesDir(null), "DanhSachMaDon.txt");
@@ -225,9 +220,6 @@ public class FloatingWidgetService extends Service {
         return null; 
     }
 
-    /**
-     * Lấy mã vận đơn tiếp theo (dòng đầu tiên)
-     */
     private String getNextTrackingNumberFromSavedList() {
         List<String> lines = getAllTrackingNumbers();
         if (lines != null && !lines.isEmpty()) {
@@ -236,9 +228,6 @@ public class FloatingWidgetService extends Service {
         return null;
     }
 
-    /**
-     * Xóa mã đầu tiên sau khi đã xử lý xong để chuyển sang mã tiếp theo trong danh sách hàng loạt
-     */
     private void removeFirstTrackingNumber() {
         try {
             File file = new File(getExternalFilesDir(null), "DanhSachMaDon.txt");
@@ -254,47 +243,32 @@ public class FloatingWidgetService extends Service {
         }
     }
 
-    /**
-     * Chuẩn bị và tạo bộ ảnh dựa trên mã vận đơn động vừa lấy
-     */
     private Uri prepareParcelImages(String trackingNumber) {
         try {
             Bitmap originalParcelBitmap = BitmapFactory.decodeStream(getAssets().open("default_parcel_image.jpg"));
             Uri editedParcelUri = ImageUtils.createModifiedParcelImage(this, originalParcelBitmap, trackingNumber);
-
-            if (editedParcelUri != null) {
-                Toast.makeText(this, "Đã tạo bộ ảnh cho mã: " + trackingNumber, Toast.LENGTH_SHORT).show();
-            }
             return editedParcelUri;
-
         } catch (Exception e) {
             e.printStackTrace();
-            Toast.makeText(this, "Lỗi xử lý ảnh: " + e.getMessage(), Toast.LENGTH_SHORT).show();
             return null;
         }
     }
 
     /**
-     * HÀM QUAN TRỌNG: Tự động tìm khung nhập mã (EditText hoặc thông qua ID) và điền mã vận đơn vào
+     * Tự động tìm ô nhập mã và điền mã vận đơn vào
      */
     private boolean typeTrackingNumberIntoApp(AccessibilityNodeInfo rootNode, String trackingNumber) {
         if (rootNode == null) return false;
 
-        // 1. Thử tìm ô nhập liệu theo các ID phổ biến hoặc thuộc tính EditText trên app BEST Courier
-        // (Bạn có thể thay đổi resource-id chính xác của ô nhập mã nếu biết, ví dụ: "com.best.android.vietcourier:id/etSearch")
         List<AccessibilityNodeInfo> editTexts = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/etSearch");
         if (editTexts == null || editTexts.isEmpty()) {
-            // Dự phòng tìm kiếm tất cả các node dạng EditText trên màn hình hiện tại
             editTexts = findAllEditTexts(rootNode);
         }
 
         if (editTexts != null && !editTexts.isEmpty()) {
             for (AccessibilityNodeInfo node : editTexts) {
                 if (node.isEditable() || node.getClassName().toString().contains("EditText")) {
-                    // Focus vào ô nhập
                     node.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
-                    
-                    // Gán trực tiếp văn bản (mã vận đơn) vào ô
                     Bundle arguments = new Bundle();
                     arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, trackingNumber);
                     boolean success = node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
@@ -320,7 +294,40 @@ public class FloatingWidgetService extends Service {
     }
 
     /**
-     * TIẾN TRÌNH HÀNG LOẠT (Nút Play): Lặp qua toàn bộ danh sách mã -> Dán mã -> Gọi điện
+     * HÀM GỌI ĐIỆN CHUẨN XÁC: Click trực tiếp vào đúng resource-id hiển thị số điện thoại (`tvPhoneNub`)[cite: 1]
+     */
+    private boolean triggerCallAction(AccessibilityNodeInfo rootNode) {
+        if (rootNode == null) return false;
+
+        // Ưu tiên tuyệt đối: Click vào đúng ID chứa SĐT / nút gọi trên app BEST[cite: 1]
+        boolean clicked = clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/tvPhoneNub", 3, 500);
+        if (clicked) {
+            return true;
+        }
+
+        // Dự phòng các ID phụ khác nếu có
+        String[] fallbackIds = {
+            "com.best.android.vietcourier:id/ivCall",
+            "com.best.android.vietcourier:id/img_call",
+            "com.best.android.vietcourier:id/btnCall"
+        };
+        for (String id : fallbackIds) {
+            if (clickNodeByIdWithRetry(rootNode, id, 1, 200)) {
+                return true;
+            }
+        }
+
+        // Dự phòng cuối cùng: Gọi qua service hệ thống
+        if (AutoScrapeService.instance != null) {
+            AutoScrapeService.instance.startAutoCallingSequence();
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * TIẾN TRÌNH HÀNG LOẠT (Nút Play): Lặp qua toàn bộ danh sách mã -> Dán mã -> Gọi điện `tvPhoneNub`[cite: 1]
      */
     private void startBatchLoopAutomation() {
         new Thread(() -> {
@@ -341,20 +348,19 @@ public class FloatingWidgetService extends Service {
                 // 1. Dán mã vào khung
                 boolean typed = typeTrackingNumberIntoApp(rootNode, trackingNumber);
                 if (typed) {
-                    try { Thread.sleep(1000); } catch (InterruptedException e) { e.printStackTrace(); }
+                    try { Thread.sleep(1500); } catch (InterruptedException e) { e.printStackTrace(); }
                 }
 
-                // 2. Kích hoạt gọi điện
-                if (AutoScrapeService.instance != null) {
-                    AutoScrapeService.instance.startAutoCallingSequence();
-                }
+                // 2. Kích hoạt gọi điện bằng cách bấm vào `tvPhoneNub`[cite: 1]
+                rootNode = AutoScrapeService.instance.getRootInActiveWindow();
+                triggerCallAction(rootNode);
+                try { Thread.sleep(2000); } catch (InterruptedException e) { e.printStackTrace(); }
 
-                // 3. Xóa mã vừa chạy khỏi danh sách để chuyển sang mã tiếp theo trong vòng lặp
+                // 3. Xóa mã vừa chạy khỏi danh sách để chuyển sang đơn tiếp theo
                 removeFirstTrackingNumber();
 
-                // Chờ một khoảng thời gian trước khi sang đơn tiếp theo
                 try {
-                    Thread.sleep(5000);
+                    Thread.sleep(4000);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                     break;
@@ -365,15 +371,15 @@ public class FloatingWidgetService extends Service {
     }
 
     /**
-     * Chuỗi quy trình đầy đủ 8 bước khi bấm nút "Chọn Kiện":
-     * 1. Lấy mã và điền (dán) vào khung
-     * 2. Bấm gọi điện
-     * 3. Tích chọn checkbox của mã (`ivSelect`)
-     * 4. Click "Kiện vấn đề" (`tvDeliveryFailed`)
-     * 5. Chọn lý do "Người nhận không nhận kiện hàng"
-     * 6. Chọn phân loại "Khách không đặt hàng"
-     * 7. Click ô thêm ảnh (`multiImageAdd`) -> Gọi Intent hệ thống nạp ảnh động đã chỉnh sửa
-     * 8. Click nút "Thêm" (`vAdd`) để hoàn tất
+     * Chuỗi quy trình đầy đủ 8 bước khi bấm nút "Chọn Kiện" (📦):
+     * 1. Dán mã vào khung
+     * 2. Bấm gọi điện (`tvPhoneNub`)[cite: 1]
+     * 3. Tích chọn checkbox của mã (`ivSelect`)[cite: 1]
+     * 4. Click "Kiện vấn đề" (`tvDeliveryFailed`)[cite: 1]
+     * 5. Chọn lý do "Người nhận không nhận kiện hàng"[cite: 1]
+     * 6. Chọn phân loại "Khách không đặt hàng"[cite: 1]
+     * 7. Click ô thêm ảnh (`multiImageAdd`) -> Gọi Intent hệ thống nạp ảnh động[cite: 1]
+     * 8. Click nút "Thêm" (`vAdd`) để hoàn tất[cite: 1]
      */
     private void executeFullAutomationSteps(String trackingNumber, Uri imageUri) {
         if (AutoScrapeService.instance == null) {
@@ -392,33 +398,32 @@ public class FloatingWidgetService extends Service {
                 typeTrackingNumberIntoApp(rootNode, trackingNumber);
                 Thread.sleep(1500);
 
-                // --- BƯỚC 2: Bấm gọi điện ---
-                if (AutoScrapeService.instance != null) {
-                    AutoScrapeService.instance.startAutoCallingSequence();
-                }
+                // --- BƯỚC 2: Bấm gọi điện (`tvPhoneNub`)[cite: 1] ---
+                rootNode = AutoScrapeService.instance.getRootInActiveWindow();
+                triggerCallAction(rootNode);
                 Thread.sleep(2500);
 
-                // --- BƯỚC 3: Click chọn checkbox của mã vận đơn (`ivSelect`) ---
+                // --- BƯỚC 3: Click chọn checkbox của mã vận đơn (`ivSelect`)[cite: 1] ---
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/ivSelect", 3, 1000);
                 Thread.sleep(1200);
 
-                // --- BƯỚC 4: Click nút "Kiện vấn đề" (`tvDeliveryFailed`) ---
+                // --- BƯỚC 4: Click nút "Kiện vấn đề" (`tvDeliveryFailed`)[cite: 1] ---
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/tvDeliveryFailed", 3, 1000);
                 Thread.sleep(1500);
 
-                // --- BƯỚC 5: Chọn lý do "Người nhận không nhận kiện hàng" ---
+                // --- BƯỚC 5: Chọn lý do "Người nhận không nhận kiện hàng"[cite: 1] ---
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByTextWithRetry(rootNode, "Người nhận không nhận kiện hàng", 3, 1000);
                 Thread.sleep(1500);
 
-                // --- BƯỚC 6: Chọn phân loại "Khách không đặt hàng" ---
+                // --- BƯỚC 6: Chọn phân loại "Khách không đặt hàng"[cite: 1] ---
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByTextWithRetry(rootNode, "Khách không đặt hàng", 3, 1000);
                 Thread.sleep(1500);
 
-                // --- BƯỚC 7: Click ô thêm ảnh (`multiImageAdd`) và gọi Intent hệ thống nạp ảnh động ---
+                // --- BƯỚC 7: Click ô thêm ảnh (`multiImageAdd`) và gọi Intent hệ thống nạp ảnh động[cite: 1] ---
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/multiImageAdd", 3, 1000);
                 Thread.sleep(1000);
@@ -435,9 +440,9 @@ public class FloatingWidgetService extends Service {
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
-                Thread.sleep(2500); // Chờ hệ thống nạp ảnh
+                Thread.sleep(2500);
 
-                // --- BƯỚC 8: Click nút "Thêm" (`vAdd`) để hoàn tất ---
+                // --- BƯỚC 8: Click nút "Thêm" (`vAdd`) để hoàn tất[cite: 1] ---
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 boolean clickedAddButton = clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/vAdd", 3, 1000);
                 if (!clickedAddButton) {
@@ -452,9 +457,6 @@ public class FloatingWidgetService extends Service {
         }).start();
     }
 
-    /**
-     * HÀM ĐIỀU PHỐI CHO NÚT CHỌN KIỆN (📦)
-     */
     public void handleParcelAutomationFullSequence() {
         String nextTrackingNumber = getNextTrackingNumberFromSavedList();
 
@@ -463,17 +465,12 @@ public class FloatingWidgetService extends Service {
             return;
         }
 
-        // 1. Tạo bộ ảnh ứng với mã vận đơn vừa bốc
         Uri editedParcelUri = prepareParcelImages(nextTrackingNumber);
-
-        // 2. Chạy chuỗi tự động hóa đơn lẻ 8 bước
         if (editedParcelUri != null) {
             executeFullAutomationSteps(nextTrackingNumber, editedParcelUri);
         }
     }
 
-    // --- CÁC HÀM HỖ TRỢ CLICK AN TOÀN CÓ CƠ CHẾ THỬ LẠI (RETRY) ---
-    
     private boolean clickNodeByIdWithRetry(AccessibilityNodeInfo rootNode, String resourceId, int maxRetries, long delayMs) {
         for (int i = 0; i < maxRetries; i++) {
             if (rootNode == null) return false;
