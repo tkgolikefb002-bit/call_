@@ -444,17 +444,20 @@ public class FloatingWidgetService extends Service {
                 clickNodeByTextWithRetry(rootNode, "Chụp ảnh", 3, 1000);
                 Thread.sleep(1500); // Chờ giao diện camera Oplus mở lên
 
+                // Lấy mốc thời gian trước khi bấm chụp để so sánh file ảnh sinh ra sau đó
+                long captureStartTime = System.currentTimeMillis();
+
                 // 3. Tự động tìm và bấm vào nút chụp chuẩn `com.oplus.camera:id/shutter_button`
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 boolean clickedShutter = clickNodeByIdWithRetry(rootNode, "com.oplus.camera:id/shutter_button", 3, 1000);
                 
-                // Fallback phòng hờ: Nếu không tìm thấy node ID thì dùng tọa độ tâm nút chụp [282,1272][438,1428]
+                // Fallback phòng hờ: Nếu không tìm thấy node ID thì dùng tọa độ tâm nút chụp
                 if (!clickedShutter) {
                     try {
                         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
                             GestureDescription.Builder builder = new GestureDescription.Builder();
                             Path path = new Path();
-                            path.moveTo(360f, 1350f); // Tâm giữa của nút chụp
+                            path.moveTo(360f, 1350f); 
                             builder.addStroke(new GestureDescription.StrokeDescription(path, 0, 50));
                             if (AutoScrapeService.instance != null) {
                                 AutoScrapeService.instance.dispatchGesture(builder.build(), null, null);
@@ -465,44 +468,59 @@ public class FloatingWidgetService extends Service {
                     }
                 }
                 
-                Thread.sleep(1500); // Đợi máy chụp và lưu file tạm xong
-
-                // 4. [QUAN TRỌNG] Copy đè file ảnh mã vận đơn (`ma_van_don.jpg`) vào file ảnh mới nhất của hệ thống camera
-                try {
-                    java.io.File cameraDir = new java.io.File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DCIM), "Camera");
-                    if (cameraDir.exists() && cameraDir.isDirectory()) {
-                        java.io.File[] files = cameraDir.listFiles();
-                        if (files != null && files.length > 0) {
-                            java.util.Arrays.sort(files, (f1, f2) -> Long.compare(f2.lastModified(), f1.lastModified()));
-                            java.io.File latestPhoto = files[0]; 
-                            
-                            java.io.File preparedImageFile = new java.io.File(getFilesDir(), "ma_van_don.jpg");
-                            if (preparedImageFile.exists()) {
-                                java.nio.file.Files.copy(preparedImageFile.toPath(), latestPhoto.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                                
-                                Intent scanIntent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
-                                scanIntent.setData(Uri.fromFile(latestPhoto));
-                                sendBroadcast(scanIntent);
+                // 4. [QUAN TRỌNG] Vòng lặp chờ tối đa 3 giây để đảm bảo camera đã ghi xong file ảnh mới nhất vào thư mục DCIM
+                java.io.File targetPhoto = null;
+                for (int i = 0; i < 30; i++) {
+                    try {
+                        java.io.File cameraDir = new java.io.File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DCIM), "Camera");
+                        if (cameraDir.exists() && cameraDir.isDirectory()) {
+                            java.io.File[] files = cameraDir.listFiles();
+                            if (files != null && files.length > 0) {
+                                java.util.Arrays.sort(files, (f1, f2) -> Long.compare(f2.lastModified(), f1.lastModified()));
+                                java.io.File latest = files[0];
+                                // Kiểm tra xem file này có được tạo ra SAU thời điểm chúng ta bấm chụp hay không
+                                if (latest.lastModified() >= (captureStartTime - 500)) {
+                                    targetPhoto = latest;
+                                    break;
+                                }
                             }
                         }
+                    } catch (Exception e) {
+                        e.printStackTrace();
                     }
-                } catch (Exception ex) {
-                    ex.printStackTrace();
+                    Thread.sleep(100); // Thử lại sau mỗi 100ms
                 }
 
-                Thread.sleep(1000); // Chờ hệ thống nhận diện file đã thay đổi
+                // 5. Tiến hành copy đè file `ma_van_don.jpg` vào đúng file ảnh vừa chụp
+                if (targetPhoto != null) {
+                    try {
+                        java.io.File preparedImageFile = new java.io.File(getFilesDir(), "ma_van_don.jpg");
+                        if (preparedImageFile.exists()) {
+                            java.nio.file.Files.copy(preparedImageFile.toPath(), targetPhoto.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                            
+                            // Báo cho hệ thống media scan lại để cập nhật hình ảnh hiển thị mới
+                            Intent scanIntent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
+                            scanIntent.setData(Uri.fromFile(targetPhoto));
+                            sendBroadcast(scanIntent);
+                        }
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    }
+                }
 
-                // 5. Tự động bấm nút tích (✔) chuẩn `com.oplus.camera:id/done_button` để xác nhận ảnh
+                Thread.sleep(800); // Ổn định sau khi ghi đè
+
+                // 6. Tự động bấm nút tích (✔) chuẩn `com.oplus.camera:id/done_button` để xác nhận ảnh
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 boolean clickedDone = clickNodeByIdWithRetry(rootNode, "com.oplus.camera:id/done_button", 3, 1000);
                 
-                // Fallback nếu không tìm thấy node ID thì bấm theo tọa độ tâm nút `done_button` [540,1304][632,1396]
+                // Fallback nếu không tìm thấy node ID thì bấm theo tọa độ tâm nút `done_button`
                 if (!clickedDone) {
                     try {
                         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
                             GestureDescription.Builder builder = new GestureDescription.Builder();
                             Path path = new Path();
-                            path.moveTo(586f, 1350f); // Tâm giữa của nút done_button
+                            path.moveTo(586f, 1350f); 
                             builder.addStroke(new GestureDescription.StrokeDescription(path, 0, 50));
                             if (AutoScrapeService.instance != null) {
                                 AutoScrapeService.instance.dispatchGesture(builder.build(), null, null);
