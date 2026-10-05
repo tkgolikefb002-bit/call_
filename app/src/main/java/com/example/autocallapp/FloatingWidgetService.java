@@ -57,7 +57,7 @@ public class FloatingWidgetService extends Service {
             startForeground(NOTIFICATION_ID, notification);
 
             // 2. Khởi tạo giao diện popup nổi từ XML
-            floatingView = LayoutInflater.from(this).inflate(R.layout.layout_layout_floating_popup, null); // Hoặc layout_floating_popup tùy project của bạn
+            floatingView = LayoutInflater.from(this).inflate(R.layout.layout_floating_popup, null);
             tvProgress = floatingView.findViewById(R.id.tvProgress);
 
             int LAYOUT_FLAG;
