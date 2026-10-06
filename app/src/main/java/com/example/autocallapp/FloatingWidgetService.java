@@ -432,26 +432,26 @@ public class FloatingWidgetService extends Service {
                 clickNodeByTextWithRetry(rootNode, "Khách không đặt hàng", 3, 1000);
                 Thread.sleep(1000);
 
-                // --- BƯỚC 7: Mở ô thêm ảnh và ÉP BUỘC gọi thẳng Camera ảo của app mình ---
+                // --- BƯỚC 7: Ép mở trực tiếp VirtualCameraActivity của app mình thay vì bấm chụp hệ thống ---
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/multiImageAdd", 3, 1000);
                 Thread.sleep(1000);
 
-                rootNode = AutoScrapeService.instance.getRootInActiveWindow();
-                clickNodeByTextWithRetry(rootNode, "Chụp ảnh", 3, 1000);
-                Thread.sleep(800); 
-
-                // Tạo Intent trỏ định danh chính xác vào VirtualCameraActivity của app mình để chiếm quyền tuyệt đối
+                // Gọi thẳng Activity camera ảo của app thay vì bấm vào chữ "Chụp ảnh" của hệ thống
                 Intent virtualCamIntent = new Intent(this, VirtualCameraActivity.class);
-                virtualCamIntent.setAction(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
                 virtualCamIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                
-                // Kiểm tra nếu app ngoài gửi kèm EXTRA_OUTPUT thì truyền tiếp qua
-                // (Đoạn này giúp app BEST nhận diện đây chính là kết quả trả về từ camera mong đợi)
                 startActivity(virtualCamIntent);
 
-                Thread.sleep(2000);
+                Thread.sleep(1500); // Đợi camera ảo tự động bơm ảnh xong
 
+                // --- BƯỚC 7.5: Tự động bấm nút xác nhận ảnh (nếu app BEST hiện màn hình xem trước) ---
+                rootNode = AutoScrapeService.instance.getRootInActiveWindow();
+                if (rootNode != null) {
+                    clickNodeByTextWithRetry(rootNode, "Dùng", 2, 1000);
+                    clickNodeByTextWithRetry(rootNode, "Xác nhận", 2, 1000);
+                    clickNodeByTextWithRetry(rootNode, "OK", 2, 1000);
+                }
+                Thread.sleep(1000);
                 // --- BƯỚC 8: Click nút "Thêm" (`vAdd`) để hoàn tất ---
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 boolean clickedAddButton = clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/vAdd", 3, 1000);
