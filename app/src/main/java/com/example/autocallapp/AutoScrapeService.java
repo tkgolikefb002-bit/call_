@@ -365,6 +365,59 @@ public class AutoScrapeService extends AccessibilityService {
         }
         return false;
     }
+    public void clickAddPhotoButton() {
+        AccessibilityNodeInfo rootNode = getRootInActiveWindow();
+        if (rootNode != null) {
+            boolean clicked = false;
+            // Tìm theo ID của nút thêm ảnh hoặc văn bản/mô tả tùy chỉnh
+            List<AccessibilityNodeInfo> nodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/ivAddPhoto");
+            if (nodes == null || nodes.isEmpty()) {
+                nodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/btnTakePhoto");
+            }
+            
+            if (nodes != null && !nodes.isEmpty()) {
+                for (AccessibilityNodeInfo node : nodes) {
+                    if (node != null && node.isVisibleToUser()) {
+                        Rect rect = new Rect();
+                        node.getBoundsInScreen(rect);
+                        if (rect.width() > 0 && rect.height() > 0) {
+                            clickAtCoordinates(rect.centerX(), rect.centerY());
+                            clicked = true;
+                            node.recycle();
+                            break;
+                        }
+                    }
+                    if (node != null) node.recycle();
+                }
+            }
+            rootNode.recycle();
+
+            if (clicked) {
+                Toast.makeText(this, "Đã bấm nút thêm ảnh, chuẩn bị mở máy ảnh ảo...", Toast.LENGTH_SHORT).show();
+                // Sau khi bấm nút thêm ảnh, chờ một nhịp rồi gọi mở máy ảnh ảo (hoặc tích hợp luôn ở đây)
+                handler.postDelayed(this::triggerVirtualCamera, 800);
+            } else {
+                Log.w(TAG, "Không tìm thấy nút thêm ảnh trên màn hình hiện tại.");
+            }
+        }
+    }
+
+    public void triggerVirtualCamera() {
+        try {
+            Intent intent = getPackageManager().getLaunchIntentForPackage("com.example.virtualcamera"); // Thay bằng package máy ảnh ảo của bạn nếu cần
+            if (intent != null) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(intent);
+                Toast.makeText(this, "Đã mở máy ảnh ảo thành công!", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, "Không tìm thấy ứng dụng máy ảnh ảo!", Toast.LENGTH_SHORT).show();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            Log.e(TAG, "Lỗi mở máy ảnh ảo: " + e.getMessage());
+        }
+    }
+
 
     private void loadWaybillsForProcessing() {
         waybillQueueList.clear();
