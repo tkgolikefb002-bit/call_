@@ -51,6 +51,7 @@ public class AutoScrapeService extends AccessibilityService {
     public void onInterrupt() {
         isScraping = false;
         isCallingProcessActive = false;
+        handler.removeCallbacksAndMessages(null);
     }
 
     // =========================================================================
@@ -79,21 +80,27 @@ public class AutoScrapeService extends AccessibilityService {
                 int previousSize = collectedWaybills.size();
                 
                 if (rootNode != null) {
-                    List<AccessibilityNodeInfo> billNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvBillCode");
-                    if (billNodes != null && !billNodes.isEmpty()) {
-                        for (AccessibilityNodeInfo billNode : billNodes) {
-                            if (billNode != null && billNode.getText() != null) {
-                                if (billNode.isVisibleToUser()) {
-                                    String code = billNode.getText().toString().trim();
-                                    if (!code.isEmpty()) {
-                                        collectedWaybills.add(code);
+                    try {
+                        List<AccessibilityNodeInfo> billNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvBillCode");
+                        if (billNodes != null && !billNodes.isEmpty()) {
+                            for (AccessibilityNodeInfo billNode : billNodes) {
+                                if (billNode != null) {
+                                    try {
+                                        if (billNode.isVisibleToUser() && billNode.getText() != null) {
+                                            String code = billNode.getText().toString().trim();
+                                            if (!code.isEmpty()) {
+                                                collectedWaybills.add(code);
+                                            }
+                                        }
+                                    } finally {
+                                        billNode.recycle();
                                     }
                                 }
                             }
-                            if (billNode != null) billNode.recycle();
                         }
+                    } finally {
+                        rootNode.recycle();
                     }
-                    rootNode.recycle();
                 }
 
                 updatePopupProgress(collectedWaybills.size());
@@ -188,39 +195,44 @@ public class AutoScrapeService extends AccessibilityService {
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
         if (rootNode != null) {
             List<AccessibilityNodeInfo> searchBoxes = new ArrayList<>();
-            findEditTextByHintRecursive(rootNode, searchBoxes);
+            try {
+                findEditTextByHintRecursive(rootNode, searchBoxes);
 
-            if (searchBoxes.isEmpty()) {
-                List<AccessibilityNodeInfo> byId = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/searchEditText");
-                if (byId != null) searchBoxes.addAll(byId);
-            }
+                if (searchBoxes.isEmpty()) {
+                    List<AccessibilityNodeInfo> byId = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/searchEditText");
+                    if (byId != null) searchBoxes.addAll(byId);
+                }
 
-            boolean filled = false;
-            if (!searchBoxes.isEmpty()) {
-                for (AccessibilityNodeInfo box : searchBoxes) {
-                    if (box != null) {
-                        box.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
-                        box.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                        
-                        Rect rect = new Rect();
-                        box.getBoundsInScreen(rect);
-                        if (rect.width() > 0 && rect.height() > 0) {
-                            clickAtCoordinates(rect.centerX(), rect.centerY());
+                boolean filled = false;
+                if (!searchBoxes.isEmpty()) {
+                    for (AccessibilityNodeInfo box : searchBoxes) {
+                        if (box != null) {
+                            try {
+                                box.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
+                                box.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                                
+                                Rect rect = new Rect();
+                                box.getBoundsInScreen(rect);
+                                if (rect.width() > 0 && rect.height() > 0) {
+                                    clickAtCoordinates(rect.centerX(), rect.centerY());
+                                }
+                                filled = true;
+                                break;
+                            } finally {
+                                box.recycle();
+                            }
                         }
-                        
-                        filled = true;
-                        break;
                     }
                 }
-            }
 
-            rootNode.recycle();
-
-            if (filled) {
-                handler.postDelayed(() -> performClipboardPasteAndSearch(codeText), 400);
-            } else {
-                clickAtCoordinates(500, 150);
-                handler.postDelayed(() -> performClipboardPasteAndSearch(codeText), 400);
+                if (filled) {
+                    handler.postDelayed(() -> performClipboardPasteAndSearch(codeText), 400);
+                } else {
+                    clickAtCoordinates(500, 150);
+                    handler.postDelayed(() -> performClipboardPasteAndSearch(codeText), 400);
+                }
+            } finally {
+                rootNode.recycle();
             }
         } else {
             handler.postDelayed(this::executeNextCallStep, 500);
@@ -236,17 +248,22 @@ public class AutoScrapeService extends AccessibilityService {
 
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
         if (rootNode != null) {
-            AccessibilityNodeInfo focusedNode = rootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
-            if (focusedNode != null) {
-                focusedNode.performAction(AccessibilityNodeInfo.ACTION_PASTE);
-                
-                Bundle arguments = new Bundle();
-                arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, codeText);
-                focusedNode.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
-                
-                focusedNode.recycle();
+            try {
+                AccessibilityNodeInfo focusedNode = rootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
+                if (focusedNode != null) {
+                    try {
+                        focusedNode.performAction(AccessibilityNodeInfo.ACTION_PASTE);
+                        
+                        Bundle arguments = new Bundle();
+                        arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, codeText);
+                        focusedNode.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
+                    } finally {
+                        focusedNode.recycle();
+                    }
+                }
+            } finally {
+                rootNode.recycle();
             }
-            rootNode.recycle();
         }
 
         clickAtCoordinates(500, 150);
@@ -282,43 +299,49 @@ public class AutoScrapeService extends AccessibilityService {
 
         for (int i = 0; i < node.getChildCount(); i++) {
             AccessibilityNodeInfo child = node.getChild(i);
-            findEditTextByHintRecursive(child, results);
-            if (child != null) child.recycle();
+            if (child != null) {
+                findEditTextByHintRecursive(child, results);
+                child.recycle();
+            }
         }
     }
 
     private void verifyAndClickItemButton(String codeText) {
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
         if (rootNode != null) {
-            boolean clicked = false;
-            
-            List<AccessibilityNodeInfo> billNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvBillCode");
-            if (billNodes != null && !billNodes.isEmpty()) {
-                for (AccessibilityNodeInfo node : billNodes) {
-                    if (node != null && node.getText() != null && node.getText().toString().contains(codeText)) {
-                        if (node.isVisibleToUser()) {
-                            Rect rect = new Rect();
-                            node.getBoundsInScreen(rect);
-                            if (rect.width() > 0 && rect.height() > 0) {
-                                clickAtCoordinates(rect.centerX(), rect.centerY());
-                                clicked = true;
+            try {
+                boolean clicked = false;
+                List<AccessibilityNodeInfo> billNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvBillCode");
+                if (billNodes != null && !billNodes.isEmpty()) {
+                    for (AccessibilityNodeInfo node : billNodes) {
+                        if (node != null) {
+                            try {
+                                if (node.getText() != null && node.getText().toString().contains(codeText)) {
+                                    if (node.isVisibleToUser()) {
+                                        Rect rect = new Rect();
+                                        node.getBoundsInScreen(rect);
+                                        if (rect.width() > 0 && rect.height() > 0) {
+                                            clickAtCoordinates(rect.centerX(), rect.centerY());
+                                            clicked = true;
+                                        }
+                                    }
+                                }
+                            } finally {
+                                node.recycle();
                             }
+                            if (clicked) break;
                         }
-                        node.recycle();
-                        if (clicked) break;
-                    } else {
-                        if (node != null) node.recycle();
                     }
                 }
-            }
 
-            rootNode.recycle();
-
-            if (clicked) {
-                Toast.makeText(this, "Đang xử lý mã: " + codeText, Toast.LENGTH_SHORT).show();
-            } else {
-                Log.w(TAG, "Không tìm thấy nút mã vận đơn cho mã: " + codeText + ", chuyển sang mã tiếp theo.");
-                handler.postDelayed(this::executeNextCallStep, 400);
+                if (clicked) {
+                    Toast.makeText(this, "Đang xử lý mã: " + codeText, Toast.LENGTH_SHORT).show();
+                } else {
+                    Log.w(TAG, "Không tìm thấy nút mã vận đơn cho mã: " + codeText + ", chuyển sang mã tiếp theo.");
+                    handler.postDelayed(this::executeNextCallStep, 400);
+                }
+            } finally {
+                rootNode.recycle();
             }
         } else {
             handler.postDelayed(this::executeNextCallStep, 500);
@@ -368,57 +391,61 @@ public class AutoScrapeService extends AccessibilityService {
     // PHẦN 3: CHÈN TRỰC TIẾP ẢNH TỪ ASSETS -> SỬA MÃ VẬN ĐƠN -> CHỜ 2S -> XÁC NHẬN
     // =========================================================================
     
-    // Bước 1: Đồng bộ ảnh từ assets ra ngoài và bấm mở khung thêm ảnh trên app
     public void clickAddPhotoButton() {
         copyAssetToFile("default_parcel_image.jpg");
         copyAssetToFile("default_scene_image.jpg");
 
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
         if (rootNode != null) {
-            boolean clicked = false;
-            List<AccessibilityNodeInfo> nodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/ivAddPhoto");
-            if (nodes == null || nodes.isEmpty()) {
-                nodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/btnTakePhoto");
-            }
-            if (nodes == null || nodes.isEmpty()) {
-                nodes = rootNode.findAccessibilityNodeInfosByText("Thêm ảnh");
-            }
-            
-            if (nodes != null && !nodes.isEmpty()) {
-                for (AccessibilityNodeInfo node : nodes) {
-                    if (node != null && node.isVisibleToUser()) {
-                        Rect rect = new Rect();
-                        node.getBoundsInScreen(rect);
-                        if (rect.width() > 0 && rect.height() > 0) {
-                            clickAtCoordinates(rect.centerX(), rect.centerY());
-                            clicked = true;
-                            node.recycle();
-                            break;
+            try {
+                boolean clicked = false;
+                List<AccessibilityNodeInfo> nodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/ivAddPhoto");
+                if (nodes == null || nodes.isEmpty()) {
+                    nodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/btnTakePhoto");
+                }
+                if (nodes == null || nodes.isEmpty()) {
+                    nodes = rootNode.findAccessibilityNodeInfosByText("Thêm ảnh");
+                }
+                
+                if (nodes != null && !nodes.isEmpty()) {
+                    for (AccessibilityNodeInfo node : nodes) {
+                        if (node != null) {
+                            try {
+                                if (node.isVisibleToUser()) {
+                                    Rect rect = new Rect();
+                                    node.getBoundsInScreen(rect);
+                                    if (rect.width() > 0 && rect.height() > 0) {
+                                        clickAtCoordinates(rect.centerX(), rect.centerY());
+                                        clicked = true;
+                                        break;
+                                    }
+                                }
+                            } finally {
+                                node.recycle();
+                            }
                         }
                     }
-                    if (node != null) node.recycle();
                 }
-            }
-            rootNode.recycle();
 
-            if (clicked) {
-                Toast.makeText(this, "Đã mở khung ảnh, chuẩn bị điền mã vận đơn...", Toast.LENGTH_SHORT).show();
-                
-                String currentCode = "";
-                if (currentCallIndex > 0 && currentCallIndex <= waybillQueueList.size()) {
-                    currentCode = waybillQueueList.get(currentCallIndex - 1);
+                if (clicked) {
+                    Toast.makeText(this, "Đã mở khung ảnh, chuẩn bị điền mã vận đơn...", Toast.LENGTH_SHORT).show();
+                    
+                    String currentCode = "";
+                    if (currentCallIndex > 0 && currentCallIndex <= waybillQueueList.size()) {
+                        currentCode = waybillQueueList.get(currentCallIndex - 1);
+                    }
+                    final String finalCode = currentCode;
+
+                    handler.postDelayed(() -> performEditWaybillOnPhoto(finalCode), 1500);
+                } else {
+                    Log.w(TAG, "Không tìm thấy nút thêm ảnh trên màn hình.");
                 }
-                final String finalCode = currentCode;
-
-                // Bước 2: Đợi 1.5 giây cho giao diện ảnh hiển thị rồi tiến hành điền mã
-                handler.postDelayed(() -> performEditWaybillOnPhoto(finalCode), 1500);
-            } else {
-                Log.w(TAG, "Không tìm thấy nút thêm ảnh trên màn hình.");
+            } finally {
+                rootNode.recycle();
             }
         }
     }
 
-    // Hàm phụ trợ copy file từ thư mục assets ra bộ nhớ ứng dụng
     private File copyAssetToFile(String assetFileName) {
         File outFile = new File(getExternalFilesDir(null), assetFileName);
         try {
@@ -440,53 +467,58 @@ public class AutoScrapeService extends AccessibilityService {
         return outFile;
     }
 
-    // Bước 3: Thao tác tìm ô sửa mã trên ảnh và dán mã vận đơn đang chạy vào
     private void performEditWaybillOnPhoto(String codeText) {
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
         if (rootNode != null && !codeText.isEmpty()) {
-            List<AccessibilityNodeInfo> editBoxes = new ArrayList<>();
-            findEditTextByHintRecursive(rootNode, editBoxes);
+            try {
+                List<AccessibilityNodeInfo> editBoxes = new ArrayList<>();
+                findEditTextByHintRecursive(rootNode, editBoxes);
 
-            if (editBoxes.isEmpty()) {
-                List<AccessibilityNodeInfo> byId = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/etEditWaybill");
-                if (byId != null) editBoxes.addAll(byId);
-            }
-
-            boolean edited = false;
-            if (!editBoxes.isEmpty()) {
-                for (AccessibilityNodeInfo box : editBoxes) {
-                    if (box != null && box.isVisibleToUser()) {
-                        box.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
-                        box.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-
-                        ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-                        ClipData clip = ClipData.newPlainText("EditWaybill", codeText);
-                        if (clipboard != null) {
-                            clipboard.setPrimaryClip(clip);
-                        }
-                        box.performAction(AccessibilityNodeInfo.ACTION_PASTE);
-
-                        Bundle arguments = new Bundle();
-                        arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, codeText);
-                        box.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
-
-                        edited = true;
-                        box.recycle();
-                        break;
-                    }
-                    if (box != null) box.recycle();
+                if (editBoxes.isEmpty()) {
+                    List<AccessibilityNodeInfo> byId = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/etEditWaybill");
+                    if (byId != null) editBoxes.addAll(byId);
                 }
-            }
-            rootNode.recycle();
 
-            if (edited) {
-                Toast.makeText(this, "Đã điền mã " + codeText + " lên ảnh!", Toast.LENGTH_SHORT).show();
-            } else {
-                Log.w(TAG, "Không tìm thấy ô sửa mã trên ảnh, tiếp tục tiến trình...");
+                boolean edited = false;
+                if (!editBoxes.isEmpty()) {
+                    for (AccessibilityNodeInfo box : editBoxes) {
+                        if (box != null) {
+                            try {
+                                if (box.isVisibleToUser()) {
+                                    box.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
+                                    box.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+
+                                    ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                                    ClipData clip = ClipData.newPlainText("EditWaybill", codeText);
+                                    if (clipboard != null) {
+                                        clipboard.setPrimaryClip(clip);
+                                    }
+                                    box.performAction(AccessibilityNodeInfo.ACTION_PASTE);
+
+                                    Bundle arguments = new Bundle();
+                                    arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, codeText);
+                                    box.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
+
+                                    edited = true;
+                                    break;
+                                }
+                            } finally {
+                                box.recycle();
+                            }
+                        }
+                    }
+                }
+
+                if (edited) {
+                    Toast.makeText(this, "Đã điền mã " + codeText + " lên ảnh!", Toast.LENGTH_SHORT).show();
+                } else {
+                    Log.w(TAG, "Không tìm thấy ô sửa mã trên ảnh, tiếp tục tiến trình...");
+                }
+            } finally {
+                rootNode.recycle();
             }
         }
 
-        // Bước 4: Đợi đúng 2 giây để hệ thống lưu xong, sau đó bấm nút xác nhận/thêm
         handler.postDelayed(this::clickSubmitButton, 2000);
     }
 
@@ -506,45 +538,51 @@ public class AutoScrapeService extends AccessibilityService {
         }
     }
 
-    // Bước 5: Bấm nút xác nhận / thêm đơn hàng hoàn tất
     public void clickSubmitButton() {
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
         if (rootNode != null) {
-            boolean clicked = false;
-            List<AccessibilityNodeInfo> nodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/btnSubmit");
-            if (nodes == null || nodes.isEmpty()) {
-                nodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/btnConfirm");
-            }
-            if (nodes == null || nodes.isEmpty()) {
-                nodes = rootNode.findAccessibilityNodeInfosByText("Xác nhận");
-            }
-            if (nodes == null || nodes.isEmpty()) {
-                nodes = rootNode.findAccessibilityNodeInfosByText("Hoàn tất");
-            }
+            try {
+                boolean clicked = false;
+                List<AccessibilityNodeInfo> nodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/btnSubmit");
+                if (nodes == null || nodes.isEmpty()) {
+                    nodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/btnConfirm");
+                }
+                if (nodes == null || nodes.isEmpty()) {
+                    nodes = rootNode.findAccessibilityNodeInfosByText("Xác nhận");
+                }
+                if (nodes == null || nodes.isEmpty()) {
+                    nodes = rootNode.findAccessibilityNodeInfosByText("Hoàn tất");
+                }
 
-            if (nodes != null && !nodes.isEmpty()) {
-                for (AccessibilityNodeInfo node : nodes) {
-                    if (node != null && node.isVisibleToUser()) {
-                        Rect rect = new Rect();
-                        node.getBoundsInScreen(rect);
-                        if (rect.width() > 0 && rect.height() > 0) {
-                            clickAtCoordinates(rect.centerX(), rect.centerY());
-                            clicked = true;
-                            node.recycle();
-                            break;
+                if (nodes != null && !nodes.isEmpty()) {
+                    for (AccessibilityNodeInfo node : nodes) {
+                        if (node != null) {
+                            try {
+                                if (node.isVisibleToUser()) {
+                                    Rect rect = new Rect();
+                                    node.getBoundsInScreen(rect);
+                                    if (rect.width() > 0 && rect.height() > 0) {
+                                        clickAtCoordinates(rect.centerX(), rect.centerY());
+                                        clicked = true;
+                                        break;
+                                    }
+                                }
+                            } finally {
+                                node.recycle();
+                            }
                         }
                     }
-                    if (node != null) node.recycle();
                 }
-            }
-            rootNode.recycle();
 
-            if (clicked) {
-                Toast.makeText(this, "Đã bấm xác nhận đơn, chuyển sang mã tiếp theo...", Toast.LENGTH_SHORT).show();
-                handler.postDelayed(this::onCallFinished, 2000);
-            } else {
-                Log.w(TAG, "Không tìm thấy nút xác nhận trên màn hình.");
-                handler.postDelayed(this::onCallFinished, 1500);
+                if (clicked) {
+                    Toast.makeText(this, "Đã bấm xác nhận đơn, chuyển sang mã tiếp theo...", Toast.LENGTH_SHORT).show();
+                    handler.postDelayed(this::onCallFinished, 2000);
+                } else {
+                    Log.w(TAG, "Không tìm thấy nút xác nhận trên màn hình.");
+                    handler.postDelayed(this::onCallFinished, 1500);
+                }
+            } finally {
+                rootNode.recycle();
             }
         } else {
             handler.postDelayed(this::onCallFinished, 1500);
