@@ -394,8 +394,12 @@ public class AutoScrapeService extends AccessibilityService {
 
             if (clicked) {
                 Toast.makeText(this, "Đã bấm nút thêm ảnh, chuẩn bị mở máy ảnh ảo...", Toast.LENGTH_SHORT).show();
-                // Sau khi bấm nút thêm ảnh, chờ một nhịp rồi gọi mở máy ảnh ảo (hoặc tích hợp luôn ở đây)
+                
+                // 1. Mở máy ảnh ảo sau 800 mili-giây
                 handler.postDelayed(this::triggerVirtualCamera, 800);
+                
+                // 2. Chờ khoảng 5 giây (đủ thời gian để máy ảnh ảo chụp/chọn ảnh xong) rồi tự động bấm Xác nhận
+                handler.postDelayed(this::clickSubmitButton, 5000);
             } else {
                 Log.w(TAG, "Không tìm thấy nút thêm ảnh trên màn hình hiện tại.");
             }
@@ -417,6 +421,52 @@ public class AutoScrapeService extends AccessibilityService {
             Log.e(TAG, "Lỗi mở máy ảnh ảo: " + e.getMessage());
         }
     }
+    public void clickSubmitButton() {
+    AccessibilityNodeInfo rootNode = getRootInActiveWindow();
+    if (rootNode != null) {
+        boolean clicked = false;
+        // Tìm theo ID nút xác nhận/lưu thường thấy trong app
+        List<AccessibilityNodeInfo> nodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/btnSubmit");
+        if (nodes == null || nodes.isEmpty()) {
+            nodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/btnConfirm");
+        }
+        // Hoặc tìm theo văn bản hiển thị trên nút
+        if (nodes == null || nodes.isEmpty()) {
+            nodes = rootNode.findAccessibilityNodeInfosByText("Xác nhận");
+        }
+        if (nodes == null || nodes.isEmpty()) {
+            nodes = rootNode.findAccessibilityNodeInfosByText("Hoàn tất");
+        }
+
+        if (nodes != null && !nodes.isEmpty()) {
+            for (AccessibilityNodeInfo node : nodes) {
+                if (node != null && node.isVisibleToUser()) {
+                    Rect rect = new Rect();
+                    node.getBoundsInScreen(rect);
+                    if (rect.width() > 0 && rect.height() > 0) {
+                        clickAtCoordinates(rect.centerX(), rect.centerY());
+                        clicked = true;
+                        node.recycle();
+                        break;
+                    }
+                }
+                if (node != null) node.recycle();
+            }
+        }
+        rootNode.recycle();
+
+        if (clicked) {
+            Toast.makeText(this, "Đã bấm xác nhận đơn, chuyển sang mã tiếp theo...", Toast.LENGTH_SHORT).show();
+            // Chờ 2 giây để app xử lý lưu dữ liệu, sau đó gọi mã tiếp theo trong hàng đợi
+            handler.postDelayed(this::onCallFinished, 2000);
+        } else {
+            Log.w(TAG, "Không tìm thấy nút xác nhận trên màn hình.");
+            handler.postDelayed(this::onCallFinished, 1500);
+        }
+    } else {
+        handler.postDelayed(this::onCallFinished, 1500);
+    }
+}
 
 
     private void loadWaybillsForProcessing() {
