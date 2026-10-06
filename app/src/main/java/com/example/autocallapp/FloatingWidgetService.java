@@ -432,115 +432,19 @@ public class FloatingWidgetService extends Service {
                 clickNodeByTextWithRetry(rootNode, "Khách không đặt hàng", 3, 1000);
                 Thread.sleep(1000);
 
-                // --- BƯỚC 7: Mở camera, chụp tự động, đánh tráo ảnh và bấm xác nhận ---
-                
-                // 1. Click mở ô thêm ảnh trên app BEST
+                // --- BƯỚC 7: Mở ô thêm ảnh và kích hoạt Camera ảo ---
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/multiImageAdd", 3, 1000);
                 Thread.sleep(1000);
 
-                // 2. Bấm "Chụp ảnh" trên popup
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByTextWithRetry(rootNode, "Chụp ảnh", 3, 1000);
-                Thread.sleep(1500); // Chờ giao diện camera Oplus mở lên
+                Thread.sleep(800); 
 
-                // Lấy mốc thời gian trước khi bấm chụp để so sánh file ảnh sinh ra sau đó
-                long captureStartTime = System.currentTimeMillis();
-
-                // 3. Tự động tìm và bấm vào nút chụp chuẩn `com.oplus.camera:id/shutter_button`
-                rootNode = AutoScrapeService.instance.getRootInActiveWindow();
-                boolean clickedShutter = clickNodeByIdWithRetry(rootNode, "com.oplus.camera:id/shutter_button", 3, 1000);
-                
-                // Fallback phòng hờ: Nếu không tìm thấy node ID thì dùng tọa độ tâm nút chụp
-                if (!clickedShutter) {
-                    try {
-                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
-                            GestureDescription.Builder builder = new GestureDescription.Builder();
-                            Path path = new Path();
-                            path.moveTo(360f, 1350f); 
-                            builder.addStroke(new GestureDescription.StrokeDescription(path, 0, 50));
-                            if (AutoScrapeService.instance != null) {
-                                AutoScrapeService.instance.dispatchGesture(builder.build(), null, null);
-                            }
-                        }
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }
-                
-                // 4. Chờ camera đóng luồng ghi file hoàn toàn (thêm lệnh ép đồng bộ luồng)
-                java.io.File targetPhoto = null;
-                for (int i = 0; i < 40; i++) { // Tăng thời gian chờ lên 4 giây
-                    try {
-                        java.io.File cameraDir = new java.io.File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DCIM), "Camera");
-                        if (cameraDir.exists()) {
-                            java.io.File[] files = cameraDir.listFiles();
-                            if (files != null && files.length > 0) {
-                                java.util.Arrays.sort(files, (f1, f2) -> Long.compare(f2.lastModified(), f1.lastModified()));
-                                java.io.File latest = files[0];
-                                if (latest.lastModified() >= (captureStartTime - 200)) {
-                                    // Kiểm tra thêm kích thước file để đảm bảo camera đã viết xong dữ liệu (khác 0 bytes)
-                                    if (latest.length() > 1024) {
-                                        targetPhoto = latest;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                    Thread.sleep(100);
-                }
-
-                // 5. Tiến hành copy đè và đóng luồng stream an toàn
-                if (targetPhoto != null) {
-                    try {
-                        java.io.File preparedImageFile = new java.io.File(getFilesDir(), "ma_van_don.jpg");
-                        if (preparedImageFile.exists()) {
-                            // Dùng InputStream/OutputStream truyền thống để ép buộc ghi đè sạch sẽ buffer
-                            try (java.io.InputStream in = new java.io.FileInputStream(preparedImageFile);
-                                 java.io.OutputStream out = new java.io.FileOutputStream(targetPhoto, false)) {
-                                byte[] buffer = new byte[1024];
-                                int read;
-                                while ((read = in.read(buffer)) != -1) {
-                                    out.write(buffer, 0, read);
-                                }
-                                out.flush();
-                            }
-
-                            // Quét lại Media Store
-                            Intent scanIntent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
-                            scanIntent.setData(Uri.fromFile(targetPhoto));
-                            sendBroadcast(scanIntent);
-                        }
-                    } catch (Exception ex) {
-                        ex.printStackTrace();
-                    }
-                }
-
-                Thread.sleep(1500); // Đợi giao diện review cập nhật lại thumbnail ảnh mới đè
-
-                // 6. Tự động bấm nút tích (✔) chuẩn `com.oplus.camera:id/done_button` để xác nhận ảnh
-                rootNode = AutoScrapeService.instance.getRootInActiveWindow();
-                boolean clickedDone = clickNodeByIdWithRetry(rootNode, "com.oplus.camera:id/done_button", 3, 1000);
-                
-                // Fallback nếu không tìm thấy node ID thì bấm theo tọa độ tâm nút `done_button`
-                if (!clickedDone) {
-                    try {
-                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
-                            GestureDescription.Builder builder = new GestureDescription.Builder();
-                            Path path = new Path();
-                            path.moveTo(586f, 1350f); 
-                            builder.addStroke(new GestureDescription.StrokeDescription(path, 0, 50));
-                            if (AutoScrapeService.instance != null) {
-                                AutoScrapeService.instance.dispatchGesture(builder.build(), null, null);
-                            }
-                        }
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }
+                // Kích hoạt Intent mở VirtualCameraActivity của chính app mình
+                Intent virtualCamIntent = new Intent(this, VirtualCameraActivity.class);
+                virtualCamIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(virtualCamIntent);
 
                 Thread.sleep(2000);
 
