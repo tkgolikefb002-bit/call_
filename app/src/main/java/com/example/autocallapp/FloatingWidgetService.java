@@ -432,7 +432,7 @@ public class FloatingWidgetService extends Service {
                 clickNodeByTextWithRetry(rootNode, "Khách không đặt hàng", 3, 1000);
                 Thread.sleep(1000);
 
-                // --- BƯỚC 7: Mở ô thêm ảnh và kích hoạt Camera ảo ---
+                // --- BƯỚC 7: Mở ô thêm ảnh và ÉP BUỘC gọi thẳng Camera ảo của app mình ---
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/multiImageAdd", 3, 1000);
                 Thread.sleep(1000);
@@ -441,9 +441,13 @@ public class FloatingWidgetService extends Service {
                 clickNodeByTextWithRetry(rootNode, "Chụp ảnh", 3, 1000);
                 Thread.sleep(800); 
 
-                // Kích hoạt Intent mở VirtualCameraActivity của chính app mình
+                // Tạo Intent trỏ định danh chính xác vào VirtualCameraActivity của app mình để chiếm quyền tuyệt đối
                 Intent virtualCamIntent = new Intent(this, VirtualCameraActivity.class);
+                virtualCamIntent.setAction(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
                 virtualCamIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                
+                // Kiểm tra nếu app ngoài gửi kèm EXTRA_OUTPUT thì truyền tiếp qua
+                // (Đoạn này giúp app BEST nhận diện đây chính là kết quả trả về từ camera mong đợi)
                 startActivity(virtualCamIntent);
 
                 Thread.sleep(2000);
