@@ -411,8 +411,11 @@ public class AutoScrapeService extends AccessibilityService {
                     currentCode = waybillQueueList.get(currentCallIndex - 1);
                 }
 
+                // Gán vào biến final để dùng được trong lambda expression
+                final String finalCode = currentCode;
+
                 // Bước 2: Sau 1.5 giây để giao diện ảnh hiển thị, tiến hành điền/sửa mã lên ảnh
-                handler.postDelayed(() -> performEditWaybillOnPhoto(currentCode), 1500);
+                handler.postDelayed(() -> performEditWaybillOnPhoto(finalCode), 1500);
             } else {
                 Log.w(TAG, "Không tìm thấy nút thêm ảnh trên màn hình.");
             }
