@@ -7,7 +7,6 @@ import android.content.ClipboardManager;
 import android.content.Intent;
 import android.graphics.Path;
 import android.graphics.Rect;
-import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -24,14 +23,12 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class AutoScrapeService extends AccessibilityService {
     private static final String TAG = "AutoScrapeService";
     public static AutoScrapeService instance;
     private boolean isScraping = false;
-    private boolean isCallingProcessActive = false; 
+    private boolean isCallingProcessActive = false;
     
     private final Set<String> collectedWaybills = new LinkedHashSet<>();
     private final List<String> waybillQueueList = new ArrayList<>();
@@ -365,11 +362,11 @@ public class AutoScrapeService extends AccessibilityService {
         }
         return false;
     }
+
     public void clickAddPhotoButton() {
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
         if (rootNode != null) {
             boolean clicked = false;
-            // Tìm theo ID của nút thêm ảnh hoặc văn bản/mô tả tùy chỉnh
             List<AccessibilityNodeInfo> nodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/ivAddPhoto");
             if (nodes == null || nodes.isEmpty()) {
                 nodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/btnTakePhoto");
@@ -393,13 +390,42 @@ public class AutoScrapeService extends AccessibilityService {
             rootNode.recycle();
 
             if (clicked) {
-                Toast.makeText(this, "Đã bấm nút thêm ảnh, chuẩn bị mở máy ảnh ảo...", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Đang mở Album ảnh...", Toast.LENGTH_SHORT).show();
                 
-                // 1. Mở máy ảnh ảo sau 800 mili-giây
-                handler.postDelayed(this::triggerVirtualCamera, 800);
-                
-                // 2. Chờ khoảng 5 giây (đủ thời gian để máy ảnh ảo chụp/chọn ảnh xong) rồi tự động bấm Xác nhận
-                handler.postDelayed(this::clickSubmitButton, 5000);
+                handler.postDelayed(() -> {
+                    AccessibilityNodeInfo innerRoot = getRootInActiveWindow();
+                    if (innerRoot != null) {
+                        boolean selected = false;
+                        List<AccessibilityNodeInfo> textNodes = innerRoot.findAccessibilityNodeInfosByText("Chọn từ album");
+                        if (textNodes != null && !textNodes.isEmpty()) {
+                            for (AccessibilityNodeInfo node : textNodes) {
+                                if (node != null && node.isVisibleToUser()) {
+                                    Rect rect = new Rect();
+                                    node.getBoundsInScreen(rect);
+                                    if (rect.width() > 0 && rect.height() > 0) {
+                                        clickAtCoordinates(rect.centerX(), rect.centerY());
+                                        selected = true;
+                                        node.recycle();
+                                        break;
+                                    }
+                                }
+                                if (node != null) node.recycle();
+                            }
+                        }
+                        innerRoot.recycle();
+
+                        if (selected) {
+                            handler.postDelayed(() -> {
+                                clickAtCoordinates(200, 350); 
+                                Toast.makeText(this, "Đã chọn ảnh, chuẩn bị lưu...", Toast.LENGTH_SHORT).show();
+                                
+                                handler.postDelayed(this::clickSubmitButton, 1500);
+                            }, 1500);
+                        } else {
+                            Log.w(TAG, "Không tìm thấy chữ 'Chọn từ album'.");
+                        }
+                    }
+                }, 600);
             } else {
                 Log.w(TAG, "Không tìm thấy nút thêm ảnh trên màn hình hiện tại.");
             }
@@ -408,7 +434,7 @@ public class AutoScrapeService extends AccessibilityService {
 
     public void triggerVirtualCamera() {
         try {
-            Intent intent = getPackageManager().getLaunchIntentForPackage("com.example.virtualcamera"); // Thay bằng package máy ảnh ảo của bạn nếu cần
+            Intent intent = getPackageManager().getLaunchIntentForPackage("com.example.virtualcamera");
             if (intent != null) {
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 startActivity(intent);
@@ -421,53 +447,50 @@ public class AutoScrapeService extends AccessibilityService {
             Log.e(TAG, "Lỗi mở máy ảnh ảo: " + e.getMessage());
         }
     }
+
     public void clickSubmitButton() {
-    AccessibilityNodeInfo rootNode = getRootInActiveWindow();
-    if (rootNode != null) {
-        boolean clicked = false;
-        // Tìm theo ID nút xác nhận/lưu thường thấy trong app
-        List<AccessibilityNodeInfo> nodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/btnSubmit");
-        if (nodes == null || nodes.isEmpty()) {
-            nodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/btnConfirm");
-        }
-        // Hoặc tìm theo văn bản hiển thị trên nút
-        if (nodes == null || nodes.isEmpty()) {
-            nodes = rootNode.findAccessibilityNodeInfosByText("Xác nhận");
-        }
-        if (nodes == null || nodes.isEmpty()) {
-            nodes = rootNode.findAccessibilityNodeInfosByText("Hoàn tất");
-        }
-
-        if (nodes != null && !nodes.isEmpty()) {
-            for (AccessibilityNodeInfo node : nodes) {
-                if (node != null && node.isVisibleToUser()) {
-                    Rect rect = new Rect();
-                    node.getBoundsInScreen(rect);
-                    if (rect.width() > 0 && rect.height() > 0) {
-                        clickAtCoordinates(rect.centerX(), rect.centerY());
-                        clicked = true;
-                        node.recycle();
-                        break;
-                    }
-                }
-                if (node != null) node.recycle();
+        AccessibilityNodeInfo rootNode = getRootInActiveWindow();
+        if (rootNode != null) {
+            boolean clicked = false;
+            List<AccessibilityNodeInfo> nodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/btnSubmit");
+            if (nodes == null || nodes.isEmpty()) {
+                nodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/btnConfirm");
             }
-        }
-        rootNode.recycle();
+            if (nodes == null || nodes.isEmpty()) {
+                nodes = rootNode.findAccessibilityNodeInfosByText("Xác nhận");
+            }
+            if (nodes == null || nodes.isEmpty()) {
+                nodes = rootNode.findAccessibilityNodeInfosByText("Hoàn tất");
+            }
 
-        if (clicked) {
-            Toast.makeText(this, "Đã bấm xác nhận đơn, chuyển sang mã tiếp theo...", Toast.LENGTH_SHORT).show();
-            // Chờ 2 giây để app xử lý lưu dữ liệu, sau đó gọi mã tiếp theo trong hàng đợi
-            handler.postDelayed(this::onCallFinished, 2000);
+            if (nodes != null && !nodes.isEmpty()) {
+                for (AccessibilityNodeInfo node : nodes) {
+                    if (node != null && node.isVisibleToUser()) {
+                        Rect rect = new Rect();
+                        node.getBoundsInScreen(rect);
+                        if (rect.width() > 0 && rect.height() > 0) {
+                            clickAtCoordinates(rect.centerX(), rect.centerY());
+                            clicked = true;
+                            node.recycle();
+                            break;
+                        }
+                    }
+                    if (node != null) node.recycle();
+                }
+            }
+            rootNode.recycle();
+
+            if (clicked) {
+                Toast.makeText(this, "Đã bấm xác nhận đơn, chuyển sang mã tiếp theo...", Toast.LENGTH_SHORT).show();
+                handler.postDelayed(this::onCallFinished, 2000);
+            } else {
+                Log.w(TAG, "Không tìm thấy nút xác nhận trên màn hình.");
+                handler.postDelayed(this::onCallFinished, 1500);
+            }
         } else {
-            Log.w(TAG, "Không tìm thấy nút xác nhận trên màn hình.");
             handler.postDelayed(this::onCallFinished, 1500);
         }
-    } else {
-        handler.postDelayed(this::onCallFinished, 1500);
     }
-}
-
 
     private void loadWaybillsForProcessing() {
         waybillQueueList.clear();
