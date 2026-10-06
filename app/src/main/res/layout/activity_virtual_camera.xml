@@ -4,23 +4,30 @@
     android:layout_height="match_parent"
     android:background="@android:color/black">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_centerHorizontal="true"
-        android:layout_marginTop="120dp"
-        android:text="📷 ĐANG XỬ LÝ ẢNH MÃ VẬN ĐƠN..."
-        android:textColor="@android:color/white"
-        android:textSize="16sp"
-        android:textStyle="bold" />
+    <!-- Khung hiển thị ảnh mã vận đơn làm giả lập khung ngắm -->
+    <ImageView
+        android:id="@+id/imgPreview"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerInside"
+        android:layout_above="@id/layoutBottom" />
 
-    <Button
-        android:id="@+id/virtual_shutter_button"
-        android:layout_width="80dp"
-        android:layout_height="80dp"
+    <!-- Thanh điều khiển phía dưới -->
+    <RelativeLayout
+        android:id="@+id/layoutBottom"
+        android:layout_width="match_parent"
+        android:layout_height="120dp"
         android:layout_alignParentBottom="true"
-        android:layout_centerHorizontal="true"
-        android:layout_marginBottom="60dp"
-        android:background="@android:drawable/ic_menu_camera" />
+        android:background="#99000000">
 
+        <!-- Nút chụp hình giả lập -->
+        <ImageButton
+            android:id="@+id/btnShutter"
+            android:layout_width="70dp"
+            android:layout_height="70dp"
+            android:layout_centerInParent="true"
+            android:background="@android:drawable/ic_menu_camera"
+            android:contentDescription="Chụp ảnh" />
+
+    </RelativeLayout>
 </RelativeLayout>
