@@ -365,12 +365,11 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // PHẦN 3: LUỒNG LẤY 2 ẢNH TỪ ASSETS -> CHÈN -> SỬA MÃ -> CHỜ 2S -> THÊM
+    // PHẦN 3: CHÈN TRỰC TIẾP ẢNH TỪ ASSETS -> SỬA MÃ VẬN ĐƠN -> CHỜ 2S -> XÁC NHẬN
     // =========================================================================
     
-    // Bước 1: Lấy 2 ảnh từ thư mục assets và mở giao diện thêm ảnh trên app
+    // Bước 1: Đồng bộ ảnh từ assets ra ngoài và bấm mở khung thêm ảnh trên app
     public void clickAddPhotoButton() {
-        // Đồng bộ/copy 2 ảnh từ assets ra bộ nhớ ngoài của app để sẵn sàng sử dụng
         copyAssetToFile("default_parcel_image.jpg");
         copyAssetToFile("default_scene_image.jpg");
 
@@ -403,18 +402,15 @@ public class AutoScrapeService extends AccessibilityService {
             rootNode.recycle();
 
             if (clicked) {
-                Toast.makeText(this, "Đã lấy 2 ảnh từ assets, chuẩn bị sửa mã...", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Đã mở khung ảnh, chuẩn bị điền mã vận đơn...", Toast.LENGTH_SHORT).show();
                 
-                // Lấy mã vận đơn hiện tại đang chạy
                 String currentCode = "";
                 if (currentCallIndex > 0 && currentCallIndex <= waybillQueueList.size()) {
                     currentCode = waybillQueueList.get(currentCallIndex - 1);
                 }
-
-                // Gán vào biến final để dùng được trong lambda expression
                 final String finalCode = currentCode;
 
-                // Bước 2: Sau 1.5 giây để giao diện ảnh hiển thị, tiến hành điền/sửa mã lên ảnh
+                // Bước 2: Đợi 1.5 giây cho giao diện ảnh hiển thị rồi tiến hành điền mã
                 handler.postDelayed(() -> performEditWaybillOnPhoto(finalCode), 1500);
             } else {
                 Log.w(TAG, "Không tìm thấy nút thêm ảnh trên màn hình.");
@@ -422,7 +418,7 @@ public class AutoScrapeService extends AccessibilityService {
         }
     }
 
-    // Hàm hỗ trợ chép file từ assets ra bộ nhớ ứng dụng
+    // Hàm phụ trợ copy file từ thư mục assets ra bộ nhớ ứng dụng
     private File copyAssetToFile(String assetFileName) {
         File outFile = new File(getExternalFilesDir(null), assetFileName);
         try {
@@ -444,7 +440,7 @@ public class AutoScrapeService extends AccessibilityService {
         return outFile;
     }
 
-    // Bước 3: Thao tác tìm ô sửa mã trên ảnh, dán mã vận đơn vào
+    // Bước 3: Thao tác tìm ô sửa mã trên ảnh và dán mã vận đơn đang chạy vào
     private void performEditWaybillOnPhoto(String codeText) {
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
         if (rootNode != null && !codeText.isEmpty()) {
@@ -484,13 +480,13 @@ public class AutoScrapeService extends AccessibilityService {
             rootNode.recycle();
 
             if (edited) {
-                Toast.makeText(this, "Đã sửa mã " + codeText + " lên ảnh!", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Đã điền mã " + codeText + " lên ảnh!", Toast.LENGTH_SHORT).show();
             } else {
-                Log.w(TAG, "Không tìm thấy ô sửa mã trên ảnh, tiếp tục chờ xử lý...");
+                Log.w(TAG, "Không tìm thấy ô sửa mã trên ảnh, tiếp tục tiến trình...");
             }
         }
 
-        // Bước 4: Đợi chính xác 2 giây để hệ thống lưu file ảnh đã sửa xong, rồi tiến hành bấm nút thêm/xác nhận
+        // Bước 4: Đợi đúng 2 giây để hệ thống lưu xong, sau đó bấm nút xác nhận/thêm
         handler.postDelayed(this::clickSubmitButton, 2000);
     }
 
