@@ -444,13 +444,13 @@ public class FloatingWidgetService extends Service {
 
                 Thread.sleep(1500); // Đợi camera ảo tự động bơm ảnh xong
 
-                // --- BƯỚC 7.5: Tự động bấm nút xác nhận ảnh (nếu app BEST hiện màn hình xem trước) ---
+                // --- BƯỚC 7.5: Click vào nút thêm ảnh và để app tự bật Camera ảo ---
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
-                if (rootNode != null) {
-                    clickNodeByTextWithRetry(rootNode, "Dùng", 2, 1000);
-                    clickNodeByTextWithRetry(rootNode, "Xác nhận", 2, 1000);
-                    clickNodeByTextWithRetry(rootNode, "OK", 2, 1000);
-                }
+                clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/multiImageAdd", 3, 1000);
+                Thread.sleep(1000);
+
+                rootNode = AutoScrapeService.instance.getRootInActiveWindow();
+                clickNodeByTextWithRetry(rootNode, "Chụp ảnh", 3, 1000);
                 Thread.sleep(1000);
                 // --- BƯỚC 8: Click nút "Thêm" (`vAdd`) để hoàn tất ---
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
