@@ -363,6 +363,9 @@ public class AutoScrapeService extends AccessibilityService {
         return false;
     }
 
+    // =========================================================================
+    // HÀM XỬ LÝ CHỌN ẢNH THÔNG MINH: TỰ ĐỘNG TÌM THƯ MỤC "ImageDir" TRONG BỘ CHỌN TỆP
+    // =========================================================================
     public void clickAddPhotoButton() {
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
         if (rootNode != null) {
@@ -390,45 +393,103 @@ public class AutoScrapeService extends AccessibilityService {
             rootNode.recycle();
 
             if (clicked) {
-                Toast.makeText(this, "Đang mở Album ảnh...", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Đang mở giao diện chọn ảnh...", Toast.LENGTH_SHORT).show();
                 
-                handler.postDelayed(() -> {
-                    AccessibilityNodeInfo innerRoot = getRootInActiveWindow();
-                    if (innerRoot != null) {
-                        boolean selected = false;
-                        List<AccessibilityNodeInfo> textNodes = innerRoot.findAccessibilityNodeInfosByText("Chọn từ album");
-                        if (textNodes != null && !textNodes.isEmpty()) {
-                            for (AccessibilityNodeInfo node : textNodes) {
-                                if (node != null && node.isVisibleToUser()) {
-                                    Rect rect = new Rect();
-                                    node.getBoundsInScreen(rect);
-                                    if (rect.width() > 0 && rect.height() > 0) {
-                                        clickAtCoordinates(rect.centerX(), rect.centerY());
-                                        selected = true;
-                                        node.recycle();
-                                        break;
-                                    }
-                                }
-                                if (node != null) node.recycle();
-                            }
-                        }
-                        innerRoot.recycle();
-
-                        if (selected) {
-                            handler.postDelayed(() -> {
-                                clickAtCoordinates(200, 350); 
-                                Toast.makeText(this, "Đã chọn ảnh, chuẩn bị lưu...", Toast.LENGTH_SHORT).show();
-                                
-                                handler.postDelayed(this::clickSubmitButton, 1500);
-                            }, 1500);
-                        } else {
-                            Log.w(TAG, "Không tìm thấy chữ 'Chọn từ album'.");
-                        }
-                    }
-                }, 600);
+                // Chờ 1 giây để hệ thống mở bảng chọn file/thư mục lên, sau đó quét tìm thư mục ImageDir
+                handler.postDelayed(this::findAndClickImageDirFolder, 1000);
             } else {
                 Log.w(TAG, "Không tìm thấy nút thêm ảnh trên màn hình hiện tại.");
             }
+        }
+    }
+
+    // Tự động quét và bấm vào thư mục "ImageDir" trên màn hình quản lý file
+    private void findAndClickImageDirFolder() {
+        AccessibilityNodeInfo rootNode = getRootInActiveWindow();
+        if (rootNode != null) {
+            boolean clicked = false;
+            List<AccessibilityNodeInfo> nodes = rootNode.findAccessibilityNodeInfosByText("ImageDir");
+            
+            if (nodes != null && !nodes.isEmpty()) {
+                for (AccessibilityNodeInfo node : nodes) {
+                    if (node != null && node.isVisibleToUser()) {
+                        clicked = node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                        if (!clicked) {
+                            Rect rect = new Rect();
+                            node.getBoundsInScreen(rect);
+                            if (rect.width() > 0 && rect.height() > 0) {
+                                clickAtCoordinates(rect.centerX(), rect.centerY());
+                                clicked = true;
+                            }
+                        }
+                        node.recycle();
+                        break;
+                    }
+                    if (node != null) node.recycle();
+                }
+            }
+            rootNode.recycle();
+
+            if (clicked) {
+                Toast.makeText(this, "Đã mở thư mục ImageDir thành công!", Toast.LENGTH_SHORT).show();
+                // Chờ 1 giây để danh sách ảnh bên trong load lên, sau đó tiến hành chọn ảnh đầu tiên
+                handler.postDelayed(this::selectFirstImageInCurrentFolder, 1000);
+            } else {
+                Log.w(TAG, "Chưa tìm thấy thư mục ImageDir, thử tìm cách chọn trực tiếp ảnh gần nhất...");
+                // Phương án dự phòng: Nếu không thấy thư mục ImageDir, quét chọn ô ảnh đầu tiên có sẵn
+                handler.postDelayed(this::selectFirstImageInCurrentFolder, 1000);
+            }
+        }
+    }
+
+    // Quét và chọn tấm ảnh đầu tiên xuất hiện trong thư mục hiện tại
+    private void selectFirstImageInCurrentFolder() {
+        AccessibilityNodeInfo rootNode = getRootInActiveWindow();
+        if (rootNode != null) {
+            boolean selected = false;
+            List<AccessibilityNodeInfo> imageNodes = new ArrayList<>();
+            findImageViewsRecursive(rootNode, imageNodes);
+
+            for (AccessibilityNodeInfo imgNode : imageNodes) {
+                if (imgNode != null && imgNode.isVisibleToUser()) {
+                    Rect rect = new Rect();
+                    imgNode.getBoundsInScreen(rect);
+                    // Lọc ô ảnh có kích thước hợp lệ trên màn hình
+                    if (rect.width() > 100 && rect.height() > 100) {
+                        selected = imgNode.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                        if (!selected) {
+                            clickAtCoordinates(rect.centerX(), rect.centerY());
+                            selected = true;
+                        }
+                        imgNode.recycle();
+                        break;
+                    }
+                }
+                if (imgNode != null) imgNode.recycle();
+            }
+            rootNode.recycle();
+
+            if (selected) {
+                Toast.makeText(this, "Đã chọn ảnh, chuẩn bị xác nhận đơn...", Toast.LENGTH_SHORT).show();
+                // Đợi 1.5 giây sau khi chọn ảnh xong thì bấm nút xác nhận/submit hoàn tất đơn
+                handler.postDelayed(this::clickSubmitButton, 1500);
+            } else {
+                Log.w(TAG, "Không tìm thấy ảnh để chọn trong thư mục.");
+            }
+        }
+    }
+
+    // Hàm đệ quy phụ trợ giúp quét toàn bộ các ImageView/View chứa ảnh trên màn hình chọn tệp
+    private void findImageViewsRecursive(AccessibilityNodeInfo node, List<AccessibilityNodeInfo> results) {
+        if (node == null) return;
+        CharSequence className = node.getClassName();
+        if (className != null && (className.toString().contains("ImageView") || className.toString().contains("Image") || className.toString().contains("Grid"))) {
+            results.add(node);
+        }
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo child = node.getChild(i);
+            findImageViewsRecursive(child, results);
+            if (child != null) child.recycle();
         }
     }
 
