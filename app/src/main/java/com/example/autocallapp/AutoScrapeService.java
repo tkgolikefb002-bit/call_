@@ -154,21 +154,24 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // PHẦN 2: TIẾN TRÌNH XỬ LÝ (TÌM Ô TÌM KIẾM, DÁN VÀ BẤM XỬ LÝ)
+    // PHẦN 2: XỬ LÝ NÚT PLAY (TỰ ĐỘNG GÁN MÃ, TÌM KIẾM VÀ GỌI ĐƠN)
     // =========================================================================
     public void startAutoCallingSequence() {
-        if (isCallingProcessActive) return;
+        if (isCallingProcessActive) {
+            Toast.makeText(this, "Tiến trình tự động đang chạy...", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
         loadWaybillsForProcessing();
 
         if (waybillQueueList.isEmpty()) {
-            Toast.makeText(this, "Không có mã vận đơn nào trong danh sách! Hãy quét trước.", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Không có mã vận đơn nào! Hãy quét mã trước.", Toast.LENGTH_LONG).show();
             return;
         }
 
         isCallingProcessActive = true;
         currentCallIndex = 0;
-        Toast.makeText(this, "Bắt đầu tiến trình tự động (" + waybillQueueList.size() + " mã)...", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Bắt đầu chạy tự động (" + waybillQueueList.size() + " mã)...", Toast.LENGTH_SHORT).show();
         executeNextCallStep();
     }
 
@@ -188,58 +191,76 @@ public class AutoScrapeService extends AccessibilityService {
             handler.post(() -> FloatingWidgetService.instance.updateProgress(currentCallIndex));
         }
 
-        inputCodeToSearchBox(targetCode);
+        Log.d(TAG, "Đang xử lý mã thứ [" + currentCallIndex + "/" + waybillQueueList.size() + "]: " + targetCode);
+        
+        // Bắt đầu quy trình tìm ô nhập liệu và gán mã với 5 lần thử lại (Retry)
+        inputCodeToSearchBoxWithRetry(targetCode, 5);
     }
 
-    private void inputCodeToSearchBox(String codeText) {
+    private void inputCodeToSearchBoxWithRetry(String codeText, int retryCount) {
+        if (!isCallingProcessActive) return;
+
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
         if (rootNode != null) {
-            List<AccessibilityNodeInfo> searchBoxes = new ArrayList<>();
             try {
+                List<AccessibilityNodeInfo> searchBoxes = new ArrayList<>();
+                
+                // 1. Tìm kiếm theo hint ưu tiên
                 findEditTextByHintRecursive(rootNode, searchBoxes);
 
+                // 2. Nếu không thấy, tìm theo ID chuẩn của app
                 if (searchBoxes.isEmpty()) {
                     List<AccessibilityNodeInfo> byId = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/searchEditText");
                     if (byId != null) searchBoxes.addAll(byId);
                 }
-
-                boolean filled = false;
-                if (!searchBoxes.isEmpty()) {
-                    for (AccessibilityNodeInfo box : searchBoxes) {
-                        if (box != null) {
-                            try {
-                                box.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
-                                box.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                                
-                                Rect rect = new Rect();
-                                box.getBoundsInScreen(rect);
-                                if (rect.width() > 0 && rect.height() > 0) {
-                                    clickAtCoordinates(rect.centerX(), rect.centerY());
-                                }
-                                filled = true;
-                                break;
-                            } finally {
-                                box.recycle();
-                            }
-                        }
-                    }
+                
+                // 3. Nếu vẫn không thấy, lấy toàn bộ các ô EditText đang có trên màn hình
+                if (searchBoxes.isEmpty()) {
+                    findAllEditTextsRecursive(rootNode, searchBoxes);
                 }
 
-                if (filled) {
-                    handler.postDelayed(() -> performClipboardPasteAndSearch(codeText), 400);
-                } else {
-                    clickAtCoordinates(500, 150);
-                    handler.postDelayed(() -> performClipboardPasteAndSearch(codeText), 400);
+                if (!searchBoxes.isEmpty()) {
+                    AccessibilityNodeInfo box = searchBoxes.get(0);
+                    if (box != null && box.isVisibleToUser()) {
+                        try {
+                            // Lấy tọa độ ô nhập để click trực tiếp kích hoạt bàn phím/trạng thái focus chuẩn
+                            Rect rect = new Rect();
+                            box.getBoundsInScreen(rect);
+                            if (rect.width() > 0 && rect.height() > 0) {
+                                clickAtCoordinates(rect.centerX(), rect.centerY());
+                            } else {
+                                box.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
+                                box.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                            }
+
+                            // Đợi một nhịp ngắn sau khi click rồi tiến hành dán dữ liệu
+                            handler.postDelayed(() -> performClipboardPasteAndSearch(codeText), 400);
+                            return;
+                        } finally {
+                            box.recycle();
+                        }
+                    }
                 }
             } finally {
                 rootNode.recycle();
             }
+        }
+
+        // Nếu app chưa load kịp khung giao diện, thực hiện retry lại sau 400ms
+        if (retryCount > 0) {
+            handler.postDelayed(() -> inputCodeToSearchBoxWithRetry(codeText, retryCount - 1), 400);
         } else {
-            handler.postDelayed(this::executeNextCallStep, 500);
+            // Hết lượt tìm tự động, fallback bằng cách click vào vùng tọa độ phía trên và dán
+            Log.w(TAG, "Không tìm thấy ô nhập tự động bằng Node, dùng tọa độ mặc định cho mã: " + codeText);
+            clickAtCoordinates(500, 250);
+            handler.postDelayed(() -> performClipboardPasteAndSearch(codeText), 500);
         }
     }
 
     private void performClipboardPasteAndSearch(String codeText) {
+        if (!isCallingProcessActive) return;
+
+        // Đưa mã vào Clipboard hệ thống
         ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
         ClipData clip = ClipData.newPlainText("WaybillCode", codeText);
         if (clipboard != null) {
@@ -249,6 +270,7 @@ public class AutoScrapeService extends AccessibilityService {
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
         if (rootNode != null) {
             try {
+                // Thử dán trực tiếp vào node đang được focus bàn phím
                 AccessibilityNodeInfo focusedNode = rootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
                 if (focusedNode != null) {
                     try {
@@ -260,16 +282,30 @@ public class AutoScrapeService extends AccessibilityService {
                     } finally {
                         focusedNode.recycle();
                     }
+                } else {
+                    // Nếu không bắt được node focus, tìm ô EditText đầu tiên để dán ép buộc
+                    List<AccessibilityNodeInfo> editBoxes = new ArrayList<>();
+                    findAllEditTextsRecursive(rootNode, editBoxes);
+                    if (!editBoxes.isEmpty()) {
+                        AccessibilityNodeInfo box = editBoxes.get(0);
+                        try {
+                            box.performAction(AccessibilityNodeInfo.ACTION_PASTE);
+                            Bundle arguments = new Bundle();
+                            arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, codeText);
+                            box.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
+                        } finally {
+                            box.recycle();
+                        }
+                    }
                 }
             } finally {
                 rootNode.recycle();
             }
         }
 
-        clickAtCoordinates(500, 150);
-        Log.d(TAG, "Đã dán mã: " + codeText + ", chờ 1s để app lọc kết quả...");
-
-        handler.postDelayed(() -> verifyAndClickItemButton(codeText), 1000);
+        Log.d(TAG, "Đã thực hiện dán mã: " + codeText + ", chờ hệ thống lọc kết quả...");
+        // Chờ app phản hồi và lọc kết quả tìm kiếm, sau đó tiến hành click chọn mục đơn hàng tương ứng
+        handler.postDelayed(() -> verifyAndClickItemButton(codeText), 1200);
     }
 
     private void clickAtCoordinates(float x, float y) {
@@ -289,11 +325,9 @@ public class AutoScrapeService extends AccessibilityService {
         CharSequence className = node.getClassName();
         
         if (className != null && className.toString().contains("EditText")) {
-            if (hint != null && (hint.toString().contains("Nhập mã") || hint.toString().contains("vận đơn") || hint.toString().contains("Người nhận"))) {
+            if (hint != null && (hint.toString().toLowerCase().contains("nhập") || hint.toString().toLowerCase().contains("vận đơn") || hint.toString().toLowerCase().contains("tìm kiếm"))) {
                 results.add(node);
                 return;
-            } else if (results.isEmpty()) {
-                results.add(node);
             }
         }
 
@@ -306,11 +340,34 @@ public class AutoScrapeService extends AccessibilityService {
         }
     }
 
+    private void findAllEditTextsRecursive(AccessibilityNodeInfo node, List<AccessibilityNodeInfo> results) {
+        if (node == null) return;
+        
+        CharSequence className = node.getClassName();
+        if (className != null && className.toString().contains("EditText")) {
+            if (node.isVisibleToUser()) {
+                results.add(node);
+            }
+        }
+
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo child = node.getChild(i);
+            if (child != null) {
+                findAllEditTextsRecursive(child, results);
+                child.recycle();
+            }
+        }
+    }
+
     private void verifyAndClickItemButton(String codeText) {
+        if (!isCallingProcessActive) return;
+
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
         if (rootNode != null) {
             try {
                 boolean clicked = false;
+                
+                // 1. Tìm theo ID mã đơn hiển thị trong danh sách kết quả
                 List<AccessibilityNodeInfo> billNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvBillCode");
                 if (billNodes != null && !billNodes.isEmpty()) {
                     for (AccessibilityNodeInfo node : billNodes) {
@@ -334,11 +391,35 @@ public class AutoScrapeService extends AccessibilityService {
                     }
                 }
 
+                // 2. Nếu không thấy qua ID, tìm trực tiếp đoạn text chứa mã trên màn hình để click
+                if (!clicked) {
+                    List<AccessibilityNodeInfo> textNodes = rootNode.findAccessibilityNodeInfosByText(codeText);
+                    if (textNodes != null && !textNodes.isEmpty()) {
+                        for (AccessibilityNodeInfo node : textNodes) {
+                            if (node != null) {
+                                try {
+                                    if (node.isVisibleToUser()) {
+                                        Rect rect = new Rect();
+                                        node.getBoundsInScreen(rect);
+                                        if (rect.width() > 0 && rect.height() > 0) {
+                                            clickAtCoordinates(rect.centerX(), rect.centerY());
+                                            clicked = true;
+                                            break;
+                                        }
+                                    }
+                                } finally {
+                                    node.recycle();
+                                }
+                            }
+                        }
+                    }
+                }
+
                 if (clicked) {
-                    Toast.makeText(this, "Đang xử lý mã: " + codeText, Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Đã chọn mã: " + codeText, Toast.LENGTH_SHORT).show();
                 } else {
-                    Log.w(TAG, "Không tìm thấy nút mã vận đơn cho mã: " + codeText + ", chuyển sang mã tiếp theo.");
-                    handler.postDelayed(this::executeNextCallStep, 400);
+                    Log.w(TAG, "Không tìm thấy nút hoặc dòng hiển thị mã: " + codeText + ", bỏ qua và chuyển mã tiếp theo.");
+                    handler.postDelayed(this::executeNextCallStep, 500);
                 }
             } finally {
                 rootNode.recycle();
@@ -350,6 +431,7 @@ public class AutoScrapeService extends AccessibilityService {
 
     public void onCallFinished() {
         if (!isCallingProcessActive) return;
+        // Tiếp tục bước tiếp theo sau khi hoàn thành đơn hiện tại
         handler.postDelayed(this::executeNextCallStep, 1000);
     }
 
@@ -388,7 +470,7 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // PHẦN 3: CHÈN TRỰC TIẾP ẢNH TỪ ASSETS -> SỬA MÃ VẬN ĐƠN -> CHỜ 2S -> XÁC NHẬN
+    // PHẦN 3: XỬ LÝ CHÈN ẢNH VÀ XÁC NHẬN (NÚT CHỌN KIỆN)
     // =========================================================================
     
     public void clickAddPhotoButton() {
@@ -472,7 +554,7 @@ public class AutoScrapeService extends AccessibilityService {
         if (rootNode != null && !codeText.isEmpty()) {
             try {
                 List<AccessibilityNodeInfo> editBoxes = new ArrayList<>();
-                findEditTextByHintRecursive(rootNode, editBoxes);
+                findAllEditTextsRecursive(rootNode, editBoxes);
 
                 if (editBoxes.isEmpty()) {
                     List<AccessibilityNodeInfo> byId = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/etEditWaybill");
