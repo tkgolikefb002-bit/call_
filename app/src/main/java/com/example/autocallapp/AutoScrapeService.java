@@ -193,7 +193,6 @@ public class AutoScrapeService extends AccessibilityService {
 
         Log.d(TAG, "Đang xử lý mã thứ [" + currentCallIndex + "/" + waybillQueueList.size() + "]: " + targetCode);
         
-        // Bắt đầu quy trình tìm ô nhập liệu và gán mã với 5 lần thử lại (Retry)
         inputCodeToSearchBoxWithRetry(targetCode, 5);
     }
 
@@ -205,7 +204,6 @@ public class AutoScrapeService extends AccessibilityService {
             try {
                 List<AccessibilityNodeInfo> searchBoxes = new ArrayList<>();
                 
-                // Tìm kiếm ô nhập hoặc nút tìm kiếm trên màn hình hiện tại
                 findEditTextByHintRecursive(rootNode, searchBoxes);
 
                 if (searchBoxes.isEmpty()) {
@@ -232,7 +230,6 @@ public class AutoScrapeService extends AccessibilityService {
                                 box.performAction(AccessibilityNodeInfo.ACTION_CLICK);
                             }
 
-                            // Tăng thời gian chờ lên 800ms để đảm bảo app đã chuyển sang màn hình nhập liệu
                             handler.postDelayed(() -> performClipboardPasteAndSearch(codeText), 800);
                             return;
                         } finally {
@@ -245,7 +242,6 @@ public class AutoScrapeService extends AccessibilityService {
             }
         }
 
-        // Thử lại nếu chưa tìm thấy khung
         if (retryCount > 0) {
             handler.postDelayed(() -> inputCodeToSearchBoxWithRetry(codeText, retryCount - 1), 500);
         } else {
@@ -258,7 +254,6 @@ public class AutoScrapeService extends AccessibilityService {
     private void performClipboardPasteAndSearch(String codeText) {
         if (!isCallingProcessActive) return;
 
-        // Đưa mã vào Clipboard
         ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
         ClipData clip = ClipData.newPlainText("WaybillCode", codeText);
         if (clipboard != null) {
@@ -270,11 +265,9 @@ public class AutoScrapeService extends AccessibilityService {
             try {
                 boolean textSet = false;
                 
-                // Quét lại toàn bộ các ô EditText đang hiển thị trên màn hình mới mở
                 List<AccessibilityNodeInfo> editBoxes = new ArrayList<>();
                 findAllEditTextsRecursive(rootNode, editBoxes);
 
-                // Nếu tìm thấy ô nhập trên màn hình mới, tiến hành dán dữ liệu trực tiếp
                 if (!editBoxes.isEmpty()) {
                     for (AccessibilityNodeInfo box : editBoxes) {
                         if (box != null && box.isVisibleToUser()) {
@@ -282,16 +275,13 @@ public class AutoScrapeService extends AccessibilityService {
                                 box.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
                                 box.performAction(AccessibilityNodeInfo.ACTION_CLICK);
                                 
-                                // Dán từ clipboard
                                 box.performAction(AccessibilityNodeInfo.ACTION_PASTE);
                                 
-                                // Gán trực tiếp text dự phòng
                                 Bundle arguments = new Bundle();
                                 arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, codeText);
                                 box.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
                                 
                                 textSet = true;
-                                Log.setTag(TAG);
                                 Log.d(TAG, "Đã điền thành công mã vào ô EditText: " + codeText);
                                 break;
                             } finally {
@@ -301,7 +291,6 @@ public class AutoScrapeService extends AccessibilityService {
                     }
                 }
 
-                // Fallback nếu không quét được node EditText cụ thể
                 if (!textSet) {
                     AccessibilityNodeInfo focusedNode = rootNode.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
                     if (focusedNode != null) {
@@ -320,7 +309,6 @@ public class AutoScrapeService extends AccessibilityService {
             }
         }
 
-        // Chờ app lọc danh sách kết quả dựa trên mã vừa điền
         handler.postDelayed(() -> verifyAndClickItemButton(codeText), 1500);
     }
 
@@ -383,7 +371,6 @@ public class AutoScrapeService extends AccessibilityService {
             try {
                 boolean clicked = false;
                 
-                // 1. Tìm theo ID mã đơn hiển thị trong danh sách kết quả
                 List<AccessibilityNodeInfo> billNodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvBillCode");
                 if (billNodes != null && !billNodes.isEmpty()) {
                     for (AccessibilityNodeInfo node : billNodes) {
@@ -407,7 +394,6 @@ public class AutoScrapeService extends AccessibilityService {
                     }
                 }
 
-                // 2. Nếu không thấy qua ID, tìm trực tiếp đoạn text chứa mã trên màn hình để click
                 if (!clicked) {
                     List<AccessibilityNodeInfo> textNodes = rootNode.findAccessibilityNodeInfosByText(codeText);
                     if (textNodes != null && !textNodes.isEmpty()) {
@@ -447,7 +433,6 @@ public class AutoScrapeService extends AccessibilityService {
 
     public void onCallFinished() {
         if (!isCallingProcessActive) return;
-        // Tiếp tục bước tiếp theo sau khi hoàn thành đơn hiện tại
         handler.postDelayed(this::executeNextCallStep, 1000);
     }
 
