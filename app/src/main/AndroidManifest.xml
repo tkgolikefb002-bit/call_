@@ -37,16 +37,29 @@
             </intent-filter>
         </activity>
 
-        <!-- CAMERA ẢO: Đón lệnh chụp ảnh từ ứng dụng ngoài để tự động trả về ảnh mã vận đơn -->
-        <activity
-            android:name=".VirtualCameraActivity"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.media.action.IMAGE_CAPTURE" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-            </intent-filter>
-        </activity>
+        <!-- 1. Khai báo FileProvider để chia sẻ file ảnh an toàn giữa các app -->
+    <provider
+        android:name="androidx.core.content.FileProvider"
+        android:authorities="${applicationId}.fileprovider"
+        android:exported="false"
+        android:grantUriPermissions="true">
+        <meta-data
+            android:name="android.support.FILE_PROVIDER_PATHS"
+            android:resource="@xml/file_paths" />
+    </provider>
+
+    <!-- 2. Khai báo Camera ảo để đón lệnh chụp ảnh IMAGE_CAPTURE từ app ngoài -->
+    <activity
+        android:name=".VirtualCameraActivity"
+        android:exported="true"
+        android:screenOrientation="portrait"
+        android:theme="@style/Theme.AppCompat.NoActionBar">
+        <intent-filter>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+        </intent-filter>
+    </activity>
         <!-- MAIN ACTIVITY: Chứa cấu hình bộ lọc để nhận diện ứng dụng quay số mặc định -->
         <activity
             android:name=".MainActivity"
