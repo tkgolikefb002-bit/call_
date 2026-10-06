@@ -4,17 +4,11 @@ import android.app.Activity;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
-import android.widget.Button;
-
+import android.view.View;
+import android.widget.ImageButton;
+import android.widget.ImageView;
 import androidx.core.content.FileProvider;
-
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.io.OutputStream;
 
 public class VirtualCameraActivity extends Activity {
 
@@ -23,65 +17,42 @@ public class VirtualCameraActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_virtual_camera);
 
-        Button btnShutter = findViewById(R.id.virtual_shutter_button);
-        if (btnShutter != null) {
-            btnShutter.setOnClickListener(v -> processAndReturnImage());
+        ImageView imgPreview = findViewById(R.id.imgPreview);
+        ImageButton btnShutter = findViewById(R.id.btnShutter);
+
+        // Nạp sẵn file ma_van_don.jpg vào khung ngắm giả lập
+        File imageFile = new File(getFilesDir(), "ma_van_don.jpg");
+        if (imageFile.exists()) {
+            imgPreview.setImageURI(Uri.fromFile(imageFile));
         }
 
-        // Tự động hóa hoàn toàn: Bơm ảnh và trả về cho app BEST sau 400ms
-        new Handler(Looper.getMainLooper()).postDelayed(this::processAndReturnImage, 400);
-    }
+        // Khi bấm nút chụp trên máy ảnh ảo
+        btnShutter.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                try {
+                    if (imageFile.exists()) {
+                        Uri imageUri = FileProvider.getUriForFile(
+                                VirtualCameraActivity.this,
+                                getPackageName() + ".fileprovider",
+                                imageFile
+                        );
 
-    private void processAndReturnImage() {
-        try {
-            // 1. Lấy file ảnh mẫu có sẵn trong thư mục assets copy ra bộ nhớ trong
-            File sourceFile = new File(getFilesDir(), "ma_van_don.jpg");
-            if (!sourceFile.exists()) {
-                try (InputStream in = getAssets().open("default_parcel_image.jpg");
-                     OutputStream out = new FileOutputStream(sourceFile)) {
-                    byte[] buffer = new byte[1024];
-                    int read;
-                    while ((read = in.read(buffer)) != -1) {
-                        out.write(buffer, 0, read);
+                        Intent resultIntent = new Intent();
+                        resultIntent.setData(imageUri);
+                        resultIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        
+                        setResult(RESULT_OK, resultIntent);
+                    } else {
+                        setResult(RESULT_CANCELED);
                     }
-                    out.flush();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    setResult(RESULT_CANCELED);
                 }
+                
+                finish(); // Trả kết quả về cho app BEST ngay lập tức
             }
-
-            Intent resultIntent = new Intent();
-            Uri outputUri = null;
-
-            // 2. Kiểm tra xem app BEST có gửi kèm đường dẫn Uri yêu cầu ghi file hay không
-            if (getIntent() != null && getIntent().getExtras() != null) {
-                outputUri = (Uri) getIntent().getExtras().get(android.provider.MediaStore.EXTRA_OUTPUT);
-            }
-
-            if (outputUri != null) {
-                // Ghi thẳng dữ liệu ảnh vào Uri mà app BEST đang chờ đợi
-                try (InputStream in = new FileInputStream(sourceFile);
-                     OutputStream out = getContentResolver().openOutputStream(outputUri)) {
-                    byte[] buffer = new byte[1024];
-                    int read;
-                    while ((read = in.read(buffer)) != -1) {
-                        out.write(buffer, 0, read);
-                    }
-                    out.flush();
-                }
-            } else {
-                // Trả về dạng Uri thông qua FileProvider
-                Uri fileUri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", sourceFile);
-                resultIntent.setData(fileUri);
-                resultIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            }
-
-            // 3. Trả kết quả về cho Activity của app BEST
-            setResult(RESULT_OK, resultIntent);
-            finish();
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            setResult(RESULT_CANCELED);
-            finish();
-        }
+        });
     }
 }
