@@ -7,12 +7,10 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.widget.Button;
-import android.widget.Toast;
 
 import androidx.core.content.FileProvider;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -29,22 +27,25 @@ public class VirtualCameraActivity extends Activity {
             btnShutter.setOnClickListener(v -> triggerVirtualCapture());
         }
 
-        // Tự động hóa hoàn toàn: Kích hoạt trả ảnh luôn sau 400ms mà không cần chạm tay
-        new Handler(Looper.getMainLooper()).postDelayed(this::triggerVirtualCapture, 400);
+        // Tự động kích hoạt trả ảnh sau 300ms
+        new Handler(Looper.getMainLooper()).postDelayed(this::triggerVirtualCapture, 300);
     }
 
     private void triggerVirtualCapture() {
         try {
-            // Lấy đường dẫn file ảnh chuẩn trong thư mục nội bộ
+            // 1. Định nghĩa đích đến là file ma_van_don.jpg trong thư mục nội bộ
             File sourceFile = new File(getFilesDir(), "ma_van_don.jpg");
-            
-            // PHÒNG HỜ: Nếu vì lý do nào đó file chưa được tạo kịp, tự sinh một ảnh trắng chống lỗi
+
+            // 2. Nếu file chưa có, tự động copy từ thư mục assets (default_parcel_image.jpg) sang
             if (!sourceFile.exists()) {
-                android.graphics.Bitmap dummyBitmap = android.graphics.Bitmap.createBitmap(600, 800, android.graphics.Bitmap.Config.RGB_565);
-                dummyBitmap.eraseColor(android.graphics.Color.WHITE);
-                try (java.io.FileOutputStream fos = new java.io.FileOutputStream(sourceFile)) {
-                    dummyBitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 100, fos);
-                    fos.flush();
+                try (InputStream in = getAssets().open("default_parcel_image.jpg");
+                     OutputStream out = new FileOutputStream(sourceFile)) {
+                    byte[] buffer = new byte[1024];
+                    int read;
+                    while ((read = in.read(buffer)) != -1) {
+                        out.write(buffer, 0, read);
+                    }
+                    out.flush();
                 }
             }
 
@@ -57,7 +58,7 @@ public class VirtualCameraActivity extends Activity {
 
             if (outputUri != null) {
                 // Nếu app gọi yêu cầu ghi thẳng vào Uri của họ
-                try (InputStream in = new FileInputStream(sourceFile);
+                try (InputStream in = new java.io.FileInputStream(sourceFile);
                      OutputStream out = getContentResolver().openOutputStream(outputUri)) {
                     byte[] buffer = new byte[1024];
                     int read;
