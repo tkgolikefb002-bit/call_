@@ -16,8 +16,8 @@ import android.widget.Toast;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
 import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -364,11 +364,15 @@ public class AutoScrapeService extends AccessibilityService {
     }
 
     // =========================================================================
-    // LUỒNG CHỤP ẢNH & SỬA MÃ ĐẦY ĐỦ: BẤM CHỤP -> TÍCH V -> SỬA MÃ -> ĐỢI 2S -> THÊM
+    // PHẦN 3: LUỒNG LẤY 2 ẢNH TỪ ASSETS -> CHÈN -> SỬA MÃ -> CHỜ 2S -> THÊM
     // =========================================================================
     
-    // Bước 1: Bấm nút mở camera / chụp ảnh trong app
+    // Bước 1: Lấy 2 ảnh từ thư mục assets và mở giao diện thêm ảnh trên app
     public void clickAddPhotoButton() {
+        // Đồng bộ/copy 2 ảnh từ assets ra bộ nhớ ngoài của app để sẵn sàng sử dụng
+        copyAssetToFile("default_parcel_image.jpg");
+        copyAssetToFile("default_scene_image.jpg");
+
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
         if (rootNode != null) {
             boolean clicked = false;
@@ -377,7 +381,7 @@ public class AutoScrapeService extends AccessibilityService {
                 nodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/btnTakePhoto");
             }
             if (nodes == null || nodes.isEmpty()) {
-                nodes = rootNode.findAccessibilityNodeInfosByText("Chụp ảnh");
+                nodes = rootNode.findAccessibilityNodeInfosByText("Thêm ảnh");
             }
             
             if (nodes != null && !nodes.isEmpty()) {
@@ -398,109 +402,45 @@ public class AutoScrapeService extends AccessibilityService {
             rootNode.recycle();
 
             if (clicked) {
-                Toast.makeText(this, "Đang mở camera chụp ảnh...", Toast.LENGTH_SHORT).show();
-                handler.postDelayed(this::performCaptureAction, 1500);
+                Toast.makeText(this, "Đã lấy 2 ảnh từ assets, chuẩn bị sửa mã...", Toast.LENGTH_SHORT).show();
+                
+                // Lấy mã vận đơn hiện tại đang chạy
+                String currentCode = "";
+                if (currentCallIndex > 0 && currentCallIndex <= waybillQueueList.size()) {
+                    currentCode = waybillQueueList.get(currentCallIndex - 1);
+                }
+
+                // Bước 2: Sau 1.5 giây để giao diện ảnh hiển thị, tiến hành điền/sửa mã lên ảnh
+                handler.postDelayed(() -> performEditWaybillOnPhoto(currentCode), 1500);
             } else {
-                Log.w(TAG, "Không tìm thấy nút mở camera trên màn hình.");
+                Log.w(TAG, "Không tìm thấy nút thêm ảnh trên màn hình.");
             }
         }
     }
 
-    // Bước 2: Tự động bấm nút chụp ảnh
-    private void performCaptureAction() {
-        AccessibilityNodeInfo rootNode = getRootInActiveWindow();
-        boolean captured = false;
-        
-        if (rootNode != null) {
-            List<AccessibilityNodeInfo> captureNodes = rootNode.findAccessibilityNodeInfosByViewId("com.sec.android.app.camerafiles:id/shutter_btn");
-            if (captureNodes == null || captureNodes.isEmpty()) {
-                captureNodes = rootNode.findAccessibilityNodeInfosByViewId("com.android.camera:id/shutter_button");
-            }
-            
-            if (captureNodes != null && !captureNodes.isEmpty()) {
-                for (AccessibilityNodeInfo node : captureNodes) {
-                    if (node != null && node.isVisibleToUser()) {
-                        Rect rect = new Rect();
-                        node.getBoundsInScreen(rect);
-                        if (rect.width() > 0 && rect.height() > 0) {
-                            clickAtCoordinates(rect.centerX(), rect.centerY());
-                            captured = true;
-                            node.recycle();
-                            break;
-                        }
-                    }
-                    if (node != null) node.recycle();
+    // Hàm hỗ trợ chép file từ assets ra bộ nhớ ứng dụng
+    private File copyAssetToFile(String assetFileName) {
+        File outFile = new File(getExternalFilesDir(null), assetFileName);
+        try {
+            if (!outFile.exists()) {
+                InputStream in = getAssets().open(assetFileName);
+                FileOutputStream out = new FileOutputStream(outFile);
+                byte[] buffer = new byte[1024];
+                int read;
+                while ((read = in.read(buffer)) != -1) {
+                    out.write(buffer, 0, read);
                 }
+                in.close();
+                out.flush();
+                out.close();
             }
-            rootNode.recycle();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-
-        if (!captured) {
-            clickAtCoordinates(500, 2150); 
-        }
-
-        Toast.makeText(this, "Đã chụp 1 tấm ảnh, chuẩn bị bấm tích...", Toast.LENGTH_SHORT).show();
-        handler.postDelayed(this::clickCheckMarkButton, 1000);
+        return outFile;
     }
 
-    // Bước 3: Tự động bấm nút tích v (xác nhận ảnh vừa chụp)
-    private void clickCheckMarkButton() {
-        AccessibilityNodeInfo rootNode = getRootInActiveWindow();
-        if (rootNode != null) {
-            boolean checked = false;
-            
-            List<AccessibilityNodeInfo> nodes = rootNode.findAccessibilityNodeInfosByViewId("com.sec.android.app.camerafiles:id/done");
-            if (nodes == null || nodes.isEmpty()) {
-                nodes = rootNode.findAccessibilityNodeInfosByViewId("com.android.camera:id/done_button");
-            }
-            if (nodes == null || nodes.isEmpty()) {
-                nodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/btnDone");
-            }
-            if (nodes == null || nodes.isEmpty()) {
-                nodes = rootNode.findAccessibilityNodeInfosByText("Xác nhận");
-            }
-            if (nodes == null || nodes.isEmpty()) {
-                nodes = rootNode.findAccessibilityNodeInfosByText("OK");
-            }
-
-            if (nodes != null && !nodes.isEmpty()) {
-                for (AccessibilityNodeInfo node : nodes) {
-                    if (node != null && node.isVisibleToUser()) {
-                        Rect rect = new Rect();
-                        node.getBoundsInScreen(rect);
-                        if (rect.width() > 0 && rect.height() > 0) {
-                            clickAtCoordinates(rect.centerX(), rect.centerY());
-                            checked = true;
-                            node.recycle();
-                            break;
-                        }
-                    }
-                    if (node != null) node.recycle();
-                }
-            }
-            rootNode.recycle();
-
-            if (!checked) {
-                clickAtCoordinates(950, 2200);
-            }
-
-            Toast.makeText(this, "Đã bấm tích v! Tiến hành sửa mã lên ảnh...", Toast.LENGTH_SHORT).show();
-            
-            // Lấy mã đơn hiện tại để tiến hành điền/sửa lên ảnh
-            String currentCode = "";
-            if (currentCallIndex > 0 && currentCallIndex <= waybillQueueList.size()) {
-                currentCode = waybillQueueList.get(currentCallIndex - 1);
-            }
-
-            // Bước 4: Gọi thao tác điền/sửa mã vận đơn lên giao diện chỉnh sửa ảnh sau 1 giây
-            handler.postDelayed(() -> performEditWaybillOnPhoto(currentCode), 1000);
-        } else {
-            clickAtCoordinates(950, 2200);
-            handler.postDelayed(() -> performEditWaybillOnPhoto(""), 1000);
-        }
-    }
-
-    // Bước 4: Thao tác tìm ô sửa mã trên giao diện ảnh, dán mã vào
+    // Bước 3: Thao tác tìm ô sửa mã trên ảnh, dán mã vận đơn vào
     private void performEditWaybillOnPhoto(String codeText) {
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
         if (rootNode != null && !codeText.isEmpty()) {
@@ -546,7 +486,7 @@ public class AutoScrapeService extends AccessibilityService {
             }
         }
 
-        // Bước 5: Đợi chính xác 2 giây để hệ thống lưu file ảnh đã sửa xong, rồi bấm nút thêm
+        // Bước 4: Đợi chính xác 2 giây để hệ thống lưu file ảnh đã sửa xong, rồi tiến hành bấm nút thêm/xác nhận
         handler.postDelayed(this::clickSubmitButton, 2000);
     }
 
@@ -566,7 +506,7 @@ public class AutoScrapeService extends AccessibilityService {
         }
     }
 
-    // Bước 6: Bấm nút xác nhận / thêm đơn hàng hoàn tất
+    // Bước 5: Bấm nút xác nhận / thêm đơn hàng hoàn tất
     public void clickSubmitButton() {
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
         if (rootNode != null) {
