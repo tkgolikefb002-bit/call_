@@ -432,13 +432,21 @@ public class FloatingWidgetService extends Service {
                 clickNodeByTextWithRetry(rootNode, "Khách không đặt hàng", 3, 1000);
                 Thread.sleep(1000);
 
-                // --- BƯỚC 7: Mở menu thêm ảnh và bấm "Chụp ảnh" để hệ thống tự gọi Camera ảo ---
+                // --- BƯỚC 7: Mở menu thêm ảnh và bấm "Thư viện" hoặc "Album" ---
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/multiImageAdd", 3, 1000);
                 Thread.sleep(1000);
 
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
-                clickNodeByTextWithRetry(rootNode, "Chụp ảnh", 3, 1000);
+                // Thay vì bấm "Chụp ảnh", ta bấm chọn qua Thư viện/Album để kích hoạt Intent lấy ảnh có sẵn
+                boolean clickedLib = clickNodeByTextWithRetry(rootNode, "Thư viện", 3, 1000);
+                if (!clickedLib) {
+                    clickedLib = clickNodeByTextWithRetry(rootNode, "Album", 3, 1000);
+                }
+                if (!clickedLib) {
+                    clickNodeByTextWithRetry(rootNode, "Chọn từ thiết bị", 3, 1000);
+                }
+                
                 Thread.sleep(2000);
                 
                 // --- BƯỚC 8: Click nút "Thêm" (`vAdd`) để hoàn tất ---
