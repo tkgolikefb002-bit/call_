@@ -130,7 +130,7 @@ public class FloatingWidgetService extends Service {
             Button btnSearch = floatingView.findViewById(R.id.btnSearch);
             if (btnSearch != null) {
                 btnSearch.setOnClickListener(v -> {
-                    if (AutoScrapeService.instance != null) {
+                    if (MyAccessibilityService.instance != null) {
                         updateProgress(0);
                     } else {
                         showToastOnMainThread("Vui lòng bật Quyền Trợ năng (Accessibility) trước!");
@@ -282,17 +282,17 @@ public class FloatingWidgetService extends Service {
                     break;
                 }
 
-                if (AutoScrapeService.instance == null || AutoScrapeService.instance.getRootInActiveWindow() == null) {
+                if (MyAccessibilityService.instance == null || MyAccessibilityService.instance.getRootInActiveWindow() == null) {
                     try { Thread.sleep(2000); } catch (InterruptedException e) { e.printStackTrace(); }
                     continue;
                 }
 
-                AccessibilityNodeInfo rootNode = AutoScrapeService.instance.getRootInActiveWindow();
+                AccessibilityNodeInfo rootNode = MyAccessibilityService.instance.getRootInActiveWindow();
                 if (typeTrackingNumberIntoApp(rootNode, trackingNumber)) {
                     try { Thread.sleep(1500); } catch (InterruptedException e) { e.printStackTrace(); }
                 }
 
-                rootNode = AutoScrapeService.instance.getRootInActiveWindow();
+                rootNode = MyAccessibilityService.instance.getRootInActiveWindow();
                 triggerCallAction(rootNode);
                 try { Thread.sleep(2000); } catch (InterruptedException e) { e.printStackTrace(); }
 
@@ -332,8 +332,8 @@ public class FloatingWidgetService extends Service {
             }
             try {
                 Thread.sleep(delayMs);
-                if (AutoScrapeService.instance != null) {
-                    rootNode = AutoScrapeService.instance.getRootInActiveWindow();
+                if (MyAccessibilityService.instance != null) {
+                    rootNode = MyAccessibilityService.instance.getRootInActiveWindow();
                 }
             } catch (InterruptedException e) {
                 e.printStackTrace();
