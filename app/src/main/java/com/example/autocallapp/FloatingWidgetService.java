@@ -179,7 +179,20 @@ public class FloatingWidgetService extends Service {
             Button btnAttachImages = floatingView.findViewById(R.id.btnAttachImages);
             if (btnAttachImages != null) {
                 btnAttachImages.setOnClickListener(v -> {
-                    Toast.makeText(this, "Đang thực hiện gắn ảnh quang cảnh...", Toast.LENGTH_SHORT).show();
+                    String nextTrackingNumber = getNextTrackingNumberFromSavedList();
+                    if (nextTrackingNumber == null || nextTrackingNumber.isEmpty()) {
+                        Toast.makeText(this, "Không tìm thấy mã vận đơn để gắn ảnh!", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    Toast.makeText(this, "Đang chuẩn bị và gắn ảnh cho mã: " + nextTrackingNumber, Toast.LENGTH_SHORT).show();
+                    
+                    Uri editedParcelUri = prepareParcelImages(nextTrackingNumber);
+                    if (editedParcelUri != null) {
+                        executeFullAutomationSteps(nextTrackingNumber, editedParcelUri);
+                    } else {
+                        Toast.makeText(this, "Lỗi tạo ảnh chỉnh sửa!", Toast.LENGTH_SHORT).show();
+                    }
                 });
             }
 
@@ -249,11 +262,8 @@ public class FloatingWidgetService extends Service {
     private Uri prepareParcelImages(String trackingNumber) {
         try {
             Bitmap originalParcelBitmap = BitmapFactory.decodeStream(getAssets().open("default_parcel_image.jpg"));
-            // Lưu trực tiếp file vào thư mục nội bộ app để Camera ảo đọc
             File cacheFile = new File(getFilesDir(), "ma_van_don.jpg");
             
-            // Gọi hàm tạo ảnh của bạn và lưu vào cacheFile
-            // (Hoặc nếu ImageUtils trả về Uri, bạn có thể copy nội dung sang cacheFile này)
             Uri editedParcelUri = ImageUtils.createModifiedParcelImage(this, originalParcelBitmap, trackingNumber);
             
             return editedParcelUri;
@@ -308,13 +318,11 @@ public class FloatingWidgetService extends Service {
     private boolean triggerCallAction(AccessibilityNodeInfo rootNode) {
         if (rootNode == null) return false;
 
-        // Ưu tiên tuyệt đối: Click vào đúng ID chứa SĐT / nút gọi trên app BEST[cite: 1]
         boolean clicked = clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/tvPhoneNub", 3, 500);
         if (clicked) {
             return true;
         }
 
-        // Dự phòng các ID phụ khác nếu có
         String[] fallbackIds = {
             "com.best.android.vietcourier:id/ivCall",
             "com.best.android.vietcourier:id/img_call",
@@ -326,7 +334,6 @@ public class FloatingWidgetService extends Service {
             }
         }
 
-        // Dự phòng cuối cùng: Gọi qua service hệ thống
         if (AutoScrapeService.instance != null) {
             AutoScrapeService.instance.startAutoCallingSequence();
             return true;
@@ -380,15 +387,7 @@ public class FloatingWidgetService extends Service {
     }
 
     /**
-     * Chuỗi quy trình đầy đủ 8 bước khi bấm nút "Chọn Kiện" (📦):
-     * 1. Dán mã vào khung
-     * 2. Bấm gọi điện (`tvPhoneNub`)[cite: 1]
-     * 3. Tích chọn checkbox của mã (`ivSelect`)[cite: 1]
-     * 4. Click "Kiện vấn đề" (`tvDeliveryFailed`)[cite: 1]
-     * 5. Chọn lý do "Người nhận không nhận kiện hàng"[cite: 1]
-     * 6. Chọn phân loại "Khách không đặt hàng"[cite: 1]
-     * 7. Click ô thêm ảnh (`multiImageAdd`) -> Gọi Intent hệ thống nạp ảnh động[cite: 1]
-     * 8. Click nút "Thêm" (`vAdd`) để hoàn tất[cite: 1]
+     * Chuỗi quy trình đầy đủ 8 bước khi bấm nút "Chọn Kiện" (📦)[cite: 1]:
      */
     private void executeFullAutomationSteps(String trackingNumber, Uri imageUri) {
         if (AutoScrapeService.instance == null) {
@@ -438,7 +437,6 @@ public class FloatingWidgetService extends Service {
                 Thread.sleep(1000);
 
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
-                // Thay vì bấm "Chụp ảnh", ta bấm chọn qua Thư viện/Album để kích hoạt Intent lấy ảnh có sẵn
                 boolean clickedLib = clickNodeByTextWithRetry(rootNode, "Thư viện", 3, 1000);
                 if (!clickedLib) {
                     clickedLib = clickNodeByTextWithRetry(rootNode, "Album", 3, 1000);
@@ -449,7 +447,7 @@ public class FloatingWidgetService extends Service {
                 
                 Thread.sleep(2000);
                 
-                // --- BƯỚC 8: Click nút "Thêm" (`vAdd`) để hoàn tất ---
+                // --- BƯỚC 8: Click nút "Thêm" (`vAdd`) để hoàn tất[cite: 1] ---
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 boolean clickedAddButton = clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/vAdd", 3, 1000);
                 if (!clickedAddButton) {
