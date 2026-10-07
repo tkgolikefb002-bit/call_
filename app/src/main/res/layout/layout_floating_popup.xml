@@ -44,7 +44,7 @@
             android:textSize="14sp" />
     </LinearLayout>
 
-    <!-- Hàng 3 nút bấm cũ -->
+    <!-- Hàng nút bấm chính -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -79,39 +79,6 @@
             android:backgroundTint="#F44336"
             android:text="🗑"
             android:textSize="16sp" />
-    </LinearLayout>
-
-    <!-- ===== HÀNG 2 NÚT MỚI THÊM ===== -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:gravity="center"
-        android:orientation="horizontal">
-
-        <!-- Nút Tự động gắn 2 ảnh -->
-        <Button
-            android:id="@+id/btnAttachImages"
-            android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_weight="1"
-            android:layout_marginEnd="4dp"
-            android:backgroundTint="#9C27B0"
-            android:text="🖼 Gắn Ảnh"
-            android:textColor="#FFFFFF"
-            android:textSize="12sp" />
-
-        <!-- Nút Tự động chọn kiện -->
-        <Button
-            android:id="@+id/btnSelectParcel"
-            android:layout_width="0dp"
-            android:layout_height="40dp"
-            android:layout_weight="1"
-            android:layout_marginStart="4dp"
-            android:backgroundTint="#009688"
-            android:text="📦 Chọn Kiện"
-            android:textColor="#FFFFFF"
-            android:textSize="12sp" />
     </LinearLayout>
 
 </LinearLayout>
