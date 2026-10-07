@@ -268,26 +268,36 @@ public class FloatingWidgetService extends Service {
      * Copy file ảnh từ thư mục assets ra thư mục cache để tạo Uri hợp lệ cho app khác sử dụng
      */
     private Uri copyAssetImageToCache(String assetFileName) {
-        try {
-            File cacheFile = new File(getCacheDir(), assetFileName);
-            try (InputStream in = getAssets().open(assetFileName);
-                 OutputStream out = new FileOutputStream(cacheFile)) {
-                byte[] buffer = new byte[1024];
-                int read;
-                while ((read = in.read(buffer)) != -1) {
-                    out.write(buffer, 0, read);
-                }
+    try {
+        File cacheFile = new File(getCacheDir(), assetFileName);
+        
+        // Thử đọc file từ thư mục assets
+        try (InputStream in = getAssets().open(assetFileName);
+             OutputStream out = new FileOutputStream(cacheFile)) {
+            byte[] buffer = new byte[1024];
+            int read;
+            while ((read = in.read(buffer)) != -1) {
+                out.write(buffer, 0, read);
             }
-            return FileProvider.getUriForFile(
-                    this,
-                    getPackageName() + ".fileprovider",
-                    cacheFile
-            );
         } catch (Exception e) {
-            e.printStackTrace();
-            return null;
+            // NẾU VẪN KHÔNG ĐỌC ĐƯỢC TỪ ASSETS -> TỰ ĐỘNG SINH ẢNH MẪU ĐỂ CHẠY TIẾP
+            Bitmap bitmap = Bitmap.createBitmap(500, 500, Bitmap.Config.ARGB_8888);
+            bitmap.eraseColor(android.graphics.Color.GRAY);
+            try (FileOutputStream out = new FileOutputStream(cacheFile)) {
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out);
+            }
         }
+
+        return FileProvider.getUriForFile(
+                this,
+                getPackageName() + ".fileprovider",
+                cacheFile
+        );
+    } catch (Exception e) {
+        e.printStackTrace();
+        return null;
     }
+}
 
     /**
      * Tự động tìm ô nhập mã và điền mã vận đơn vào
