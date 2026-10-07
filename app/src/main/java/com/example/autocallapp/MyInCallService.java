@@ -1,5 +1,6 @@
 package com.example.autocallapp;
 
+import com.example.autocrape.AutoScrapeService;
 import android.content.ContentValues;
 import android.content.Intent;
 import android.content.SharedPreferences;
