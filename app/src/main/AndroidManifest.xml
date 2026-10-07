@@ -65,40 +65,6 @@
             android:showWhenLocked="true"
             android:turnScreenOn="true" />
 
-        <!-- CAMERA ẢO & FILE PROVIDER -->
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
-        </provider>
-
-        <activity
-            android:name=".VirtualCameraActivity"
-            android:exported="true"
-            android:screenOrientation="portrait"
-            android:theme="@style/Theme.AppCompat.NoActionBar">
-            
-            <intent-filter>
-                <action android:name="android.media.action.IMAGE_CAPTURE" />
-                <action android:name="android.media.action.IMAGE_CAPTURE_SECURE" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-            </intent-filter>
-
-            <!-- Lắng nghe thêm các Intent chọn ảnh từ bộ sưu tập để chiếm quyền triệt để nếu app gọi qua bộ lọc thư viện -->
-            <intent-filter>
-                <action android:name="android.intent.action.GET_CONTENT" />
-                <action android:name="android.intent.action.PICK" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.OPENABLE" />
-                <data android:mimeType="image/*" />
-            </intent-filter>
-        </activity>
-
         <receiver
             android:name=".CallReceiver"
             android:exported="true">
@@ -135,18 +101,6 @@
             android:name=".FloatingWidgetService" 
             android:exported="false"
             android:foregroundServiceType="specialUse" />
-
-        <service
-            android:name=".AutoScrapeService"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/accessibility_service_config" />
-        </service>
 
         <service
             android:name=".MyAccessibilityService"
