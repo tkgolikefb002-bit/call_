@@ -6,7 +6,6 @@ import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Intent;
 import android.graphics.PixelFormat;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -22,12 +21,8 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.core.app.NotificationCompat;
-import androidx.core.content.FileProvider;
 
 import java.io.File;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.FileOutputStream;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
@@ -135,7 +130,7 @@ public class FloatingWidgetService extends Service {
             Button btnSearch = floatingView.findViewById(R.id.btnSearch);
             if (btnSearch != null) {
                 btnSearch.setOnClickListener(v -> {
-                    if (AutoCallAccessibilityService.instance != null) {
+                    if (AutoScrapeService.instance != null) {
                         updateProgress(0);
                     } else {
                         showToastOnMainThread("Vui lòng bật Quyền Trợ năng (Accessibility) trước!");
@@ -146,16 +141,6 @@ public class FloatingWidgetService extends Service {
             Button btnDelete = floatingView.findViewById(R.id.btnDelete);
             if (btnDelete != null) {
                 btnDelete.setOnClickListener(v -> clearSavedDataFile());
-            }
-
-            Button btnAttachImages = floatingView.findViewById(R.id.btnAttachImages);
-            if (btnAttachImages != null) {
-                btnAttachImages.setOnClickListener(v -> handleParcelAutomationFullSequence());
-            }
-
-            Button btnSelectParcel = floatingView.findViewById(R.id.btnSelectParcel);
-            if (btnSelectParcel != null) {
-                btnSelectParcel.setOnClickListener(v -> handleParcelAutomationFullSequence());
             }
 
         } catch (Exception e) {
@@ -231,35 +216,6 @@ public class FloatingWidgetService extends Service {
         }
     }
 
-    private Uri copyAssetImageToCache(String assetFileName) {
-        try {
-            File imageDir = new File(getCacheDir(), "ImageDir");
-            if (!imageDir.exists()) {
-                imageDir.mkdirs();
-            }
-
-            File cacheFile = new File(imageDir, assetFileName);
-            
-            try (InputStream in = getAssets().open(assetFileName);
-                 OutputStream out = new FileOutputStream(cacheFile)) {
-                byte[] buffer = new byte[1024];
-                int read;
-                while ((read = in.read(buffer)) != -1) {
-                    out.write(buffer, 0, read);
-                }
-            }
-
-            return FileProvider.getUriForFile(
-                    this,
-                    getPackageName() + ".fileprovider",
-                    cacheFile
-            );
-        } catch (Exception e) {
-            e.printStackTrace();
-            return null;
-        }
-    }
-
     private boolean typeTrackingNumberIntoApp(AccessibilityNodeInfo rootNode, String trackingNumber) {
         if (rootNode == null) return false;
 
@@ -326,17 +282,17 @@ public class FloatingWidgetService extends Service {
                     break;
                 }
 
-                if (AutoCallAccessibilityService.instance == null || AutoCallAccessibilityService.instance.getRootInActiveWindow() == null) {
+                if (AutoScrapeService.instance == null || AutoScrapeService.instance.getRootInActiveWindow() == null) {
                     try { Thread.sleep(2000); } catch (InterruptedException e) { e.printStackTrace(); }
                     continue;
                 }
 
-                AccessibilityNodeInfo rootNode = AutoCallAccessibilityService.instance.getRootInActiveWindow();
+                AccessibilityNodeInfo rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 if (typeTrackingNumberIntoApp(rootNode, trackingNumber)) {
                     try { Thread.sleep(1500); } catch (InterruptedException e) { e.printStackTrace(); }
                 }
 
-                rootNode = AutoCallAccessibilityService.instance.getRootInActiveWindow();
+                rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 triggerCallAction(rootNode);
                 try { Thread.sleep(2000); } catch (InterruptedException e) { e.printStackTrace(); }
 
@@ -351,85 +307,6 @@ public class FloatingWidgetService extends Service {
             }
             isRunning = false;
         }).start();
-    }
-
-    private void executeFullAutomationSteps(String trackingNumber, Uri imageUri) {
-        if (AutoCallAccessibilityService.instance == null) {
-            showToastOnMainThread("Chưa bật Quyền Trợ năng (Accessibility) trước!");
-            return;
-        }
-
-        new Thread(() -> {
-            try {
-                Thread.sleep(1000);
-                AccessibilityNodeInfo rootNode = AutoCallAccessibilityService.instance.getRootInActiveWindow();
-                if (rootNode == null) return;
-
-                typeTrackingNumberIntoApp(rootNode, trackingNumber);
-                Thread.sleep(1500);
-
-                rootNode = AutoCallAccessibilityService.instance.getRootInActiveWindow();
-                triggerCallAction(rootNode);
-                Thread.sleep(2500);
-
-                rootNode = AutoCallAccessibilityService.instance.getRootInActiveWindow();
-                clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/ivSelect", 3, 1000);
-                Thread.sleep(1000);
-
-                rootNode = AutoCallAccessibilityService.instance.getRootInActiveWindow();
-                clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/tvDeliveryFailed", 3, 1000);
-                Thread.sleep(1000);
-
-                rootNode = AutoCallAccessibilityService.instance.getRootInActiveWindow();
-                clickNodeByTextWithRetry(rootNode, "Người nhận không nhận kiện hàng", 3, 1000);
-                Thread.sleep(1000);
-
-                rootNode = AutoCallAccessibilityService.instance.getRootInActiveWindow();
-                clickNodeByTextWithRetry(rootNode, "Khách không đặt hàng", 3, 1000);
-                Thread.sleep(1000);
-
-                rootNode = AutoCallAccessibilityService.instance.getRootInActiveWindow();
-                clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/multiImageAdd", 3, 1000);
-                Thread.sleep(1000);
-
-                rootNode = AutoCallAccessibilityService.instance.getRootInActiveWindow();
-                boolean clickedLib = clickNodeByTextWithRetry(rootNode, "Thư viện", 3, 1000);
-                if (!clickedLib) {
-                    clickedLib = clickNodeByTextWithRetry(rootNode, "Album", 3, 1000);
-                }
-                if (!clickedLib) {
-                    clickNodeByTextWithRetry(rootNode, "Chọn từ thiết bị", 3, 1000);
-                }
-                
-                Thread.sleep(2000);
-                
-                rootNode = AutoCallAccessibilityService.instance.getRootInActiveWindow();
-                if (!clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/vAdd", 3, 1000)) {
-                    clickNodeByTextWithRetry(rootNode, "Thêm", 3, 1000);
-                }
-                
-                showToastOnMainThread("Đã hoàn tất 8 bước xử lý kiện hàng!");
-
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }).start();
-    }
-
-    public void handleParcelAutomationFullSequence() {
-        String nextTrackingNumber = getNextTrackingNumberFromSavedList();
-
-        if (nextTrackingNumber == null || nextTrackingNumber.isEmpty()) {
-            showToastOnMainThread("Không tìm thấy mã vận đơn trong danh sách đã lưu!");
-            return;
-        }
-
-        Uri assetImageUri = copyAssetImageToCache("default_parcel_image.jpg");
-        if (assetImageUri != null) {
-            executeFullAutomationSteps(nextTrackingNumber, assetImageUri);
-        } else {
-            showToastOnMainThread("Không thể lấy ảnh từ assets!");
-        }
     }
 
     private boolean clickNodeByIdWithRetry(AccessibilityNodeInfo rootNode, String resourceId, int maxRetries, long delayMs) {
@@ -455,41 +332,8 @@ public class FloatingWidgetService extends Service {
             }
             try {
                 Thread.sleep(delayMs);
-                if (AutoCallAccessibilityService.instance != null) {
-                    rootNode = AutoCallAccessibilityService.instance.getRootInActiveWindow();
-                }
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
-        return false;
-    }
-
-    private boolean clickNodeByTextWithRetry(AccessibilityNodeInfo rootNode, String text, int maxRetries, long delayMs) {
-        for (int i = 0; i < maxRetries; i++) {
-            if (rootNode == null) return false;
-            List<AccessibilityNodeInfo> list = rootNode.findAccessibilityNodeInfosByText(text);
-            if (list != null && !list.isEmpty()) {
-                for (AccessibilityNodeInfo node : list) {
-                    if (node.isClickable()) {
-                        node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                        return true;
-                    } else {
-                        AccessibilityNodeInfo parent = node.getParent();
-                        while (parent != null) {
-                            if (parent.isClickable()) {
-                                parent.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                                return true;
-                            }
-                            parent = parent.getParent();
-                        }
-                    }
-                }
-            }
-            try {
-                Thread.sleep(delayMs);
-                if (AutoCallAccessibilityService.instance != null) {
-                    rootNode = AutoCallAccessibilityService.instance.getRootInActiveWindow();
+                if (AutoScrapeService.instance != null) {
+                    rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 }
             } catch (InterruptedException e) {
                 e.printStackTrace();
