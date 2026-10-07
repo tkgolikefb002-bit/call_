@@ -23,7 +23,6 @@ public class MyAccessibilityService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        // Tự động bắt và lưu root node khi có tương tác trong app BEST
         if (event.getPackageName() != null && event.getPackageName().toString().contains("best")) {
             AccessibilityNodeInfo root = getRootInActiveWindow();
             if (root != null) {
@@ -32,7 +31,12 @@ public class MyAccessibilityService extends AccessibilityService {
         }
     }
 
-    // Phương thức lấy root node an toàn, tránh lỗi mất focus từ bảng nổi
+    // Bổ sung phương thức để MyInCallService gọi khi kết thúc cuộc gọi
+    public void onCallFinished() {
+        // Thực hiện các hành động tiếp theo sau khi gọi xong nếu cần
+    }
+
+    // Phương thức lấy root node an toàn
     public static AccessibilityNodeInfo getRootNodeSafely(AccessibilityService service) {
         if (service != null) {
             AccessibilityNodeInfo root = service.getRootInActiveWindow();
@@ -45,6 +49,5 @@ public class MyAccessibilityService extends AccessibilityService {
 
     @Override
     public void onInterrupt() {
-        // Xử lý khi service bị gián đoạn
     }
 }
