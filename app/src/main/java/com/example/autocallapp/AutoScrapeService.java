@@ -481,30 +481,34 @@ public class AutoScrapeService extends AccessibilityService {
         AccessibilityNodeInfo rootNode = getRootInActiveWindow();
         if (rootNode != null) {
             try {
-                boolean clicked = false;
-                List<AccessibilityNodeInfo> nodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/ivAddPhoto");
-                if (nodes == null || nodes.isEmpty()) {
-                    nodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/btnTakePhoto");
-                }
-                if (nodes == null || nodes.isEmpty()) {
-                    nodes = rootNode.findAccessibilityNodeInfosByText("Thêm ảnh");
-                }
-                
-                if (nodes != null && !nodes.isEmpty()) {
-                    for (AccessibilityNodeInfo node : nodes) {
-                        if (node != null) {
-                            try {
-                                if (node.isVisibleToUser()) {
-                                    Rect rect = new Rect();
-                                    node.getBoundsInScreen(rect);
-                                    if (rect.width() > 0 && rect.height() > 0) {
-                                        clickAtCoordinates(rect.centerX(), rect.centerY());
-                                        clicked = true;
-                                        break;
+                // Tích hợp hàm tự động tìm và click ô/nút thêm ảnh trên màn hình Best
+                boolean clicked = clickAddImageButton(rootNode);
+
+                if (!clicked) {
+                    List<AccessibilityNodeInfo> nodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/ivAddPhoto");
+                    if (nodes == null || nodes.isEmpty()) {
+                        nodes = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/btnTakePhoto");
+                    }
+                    if (nodes == null || nodes.isEmpty()) {
+                        nodes = rootNode.findAccessibilityNodeInfosByText("Thêm ảnh");
+                    }
+                    
+                    if (nodes != null && !nodes.isEmpty()) {
+                        for (AccessibilityNodeInfo node : nodes) {
+                            if (node != null) {
+                                try {
+                                    if (node.isVisibleToUser()) {
+                                        Rect rect = new Rect();
+                                        node.getBoundsInScreen(rect);
+                                        if (rect.width() > 0 && rect.height() > 0) {
+                                            clickAtCoordinates(rect.centerX(), rect.centerY());
+                                            clicked = true;
+                                            break;
+                                        }
                                     }
+                                } finally {
+                                    node.recycle();
                                 }
-                            } finally {
-                                node.recycle();
                             }
                         }
                     }
@@ -527,6 +531,55 @@ public class AutoScrapeService extends AccessibilityService {
                 rootNode.recycle();
             }
         }
+    }
+
+    /**
+     * Hàm trợ năng tự động tìm và click vào ô/icon hình ảnh hoặc nút mở chọn ảnh
+     */
+    private boolean clickAddImageButton(AccessibilityNodeInfo node) {
+        if (node == null) return false;
+
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo child = node.getChild(i);
+            if (child == null) continue;
+
+            String className = child.getClassName() != null ? child.getClassName().toString() : "";
+            String text = child.getText() != null ? child.getText().toString() : "";
+            String viewId = child.getViewIdResourceName() != null ? child.getViewIdResourceName() : "";
+
+            if (text.contains("Hình ảnh") || viewId.contains("image") || viewId.contains("photo") || viewId.contains("camera") 
+                || className.equals("android.widget.ImageView")) {
+                
+                if (child.isClickable() && child.isVisibleToUser()) {
+                    Rect rect = new Rect();
+                    child.getBoundsInScreen(rect);
+                    if (rect.width() > 0 && rect.height() > 0) {
+                        clickAtCoordinates(rect.centerX(), rect.centerY());
+                        child.recycle();
+                        return true;
+                    }
+                } else {
+                    AccessibilityNodeInfo parent = child.getParent();
+                    if (parent != null && parent.isClickable() && parent.isVisibleToUser()) {
+                        Rect rect = new Rect();
+                        parent.getBoundsInScreen(rect);
+                        if (rect.width() > 0 && rect.height() > 0) {
+                            clickAtCoordinates(rect.centerX(), rect.centerY());
+                            parent.recycle();
+                            child.recycle();
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            if (clickAddImageButton(child)) {
+                child.recycle();
+                return true;
+            }
+            child.recycle();
+        }
+        return false;
     }
 
     private File copyAssetToFile(String assetFileName) {
