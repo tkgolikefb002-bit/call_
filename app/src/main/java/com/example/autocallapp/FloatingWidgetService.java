@@ -432,4 +432,117 @@ public class FloatingWidgetService extends Service {
                 Thread.sleep(2000);
                 
                 // Bước 8: Hoàn tất
-                rootNode = AutoScrapeService
+                rootNode = AutoScrapeService.instance.getRootInActiveWindow();
+                if (!clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/vAdd", 3, 1000)) {
+                    clickNodeByTextWithRetry(rootNode, "Thêm", 3, 1000);
+                }
+                
+                showToastOnMainThread("Đã hoàn tất 8 bước xử lý kiện hàng!");
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }).start();
+    }
+
+    public void handleParcelAutomationFullSequence() {
+        String nextTrackingNumber = getNextTrackingNumberFromSavedList();
+
+        if (nextTrackingNumber == null || nextTrackingNumber.isEmpty()) {
+            showToastOnMainThread("Không tìm thấy mã vận đơn trong danh sách đã lưu!");
+            return;
+        }
+
+        Uri assetImageUri = copyAssetImageToCache("default_parcel_image.jpg");
+        if (assetImageUri != null) {
+            executeFullAutomationSteps(nextTrackingNumber, assetImageUri);
+        } else {
+            showToastOnMainThread("Không thể lấy ảnh từ assets!");
+        }
+    }
+
+    private boolean clickNodeByIdWithRetry(AccessibilityNodeInfo rootNode, String resourceId, int maxRetries, long delayMs) {
+        for (int i = 0; i < maxRetries; i++) {
+            if (rootNode == null) return false;
+            List<AccessibilityNodeInfo> list = rootNode.findAccessibilityNodeInfosByViewId(resourceId);
+            if (list != null && !list.isEmpty()) {
+                for (AccessibilityNodeInfo node : list) {
+                    if (node.isClickable()) {
+                        node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                        return true;
+                    } else {
+                        AccessibilityNodeInfo parent = node.getParent();
+                        while (parent != null) {
+                            if (parent.isClickable()) {
+                                parent.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                                return true;
+                            }
+                            parent = parent.getParent();
+                        }
+                    }
+                }
+            }
+            try {
+                Thread.sleep(delayMs);
+                if (AutoScrapeService.instance != null) {
+                    rootNode = AutoScrapeService.instance.getRootInActiveWindow();
+                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+        return false;
+    }
+
+    private boolean clickNodeByTextWithRetry(AccessibilityNodeInfo rootNode, String text, int maxRetries, long delayMs) {
+        for (int i = 0; i < maxRetries; i++) {
+            if (rootNode == null) return false;
+            List<AccessibilityNodeInfo> list = rootNode.findAccessibilityNodeInfosByText(text);
+            if (list != null && !list.isEmpty()) {
+                for (AccessibilityNodeInfo node : list) {
+                    if (node.isClickable()) {
+                        node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                        return true;
+                    } else {
+                        AccessibilityNodeInfo parent = node.getParent();
+                        while (parent != null) {
+                            if (parent.isClickable()) {
+                                parent.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+                                return true;
+                            }
+                            parent = parent.getParent();
+                        }
+                    }
+                }
+            }
+            try {
+                Thread.sleep(delayMs);
+                if (AutoScrapeService.instance != `null`) {
+                    rootNode = AutoScrapeService.instance.getRootInActiveWindow();
+                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+        return false;
+    }
+
+    public void updateProgress(int count) {
+        if (tvProgress != null) {
+            tvProgress.post(() -> tvProgress.setText("Tiến độ: " + count + " đơn"));
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        instance = null; 
+        if (floatingView != null && windowManager != null) {
+            try {
+                windowManager.removeView(floatingView);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
