@@ -1,5 +1,6 @@
 package com.example.autocallapp;
 
+import com.example.autocallapp.AutoScrapeService;
 import android.content.ContentValues;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -63,7 +64,6 @@ public class MyInCallService extends InCallService {
 
                         new Thread(() -> {
                             updateLatestCallLogDuration(randomDuration);
-                            // Đồng bộ đúng tên class AutoScrapeService theo đúng project của bạn
                             if (AutoScrapeService.instance != null) {
                                 AutoScrapeService.instance.onCallFinished();
                             }
