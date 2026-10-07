@@ -24,8 +24,12 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.core.app.NotificationCompat;
+import androidx.core.content.FileProvider;
 
 import java.io.File;
+import java.io.InputStream;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.util.List;
 
@@ -175,7 +179,7 @@ public class FloatingWidgetService extends Service {
                 });
             }
 
-            // NÚT GẮN ẢNH (🖼 Gắn Ảnh)
+            // NÚT GẮN ẢNH (🖼 Gắn Ảnh) - Lấy trực tiếp từ thư mục assets
             Button btnAttachImages = floatingView.findViewById(R.id.btnAttachImages);
             if (btnAttachImages != null) {
                 btnAttachImages.setOnClickListener(v -> {
@@ -185,13 +189,14 @@ public class FloatingWidgetService extends Service {
                         return;
                     }
 
-                    Toast.makeText(this, "Đang chuẩn bị và gắn ảnh cho mã: " + nextTrackingNumber, Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Đang lấy ảnh từ assets cho mã: " + nextTrackingNumber, Toast.LENGTH_SHORT).show();
                     
-                    Uri editedParcelUri = prepareParcelImages(nextTrackingNumber);
-                    if (editedParcelUri != null) {
-                        executeFullAutomationSteps(nextTrackingNumber, editedParcelUri);
+                    // Lấy trực tiếp file ảnh có sẵn trong assets (ví dụ: default_parcel_image.jpg)
+                    Uri assetImageUri = copyAssetImageToCache("default_parcel_image.jpg");
+                    if (assetImageUri != null) {
+                        executeFullAutomationSteps(nextTrackingNumber, assetImageUri);
                     } else {
-                        Toast.makeText(this, "Lỗi tạo ảnh chỉnh sửa!", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, "Không tìm thấy ảnh trong assets!", Toast.LENGTH_SHORT).show();
                     }
                 });
             }
@@ -259,14 +264,25 @@ public class FloatingWidgetService extends Service {
         }
     }
 
-    private Uri prepareParcelImages(String trackingNumber) {
+    /**
+     * Copy file ảnh từ thư mục assets ra thư mục cache để tạo Uri hợp lệ cho app khác sử dụng
+     */
+    private Uri copyAssetImageToCache(String assetFileName) {
         try {
-            Bitmap originalParcelBitmap = BitmapFactory.decodeStream(getAssets().open("default_parcel_image.jpg"));
-            File cacheFile = new File(getFilesDir(), "ma_van_don.jpg");
-            
-            Uri editedParcelUri = ImageUtils.createModifiedParcelImage(this, originalParcelBitmap, trackingNumber);
-            
-            return editedParcelUri;
+            File cacheFile = new File(getCacheDir(), assetFileName);
+            try (InputStream in = getAssets().open(assetFileName);
+                 OutputStream out = new FileOutputStream(cacheFile)) {
+                byte[] buffer = new byte[1024];
+                int read;
+                while ((read = in.read(buffer)) != -1) {
+                    out.write(buffer, 0, read);
+                }
+            }
+            return FileProvider.getUriForFile(
+                    this,
+                    getPackageName() + ".fileprovider",
+                    cacheFile
+            );
         } catch (Exception e) {
             e.printStackTrace();
             return null;
@@ -313,7 +329,7 @@ public class FloatingWidgetService extends Service {
     }
 
     /**
-     * HÀM GỌI ĐIỆN CHUẨN XÁC: Click trực tiếp vào đúng resource-id hiển thị số điện thoại (`tvPhoneNub`)[cite: 1]
+     * HÀM GỌI ĐIỆN CHUẨN XÁC: Click trực tiếp vào đúng resource-id hiển thị số điện thoại (`tvPhoneNub`)
      */
     private boolean triggerCallAction(AccessibilityNodeInfo rootNode) {
         if (rootNode == null) return false;
@@ -343,7 +359,7 @@ public class FloatingWidgetService extends Service {
     }
 
     /**
-     * TIẾN TRÌNH HÀNG LOẠT (Nút Play): Lặp qua toàn bộ danh sách mã -> Dán mã -> Gọi điện `tvPhoneNub`[cite: 1]
+     * TIẾN TRÌNH HÀNG LOẠT (Nút Play): Lặp qua toàn bộ danh sách mã -> Dán mã -> Gọi điện
      */
     private void startBatchLoopAutomation() {
         new Thread(() -> {
@@ -367,12 +383,12 @@ public class FloatingWidgetService extends Service {
                     try { Thread.sleep(1500); } catch (InterruptedException e) { e.printStackTrace(); }
                 }
 
-                // 2. Kích hoạt gọi điện bằng cách bấm vào `tvPhoneNub`[cite: 1]
+                // 2. Kích hoạt gọi điện
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 triggerCallAction(rootNode);
                 try { Thread.sleep(2000); } catch (InterruptedException e) { e.printStackTrace(); }
 
-                // 3. Xóa mã vừa chạy khỏi danh sách để chuyển sang đơn tiếp theo
+                // 3. Xóa mã vừa chạy khỏi danh sách
                 removeFirstTrackingNumber();
 
                 try {
@@ -387,7 +403,7 @@ public class FloatingWidgetService extends Service {
     }
 
     /**
-     * Chuỗi quy trình đầy đủ 8 bước khi bấm nút "Chọn Kiện" (📦)[cite: 1]:
+     * Chuỗi quy trình đầy đủ 8 bước khi xử lý kiện hàng
      */
     private void executeFullAutomationSteps(String trackingNumber, Uri imageUri) {
         if (AutoScrapeService.instance == null) {
@@ -406,27 +422,27 @@ public class FloatingWidgetService extends Service {
                 typeTrackingNumberIntoApp(rootNode, trackingNumber);
                 Thread.sleep(1500);
 
-                // --- BƯỚC 2: Bấm gọi điện (`tvPhoneNub`)[cite: 1] ---
+                // --- BƯỚC 2: Bấm gọi điện ---
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 triggerCallAction(rootNode);
                 Thread.sleep(2500);
 
-                // --- BƯỚC 3: Click chọn checkbox của mã vận đơn (`ivSelect`)[cite: 1] ---
+                // --- BƯỚC 3: Click chọn checkbox của mã vận đơn (`ivSelect`) ---
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/ivSelect", 3, 1000);
                 Thread.sleep(1000);
 
-                // --- BƯỚC 4: Click nút "Kiện vấn đề" (`tvDeliveryFailed`)[cite: 1] ---
+                // --- BƯỚC 4: Click nút "Kiện vấn đề" (`tvDeliveryFailed`) ---
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/tvDeliveryFailed", 3, 1000);
                 Thread.sleep(1000);
 
-                // --- BƯỚC 5: Chọn lý do "Người nhận không nhận kiện hàng"[cite: 1] ---
+                // --- BƯỚC 5: Chọn lý do "Người nhận không nhận kiện hàng" ---
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByTextWithRetry(rootNode, "Người nhận không nhận kiện hàng", 3, 1000);
                 Thread.sleep(1000);
 
-                // --- BƯỚC 6: Chọn phân loại "Khách không đặt hàng"[cite: 1] ---
+                // --- BƯỚC 6: Chọn phân loại "Khách không đặt hàng" ---
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByTextWithRetry(rootNode, "Khách không đặt hàng", 3, 1000);
                 Thread.sleep(1000);
@@ -447,7 +463,7 @@ public class FloatingWidgetService extends Service {
                 
                 Thread.sleep(2000);
                 
-                // --- BƯỚC 8: Click nút "Thêm" (`vAdd`) để hoàn tất[cite: 1] ---
+                // --- BƯỚC 8: Click nút "Thêm" (`vAdd`) để hoàn tất ---
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 boolean clickedAddButton = clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/vAdd", 3, 1000);
                 if (!clickedAddButton) {
@@ -470,9 +486,11 @@ public class FloatingWidgetService extends Service {
             return;
         }
 
-        Uri editedParcelUri = prepareParcelImages(nextTrackingNumber);
-        if (editedParcelUri != null) {
-            executeFullAutomationSteps(nextTrackingNumber, editedParcelUri);
+        Uri assetImageUri = copyAssetImageToCache("default_parcel_image.jpg");
+        if (assetImageUri != null) {
+            executeFullAutomationSteps(nextTrackingNumber, assetImageUri);
+        } else {
+            Toast.makeText(this, "Không thể lấy ảnh từ assets!", Toast.LENGTH_SHORT).show();
         }
     }
 
