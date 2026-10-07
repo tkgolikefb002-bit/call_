@@ -1,4 +1,4 @@
-package com.example.autocrape;
+package com.example.autocallapp;
 
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.AccessibilityServiceInfo;
@@ -79,14 +79,12 @@ public class AutoScrapeService extends AccessibilityService {
                 boolean scrolled = performScrollDown();
 
                 if (scrolled) {
-                    // Đợi một nhịp ngắn (ví dụ 1.2 giây) cho nội dung load xong rồi lặp lại
+                    // Đợi một nhịp ngắn (1.2 giây) cho nội dung load xong rồi lặp lại
                     handler.postDelayed(this, 1200);
                 } else {
-                    // Hết trang hoặc không cuộn được nữa -> Dừng và chuyển sang giai đoạn bóc tách
+                    // Hết trang hoặc không cuộn được nữa -> Dừng và chuẩn bị hàng đợi
                     Log.d(TAG, "Đã cuộn đến cuối trang. Tổng số mã quét được: " + scrapedCodesSet.size());
                     stopScraping();
-                    
-                    // Đưa toàn bộ vào hàng đợi để sẵn sàng bóc từng mã
                     prepareQueue();
                 }
             }
@@ -131,7 +129,7 @@ public class AutoScrapeService extends AccessibilityService {
             android.accessibilityservice.GestureDescription.Builder builder = new android.accessibilityservice.GestureDescription.Builder();
             android.graphics.Path path = new android.graphics.Path();
             
-            // Tọa độ vuốt từ dưới lên trên (điều chỉnh theo màn hình thiết bị của bạn)
+            // Tọa độ vuốt từ dưới lên trên
             path.moveTo(500, 1800);
             path.lineTo(500, 600);
             
