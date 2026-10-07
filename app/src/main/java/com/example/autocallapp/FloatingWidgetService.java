@@ -130,10 +130,26 @@ public class FloatingWidgetService extends Service {
             Button btnSearch = floatingView.findViewById(R.id.btnSearch);
             if (btnSearch != null) {
                 btnSearch.setOnClickListener(v -> {
-                    if (MyAccessibilityService.instance != null) {
-                        updateProgress(0);
+                    if (MyAccessibilityService.instance == null || MyAccessibilityService.instance.getRootInActiveWindow() == null) {
+                        showToastOnMainThread("Vui lòng bật Quyền Trợ năng và mở app BEST trước!");
+                        return;
+                    }
+
+                    // Lấy mã vận đơn tiếp theo từ file
+                    String trackingNumber = getNextTrackingNumberFromSavedList();
+                    if (trackingNumber == null || trackingNumber.isEmpty()) {
+                        showToastOnMainThread("Danh sách mã đơn đã hết!");
+                        return;
+                    }
+
+                    // Thực hiện điền mã vào ô tìm kiếm của ứng dụng
+                    AccessibilityNodeInfo rootNode = MyAccessibilityService.instance.getRootInActiveWindow();
+                    boolean success = typeTrackingNumberIntoApp(rootNode, trackingNumber);
+                    
+                    if (success) {
+                        showToastOnMainThread("Đã điền mã: " + trackingNumber);
                     } else {
-                        showToastOnMainThread("Vui lòng bật Quyền Trợ năng (Accessibility) trước!");
+                        showToastOnMainThread("Không tìm thấy ô nhập mã trong app!");
                     }
                 });
             }
