@@ -1,6 +1,5 @@
 package com.example.autocrape;
 
-import com.example.autocrape.AutoScrapeService;
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.AccessibilityServiceInfo;
 import android.os.Handler;
