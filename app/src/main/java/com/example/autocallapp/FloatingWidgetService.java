@@ -135,9 +135,10 @@ public class FloatingWidgetService extends Service {
                         return;
                     }
 
-                    AccessibilityNodeInfo rootNode = MyAccessibilityService.instance.getRootInActiveWindow();
+                    // Sử dụng phương thức lấy node an toàn từ MyAccessibilityService
+                    AccessibilityNodeInfo rootNode = MyAccessibilityService.getRootNodeSafely(MyAccessibilityService.instance);
                     if (rootNode == null) {
-                        showToastOnMainThread("Đang chờ cửa sổ app BEST... Hãy chắc chắn bạn đang mở app BEST!");
+                        showToastOnMainThread("Đang chờ cửa sổ app BEST... Hãy cuộn nhẹ màn hình app BEST rồi bấm lại!");
                         return;
                     }
 
@@ -303,17 +304,17 @@ public class FloatingWidgetService extends Service {
                     break;
                 }
 
-                if (MyAccessibilityService.instance == null || MyAccessibilityService.instance.getRootInActiveWindow() == null) {
+                AccessibilityNodeInfo rootNode = MyAccessibilityService.getRootNodeSafely(MyAccessibilityService.instance);
+                if (rootNode == null) {
                     try { Thread.sleep(2000); } catch (InterruptedException e) { e.printStackTrace(); }
                     continue;
                 }
 
-                AccessibilityNodeInfo rootNode = MyAccessibilityService.instance.getRootInActiveWindow();
                 if (typeTrackingNumberIntoApp(rootNode, trackingNumber)) {
                     try { Thread.sleep(1500); } catch (InterruptedException e) { e.printStackTrace(); }
                 }
 
-                rootNode = MyAccessibilityService.instance.getRootInActiveWindow();
+                rootNode = MyAccessibilityService.getRootNodeSafely(MyAccessibilityService.instance);
                 triggerCallAction(rootNode);
                 try { Thread.sleep(2000); } catch (InterruptedException e) { e.printStackTrace(); }
 
@@ -354,7 +355,7 @@ public class FloatingWidgetService extends Service {
             try {
                 Thread.sleep(delayMs);
                 if (MyAccessibilityService.instance != null) {
-                    rootNode = MyAccessibilityService.instance.getRootInActiveWindow();
+                    rootNode = MyAccessibilityService.getRootNodeSafely(MyAccessibilityService.instance);
                 }
             } catch (InterruptedException e) {
                 e.printStackTrace();
