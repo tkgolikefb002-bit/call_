@@ -1,6 +1,5 @@
 package com.example.autocallapp;
 
-import com.example.autocrape.AutoScrapeService;
 import android.content.ContentValues;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -68,11 +67,11 @@ public class MyInCallService extends InCallService {
                             Log.e(TAG, "Lỗi khi ngắt cuộc gọi: " + e.getMessage());
                         }
 
-                        // 3. Cập nhật lịch sử cuộc gọi (CallLog) thành thời lượng ngẫu nhiên 20s - 35s
+                        // 3. Cập nhật lịch sử cuộc gọi (CallLog) thành thời lượng ngẫu nhiên 20s - 35s và gọi callback
                         new Thread(() -> {
                             updateLatestCallLogDuration(randomDuration);
-                            if (AutoScrapeService.instance != null) {
-                                AutoScrapeService.instance.onCallFinished();
+                            if (AutoCallAccessibilityService.instance != null) {
+                                AutoCallAccessibilityService.instance.onCallFinished();
                             }
                         }).start();
 
