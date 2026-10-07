@@ -15,6 +15,10 @@ import java.util.Set;
 public class AutoScrapeService extends AccessibilityService {
 
     private static final String TAG = "AutoScrapeService";
+    
+    // Khai báo instance tĩnh để các service khác có thể gọi tới
+    public static AutoScrapeService instance;
+
     private boolean isRunning = false;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
@@ -28,12 +32,20 @@ public class AutoScrapeService extends AccessibilityService {
     @Override
     public void onServiceConnected() {
         super.onServiceConnected();
+        instance = this; // Gán instance khi service được kết nối thành công
+        
         AccessibilityServiceInfo info = new AccessibilityServiceInfo();
         info.eventTypes = AccessibilityServiceInfo.FEEDBACK_GENERIC;
         info.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC;
         info.flags = AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS;
         info.notificationTimeout = 100;
         setServiceInfo(info);
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        instance = null; // Xóa instance khi service bị hủy
     }
 
     @Override
@@ -67,7 +79,7 @@ public class AutoScrapeService extends AccessibilityService {
                 boolean scrolled = performScrollDown();
 
                 if (scrolled) {
-                    // Đợi một nhịp ngắn (ví dụ 1 giây) cho nội dung load xong rồi lặp lại
+                    // Đợi một nhịp ngắn (ví dụ 1.2 giây) cho nội dung load xong rồi lặp lại
                     handler.postDelayed(this, 1200);
                 } else {
                     // Hết trang hoặc không cuộn được nữa -> Dừng và chuyển sang giai đoạn bóc tách
