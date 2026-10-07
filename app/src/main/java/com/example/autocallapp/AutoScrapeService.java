@@ -3,7 +3,6 @@ package com.example.autocallapp;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
-import com.example.autocrape.AutoScrapeService;
 import android.app.Service;
 import android.content.Intent;
 import android.graphics.PixelFormat;
@@ -138,7 +137,6 @@ public class FloatingWidgetService extends Service {
                 btnSearch.setOnClickListener(v -> {
                     if (AutoScrapeService.instance != null) {
                         updateProgress(0);
-                        // Gọi an toàn nếu phương thức tồn tại, hoặc bỏ qua nếu chưa có
                     } else {
                         showToastOnMainThread("Vui lòng bật Quyền Trợ năng (Accessibility) trước!");
                     }
