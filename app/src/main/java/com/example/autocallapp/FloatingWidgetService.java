@@ -269,8 +269,8 @@ public class FloatingWidgetService extends Service {
      */
     private Uri copyAssetImageToCache(String assetFileName) {
     try {
-        // Trỏ trực tiếp vào thư mục ImageDir của app Best
-        File imageDir = new File("/data/data/com.best.android.vietcourier/files/ImageDir");
+        // Thay đổi đường dẫn trỏ về cache của app hiện tại (com.example.autocallapp)
+        File imageDir = new File(getCacheDir(), "ImageDir");
         if (!imageDir.exists()) {
             imageDir.mkdirs();
         }
