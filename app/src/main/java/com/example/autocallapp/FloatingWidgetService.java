@@ -3,7 +3,6 @@ package com.example.autocallapp;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
-import com.example.autocallapp.AutoScrapeService;
 import android.app.Service;
 import android.content.Intent;
 import android.graphics.PixelFormat;
@@ -136,7 +135,9 @@ public class FloatingWidgetService extends Service {
             Button btnSearch = floatingView.findViewById(R.id.btnSearch);
             if (btnSearch != null) {
                 btnSearch.setOnClickListener(v -> {
-                    if (AutoScrapeService.instance != null) {
+                    // Thay AutoScrapeService bằng tên class Accessibility Service thực tế của bạn
+                    // Ví dụ: AutoCallAccessibilityService.instance
+                    if (AutoCallAccessibilityService.instance != null) {
                         updateProgress(0);
                     } else {
                         showToastOnMainThread("Vui lòng bật Quyền Trợ năng (Accessibility) trước!");
@@ -327,17 +328,17 @@ public class FloatingWidgetService extends Service {
                     break;
                 }
 
-                if (AutoScrapeService.instance == null || AutoScrapeService.instance.getRootInActiveWindow() == null) {
+                if (AutoCallAccessibilityService.instance == null || AutoCallAccessibilityService.instance.getRootInActiveWindow() == null) {
                     try { Thread.sleep(2000); } catch (InterruptedException e) { e.printStackTrace(); }
                     continue;
                 }
 
-                AccessibilityNodeInfo rootNode = AutoScrapeService.instance.getRootInActiveWindow();
+                AccessibilityNodeInfo rootNode = AutoCallAccessibilityService.instance.getRootInActiveWindow();
                 if (typeTrackingNumberIntoApp(rootNode, trackingNumber)) {
                     try { Thread.sleep(1500); } catch (InterruptedException e) { e.printStackTrace(); }
                 }
 
-                rootNode = AutoScrapeService.instance.getRootInActiveWindow();
+                rootNode = AutoCallAccessibilityService.instance.getRootInActiveWindow();
                 triggerCallAction(rootNode);
                 try { Thread.sleep(2000); } catch (InterruptedException e) { e.printStackTrace(); }
 
@@ -355,7 +356,7 @@ public class FloatingWidgetService extends Service {
     }
 
     private void executeFullAutomationSteps(String trackingNumber, Uri imageUri) {
-        if (AutoScrapeService.instance == null) {
+        if (AutoCallAccessibilityService.instance == null) {
             showToastOnMainThread("Chưa bật Quyền Trợ năng (Accessibility) trước!");
             return;
         }
@@ -363,37 +364,37 @@ public class FloatingWidgetService extends Service {
         new Thread(() -> {
             try {
                 Thread.sleep(1000);
-                AccessibilityNodeInfo rootNode = AutoScrapeService.instance.getRootInActiveWindow();
+                AccessibilityNodeInfo rootNode = AutoCallAccessibilityService.instance.getRootInActiveWindow();
                 if (rootNode == null) return;
 
                 typeTrackingNumberIntoApp(rootNode, trackingNumber);
                 Thread.sleep(1500);
 
-                rootNode = AutoScrapeService.instance.getRootInActiveWindow();
+                rootNode = AutoCallAccessibilityService.instance.getRootInActiveWindow();
                 triggerCallAction(rootNode);
                 Thread.sleep(2500);
 
-                rootNode = AutoScrapeService.instance.getRootInActiveWindow();
+                rootNode = AutoCallAccessibilityService.instance.getRootInActiveWindow();
                 clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/ivSelect", 3, 1000);
                 Thread.sleep(1000);
 
-                rootNode = AutoScrapeService.instance.getRootInActiveWindow();
+                rootNode = AutoCallAccessibilityService.instance.getRootInActiveWindow();
                 clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/tvDeliveryFailed", 3, 1000);
                 Thread.sleep(1000);
 
-                rootNode = AutoScrapeService.instance.getRootInActiveWindow();
+                rootNode = AutoCallAccessibilityService.instance.getRootInActiveWindow();
                 clickNodeByTextWithRetry(rootNode, "Người nhận không nhận kiện hàng", 3, 1000);
                 Thread.sleep(1000);
 
-                rootNode = AutoScrapeService.instance.getRootInActiveWindow();
+                rootNode = AutoCallAccessibilityService.instance.getRootInActiveWindow();
                 clickNodeByTextWithRetry(rootNode, "Khách không đặt hàng", 3, 1000);
                 Thread.sleep(1000);
 
-                rootNode = AutoScrapeService.instance.getRootInActiveWindow();
+                rootNode = AutoCallAccessibilityService.instance.getRootInActiveWindow();
                 clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/multiImageAdd", 3, 1000);
                 Thread.sleep(1000);
 
-                rootNode = AutoScrapeService.instance.getRootInActiveWindow();
+                rootNode = AutoCallAccessibilityService.instance.getRootInActiveWindow();
                 boolean clickedLib = clickNodeByTextWithRetry(rootNode, "Thư viện", 3, 1000);
                 if (!clickedLib) {
                     clickedLib = clickNodeByTextWithRetry(rootNode, "Album", 3, 1000);
@@ -404,7 +405,7 @@ public class FloatingWidgetService extends Service {
                 
                 Thread.sleep(2000);
                 
-                rootNode = AutoScrapeService.instance.getRootInActiveWindow();
+                rootNode = AutoCallAccessibilityService.instance.getRootInActiveWindow();
                 if (!clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/vAdd", 3, 1000)) {
                     clickNodeByTextWithRetry(rootNode, "Thêm", 3, 1000);
                 }
@@ -456,8 +457,8 @@ public class FloatingWidgetService extends Service {
             }
             try {
                 Thread.sleep(delayMs);
-                if (AutoScrapeService.instance != null) {
-                    rootNode = AutoScrapeService.instance.getRootInActiveWindow();
+                if (AutoCallAccessibilityService.instance != null) {
+                    rootNode = AutoCallAccessibilityService.instance.getRootInActiveWindow();
                 }
             } catch (InterruptedException e) {
                 e.printStackTrace();
@@ -489,8 +490,8 @@ public class FloatingWidgetService extends Service {
             }
             try {
                 Thread.sleep(delayMs);
-                if (AutoScrapeService.instance != null) {
-                    rootNode = AutoScrapeService.instance.getRootInActiveWindow();
+                if (AutoCallAccessibilityService.instance != null) {
+                    rootNode = AutoCallAccessibilityService.instance.getRootInActiveWindow();
                 }
             } catch (InterruptedException e) {
                 e.printStackTrace();
