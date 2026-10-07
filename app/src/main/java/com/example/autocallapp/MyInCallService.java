@@ -22,6 +22,7 @@ public class MyInCallService extends InCallService {
     public void onCallAdded(Call call) {
         super.onCallAdded(call);
 
+        // 1. Kiểm tra xem app có thực sự đang giữ quyền Default Dialer của hệ thống không
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
             android.app.role.RoleManager roleManager = getSystemService(android.app.role.RoleManager.class);
             if (roleManager != null && !roleManager.isRoleHeld(android.app.role.RoleManager.ROLE_DIALER)) {
@@ -29,6 +30,7 @@ public class MyInCallService extends InCallService {
             }
         }
 
+        // 2. Kiểm tra thêm cờ SharedPreferences trong app
         SharedPreferences prefs = getSharedPreferences("AppPrefs", MODE_PRIVATE);
         boolean isCallActive = prefs.getBoolean("is_call_active", true); 
         if (!isCallActive) {
@@ -38,6 +40,7 @@ public class MyInCallService extends InCallService {
         activeCall = call;
         isHandled = false;
 
+        // Mở giao diện ảo
         Intent intent = new Intent(this, CallActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         startActivity(intent);
@@ -50,8 +53,10 @@ public class MyInCallService extends InCallService {
                 if (!isHandled && (state == Call.STATE_DIALING || state == Call.STATE_CONNECTING || state == Call.STATE_ACTIVE)) {
                     isHandled = true;
 
+                    // Sinh thời gian ngẫu nhiên từ 20 đến 35 giây cho CallLog
                     int randomDuration = new Random().nextInt(16) + 20;
 
+                    // CHỜ ĐÚNG 700ms RỒI NGẮT LUÔN CUỘC GỌI
                     new Handler(Looper.getMainLooper()).postDelayed(() -> {
                         try {
                             if (call != null) {
@@ -61,11 +66,11 @@ public class MyInCallService extends InCallService {
                             Log.e(TAG, "Lỗi khi ngắt cuộc gọi: " + e.getMessage());
                         }
 
+                        // Cập nhật lịch sử cuộc gọi (CallLog) và gọi callback
                         new Thread(() -> {
                             updateLatestCallLogDuration(randomDuration);
-                            // Sửa lại tên class cho đúng với Service trợ năng thực tế trong project của bạn (Ví dụ: AutoScrapeService hoặc AutoCallAccessibilityService)
-                            if (AutoScrapeService.instance != null) {
-                                AutoScrapeService.instance.onCallFinished();
+                            if (AutoCallAccessibilityService.instance != null) {
+                                AutoCallAccessibilityService.instance.onCallFinished();
                             }
                         }).start();
 
@@ -85,7 +90,7 @@ public class MyInCallService extends InCallService {
 
     private void updateLatestCallLogDuration(int targetDurationSeconds) {
         try {
-            Thread.sleep(600);
+            Thread.sleep(600); // Chờ hệ thống ghi nhận log thô xuống database
 
             Cursor cursor = getContentResolver().query(
                 CallLog.Calls.CONTENT_URI,
