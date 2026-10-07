@@ -130,8 +130,14 @@ public class FloatingWidgetService extends Service {
             Button btnSearch = floatingView.findViewById(R.id.btnSearch);
             if (btnSearch != null) {
                 btnSearch.setOnClickListener(v -> {
-                    if (MyAccessibilityService.instance == null || MyAccessibilityService.instance.getRootInActiveWindow() == null) {
-                        showToastOnMainThread("Vui lòng bật Quyền Trợ năng và mở app BEST trước!");
+                    if (MyAccessibilityService.instance == null) {
+                        showToastOnMainThread("Lỗi: Dịch vụ trợ năng chưa chạy. Hãy tắt và bật lại quyền Trợ năng!");
+                        return;
+                    }
+
+                    AccessibilityNodeInfo rootNode = MyAccessibilityService.instance.getRootInActiveWindow();
+                    if (rootNode == null) {
+                        showToastOnMainThread("Đang chờ cửa sổ app BEST... Hãy chắc chắn bạn đang mở app BEST!");
                         return;
                     }
 
@@ -143,7 +149,6 @@ public class FloatingWidgetService extends Service {
                     }
 
                     // Thực hiện điền mã vào ô tìm kiếm của ứng dụng
-                    AccessibilityNodeInfo rootNode = MyAccessibilityService.instance.getRootInActiveWindow();
                     boolean success = typeTrackingNumberIntoApp(rootNode, trackingNumber);
                     
                     if (success) {
