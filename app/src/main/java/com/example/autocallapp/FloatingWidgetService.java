@@ -5,16 +5,14 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import com.example.autocrape.AutoScrapeService;
 import android.app.Service;
-import android.accessibilityservice.GestureDescription;
-import android.graphics.Path;
 import android.content.Intent;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.PixelFormat;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -29,18 +27,19 @@ import androidx.core.content.FileProvider;
 
 import java.io.File;
 import java.io.InputStream;
-import java.io.FileOutputStream;
 import java.io.OutputStream;
+import java.io.FileOutputStream;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.List;
 
 public class FloatingWidgetService extends Service {
     public static FloatingWidgetService instance;
-    private File preparedImageFile;
     private WindowManager windowManager;
     private View floatingView;
     private boolean isRunning = false;  
-    private TextView tvProgress; 
+    private TextView tvProgress;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     private static final String CHANNEL_ID = "AutoScrapeForegroundChannel";
     private static final int NOTIFICATION_ID = 12345;
@@ -123,18 +122,18 @@ public class FloatingWidgetService extends Service {
                 btnClose.setOnClickListener(v -> stopSelf());
             }
 
-            // NÚT PLAY/PAUSE (▶): Chạy HÀNG LOẠT vòng lặp (Bốc mã -> Dán mã -> Gọi điện)
+            // NÚT PLAY/PAUSE (▶): Chạy HÀNG LOẠT vòng lặp
             Button btnPlayPause = floatingView.findViewById(R.id.btnPlayPause);
             if (btnPlayPause != null) {
                 btnPlayPause.setOnClickListener(v -> {
                     isRunning = !isRunning;
                     if (isRunning) {
                         btnPlayPause.setText("⏸");
-                        Toast.makeText(this, "Bắt đầu chạy hàng loạt: Dán mã & Gọi điện...", Toast.LENGTH_SHORT).show();
+                        showToastOnMainThread("Bắt đầu chạy hàng loạt: Dán mã & Gọi điện...");
                         startBatchLoopAutomation();
                     } else {
                         btnPlayPause.setText("▶");
-                        Toast.makeText(this, "Đã tạm dừng tiến trình hàng loạt!", Toast.LENGTH_SHORT).show();
+                        showToastOnMainThread("Đã tạm dừng tiến trình hàng loạt!");
                     }
                 });
             }
@@ -147,7 +146,7 @@ public class FloatingWidgetService extends Service {
                         updateProgress(0);
                         AutoScrapeService.instance.startScraping();
                     } else {
-                        Toast.makeText(this, "Vui lòng bật Quyền Trợ năng (Accessibility) trước!", Toast.LENGTH_LONG).show();
+                        showToastOnMainThread("Vui lòng bật Quyền Trợ năng (Accessibility) trước!");
                     }
                 });
             }
@@ -155,65 +154,29 @@ public class FloatingWidgetService extends Service {
             // NÚT THÙNG RÁC (btnDelete) - Xóa dữ liệu đã lưu
             Button btnDelete = floatingView.findViewById(R.id.btnDelete);
             if (btnDelete != null) {
-                btnDelete.setOnClickListener(v -> {
-                    if (AutoScrapeService.instance != null) {
-                        boolean cleared = AutoScrapeService.instance.clearSavedData();
-                        if (cleared) {
-                            updateProgress(0);
-                            Toast.makeText(this, "Đã xóa toàn bộ dữ liệu!", Toast.LENGTH_SHORT).show();
-                        } else {
-                            Toast.makeText(this, "Không có dữ liệu để xóa.", Toast.LENGTH_SHORT).show();
-                        }
-                    } else {
-                        try {
-                            File file = new File(getExternalFilesDir(null), "DanhSachMaDon.txt");
-                            if (file.exists() && file.delete()) {
-                                updateProgress(0);
-                                Toast.makeText(this, "Đã xóa file dữ liệu thành công!", Toast.LENGTH_SHORT).show();
-                            } else {
-                                Toast.makeText(this, "Không tìm thấy file dữ liệu.", Toast.LENGTH_SHORT).show();
-                            }
-                        } catch (Exception e) {
-                            Toast.makeText(this, "Lỗi khi xóa: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                        }
-                    }
-                });
+                btnDelete.setOnClickListener(v -> clearSavedDataFile());
             }
 
-            // NÚT GẮN ẢNH (🖼 Gắn Ảnh) - Lấy trực tiếp từ thư mục assets
+            // NÚT GẮN ẢNH (🖼 Gắn Ảnh)
             Button btnAttachImages = floatingView.findViewById(R.id.btnAttachImages);
             if (btnAttachImages != null) {
-                btnAttachImages.setOnClickListener(v -> {
-                    String nextTrackingNumber = getNextTrackingNumberFromSavedList();
-                    if (nextTrackingNumber == null || nextTrackingNumber.isEmpty()) {
-                        Toast.makeText(this, "Không tìm thấy mã vận đơn để gắn ảnh!", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-
-                    Toast.makeText(this, "Đang lấy ảnh từ assets cho mã: " + nextTrackingNumber, Toast.LENGTH_SHORT).show();
-                    
-                    // Lấy trực tiếp file ảnh có sẵn trong assets (ví dụ: default_parcel_image.jpg)
-                    Uri assetImageUri = copyAssetImageToCache("default_parcel_image.jpg");
-                    if (assetImageUri != null) {
-                        executeFullAutomationSteps(nextTrackingNumber, assetImageUri);
-                    } else {
-                        Toast.makeText(this, "Không tìm thấy ảnh trong assets!", Toast.LENGTH_SHORT).show();
-                    }
-                });
+                btnAttachImages.setOnClickListener(v -> handleParcelAutomationFullSequence());
             }
 
-            // NÚT CHỌN KIỆN (📦 Chọn Kiện): Chạy ĐƠN LẺ toàn bộ 8 bước chuyên sâu
+            // NÚT CHỌN KIỆN (📦 Chọn Kiện): Chạy ĐƠN LẺ toàn bộ 8 bước
             Button btnSelectParcel = floatingView.findViewById(R.id.btnSelectParcel);
             if (btnSelectParcel != null) {
-                btnSelectParcel.setOnClickListener(v -> {
-                    handleParcelAutomationFullSequence();
-                });
+                btnSelectParcel.setOnClickListener(v -> handleParcelAutomationFullSequence());
             }
 
         } catch (Exception e) {
             e.printStackTrace();
-            Toast.makeText(this, "Lỗi khởi tạo popup: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            showToastOnMainThread("Lỗi khởi tạo popup: " + e.getMessage());
         }
+    }
+
+    private void showToastOnMainThread(String message) {
+        mainHandler.post(() -> Toast.makeText(this, message, Toast.LENGTH_SHORT).show());
     }
 
     private void createNotificationChannel() {
@@ -265,42 +228,54 @@ public class FloatingWidgetService extends Service {
         }
     }
 
-    /**
-     * Copy file ảnh từ thư mục assets ra thư mục cache để tạo Uri hợp lệ cho app khác sử dụng
-     */
-    private Uri copyAssetImageToCache(String assetFileName) {
-    try {
-        // Thay đổi đường dẫn trỏ về cache của app hiện tại (com.example.autocallapp)
-        File imageDir = new File(getCacheDir(), "ImageDir");
-        if (!imageDir.exists()) {
-            imageDir.mkdirs();
+    private void clearSavedDataFile() {
+        if (AutoScrapeService.instance != null && AutoScrapeService.instance.clearSavedData()) {
+            updateProgress(0);
+            showToastOnMainThread("Đã xóa toàn bộ dữ liệu!");
+            return;
         }
-
-        File cacheFile = new File(imageDir, assetFileName);
-        
-        try (InputStream in = getAssets().open(assetFileName);
-             OutputStream out = new FileOutputStream(cacheFile)) {
-            byte[] buffer = new byte[1024];
-            int read;
-            while ((read = in.read(buffer)) != -1) {
-                out.write(buffer, 0, read);
+        try {
+            File file = new File(getExternalFilesDir(null), "DanhSachMaDon.txt");
+            if (file.exists() && file.delete()) {
+                updateProgress(0);
+                showToastOnMainThread("Đã xóa file dữ liệu thành công!");
+            } else {
+                showToastOnMainThread("Không tìm thấy file dữ liệu.");
             }
+        } catch (Exception e) {
+            showToastOnMainThread("Lỗi khi xóa: " + e.getMessage());
         }
-
-        return FileProvider.getUriForFile(
-                this,
-                getPackageName() + ".fileprovider",
-                cacheFile
-        );
-    } catch (Exception e) {
-        e.printStackTrace();
-        return null;
     }
-}
 
-    /**
-     * Tự động tìm ô nhập mã và điền mã vận đơn vào
-     */
+    private Uri copyAssetImageToCache(String assetFileName) {
+        try {
+            File imageDir = new File(getCacheDir(), "ImageDir");
+            if (!imageDir.exists()) {
+                imageDir.mkdirs();
+            }
+
+            File cacheFile = new File(imageDir, assetFileName);
+            
+            try (InputStream in = getAssets().open(assetFileName);
+                 OutputStream out = new FileOutputStream(cacheFile)) {
+                byte[] buffer = new byte[1024];
+                int read;
+                while ((read = in.read(buffer)) != -1) {
+                    out.write(buffer, 0, read);
+                }
+            }
+
+            return FileProvider.getUriForFile(
+                    this,
+                    getPackageName() + ".fileprovider",
+                    cacheFile
+            );
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
     private boolean typeTrackingNumberIntoApp(AccessibilityNodeInfo rootNode, String trackingNumber) {
         if (rootNode == null) return false;
 
@@ -311,12 +286,11 @@ public class FloatingWidgetService extends Service {
 
         if (editTexts != null && !editTexts.isEmpty()) {
             for (AccessibilityNodeInfo node : editTexts) {
-                if (node.isEditable() || node.getClassName().toString().contains("EditText")) {
+                if (node.isEditable() || (node.getClassName() != null && node.getClassName().toString().contains("EditText"))) {
                     node.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
                     Bundle arguments = new Bundle();
                     arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, trackingNumber);
-                    boolean success = node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
-                    if (success) {
+                    if (node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)) {
                         return true;
                     }
                 }
@@ -326,7 +300,7 @@ public class FloatingWidgetService extends Service {
     }
 
     private List<AccessibilityNodeInfo> findAllEditTexts(AccessibilityNodeInfo root) {
-        List<AccessibilityNodeInfo> list = new java.util.ArrayList<>();
+        List<AccessibilityNodeInfo> list = new ArrayList<>();
         if (root == null) return list;
         if (root.getClassName() != null && root.getClassName().toString().contains("EditText")) {
             list.add(root);
@@ -337,14 +311,10 @@ public class FloatingWidgetService extends Service {
         return list;
     }
 
-    /**
-     * HÀM GỌI ĐIỆN CHUẨN XÁC: Click trực tiếp vào đúng resource-id hiển thị số điện thoại (`tvPhoneNub`)
-     */
     private boolean triggerCallAction(AccessibilityNodeInfo rootNode) {
         if (rootNode == null) return false;
 
-        boolean clicked = clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/tvPhoneNub", 3, 500);
-        if (clicked) {
+        if (clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/tvPhoneNub", 3, 500)) {
             return true;
         }
 
@@ -367,15 +337,13 @@ public class FloatingWidgetService extends Service {
         return false;
     }
 
-    /**
-     * TIẾN TRÌNH HÀNG LOẠT (Nút Play): Lặp qua toàn bộ danh sách mã -> Dán mã -> Gọi điện
-     */
     private void startBatchLoopAutomation() {
         new Thread(() -> {
             while (isRunning) {
                 String trackingNumber = getNextTrackingNumberFromSavedList();
                 if (trackingNumber == null || trackingNumber.isEmpty()) {
                     isRunning = false;
+                    showToastOnMainThread("Đã chạy xong toàn bộ danh sách đơn!");
                     break;
                 }
 
@@ -385,19 +353,14 @@ public class FloatingWidgetService extends Service {
                 }
 
                 AccessibilityNodeInfo rootNode = AutoScrapeService.instance.getRootInActiveWindow();
-
-                // 1. Dán mã vào khung
-                boolean typed = typeTrackingNumberIntoApp(rootNode, trackingNumber);
-                if (typed) {
+                if (typeTrackingNumberIntoApp(rootNode, trackingNumber)) {
                     try { Thread.sleep(1500); } catch (InterruptedException e) { e.printStackTrace(); }
                 }
 
-                // 2. Kích hoạt gọi điện
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 triggerCallAction(rootNode);
                 try { Thread.sleep(2000); } catch (InterruptedException e) { e.printStackTrace(); }
 
-                // 3. Xóa mã vừa chạy khỏi danh sách
                 removeFirstTrackingNumber();
 
                 try {
@@ -411,52 +374,48 @@ public class FloatingWidgetService extends Service {
         }).start();
     }
 
-    /**
-     * Chuỗi quy trình đầy đủ 8 bước khi xử lý kiện hàng
-     */
     private void executeFullAutomationSteps(String trackingNumber, Uri imageUri) {
         if (AutoScrapeService.instance == null) {
-            Toast.makeText(this, "Chưa bật Quyền Trợ năng (Accessibility)!", Toast.LENGTH_SHORT).show();
+            showToastOnMainThread("Chưa bật Quyền Trợ năng (Accessibility)!");
             return;
         }
 
         new Thread(() -> {
             try {
                 Thread.sleep(1000);
-
                 AccessibilityNodeInfo rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 if (rootNode == null) return;
 
-                // --- BƯỚC 1: Dán mã vận đơn vào khung nhập ---
+                // Bước 1: Dán mã
                 typeTrackingNumberIntoApp(rootNode, trackingNumber);
                 Thread.sleep(1500);
 
-                // --- BƯỚC 2: Bấm gọi điện ---
+                // Bước 2: Gọi điện
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 triggerCallAction(rootNode);
                 Thread.sleep(2500);
 
-                // --- BƯỚC 3: Click chọn checkbox của mã vận đơn (`ivSelect`) ---
+                // Bước 3: Click checkbox chọn mã
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/ivSelect", 3, 1000);
                 Thread.sleep(1000);
 
-                // --- BƯỚC 4: Click nút "Kiện vấn đề" (`tvDeliveryFailed`) ---
+                // Bước 4: Click "Kiện vấn đề"
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/tvDeliveryFailed", 3, 1000);
                 Thread.sleep(1000);
 
-                // --- BƯỚC 5: Chọn lý do "Người nhận không nhận kiện hàng" ---
+                // Bước 5: Chọn lý do
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByTextWithRetry(rootNode, "Người nhận không nhận kiện hàng", 3, 1000);
                 Thread.sleep(1000);
 
-                // --- BƯỚC 6: Chọn phân loại "Khách không đặt hàng" ---
+                // Bước 6: Chọn phân loại
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByTextWithRetry(rootNode, "Khách không đặt hàng", 3, 1000);
                 Thread.sleep(1000);
 
-                // --- BƯỚC 7: Mở menu thêm ảnh và bấm "Thư viện" hoặc "Album" ---
+                // Bước 7: Thêm ảnh
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/multiImageAdd", 3, 1000);
                 Thread.sleep(1000);
@@ -472,119 +431,5 @@ public class FloatingWidgetService extends Service {
                 
                 Thread.sleep(2000);
                 
-                // --- BƯỚC 8: Click nút "Thêm" (`vAdd`) để hoàn tất ---
-                rootNode = AutoScrapeService.instance.getRootInActiveWindow();
-                boolean clickedAddButton = clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/vAdd", 3, 1000);
-                if (!clickedAddButton) {
-                    clickNodeByTextWithRetry(rootNode, "Thêm", 3, 1000);
-                }
-                
-                Toast.makeText(this, "Đã hoàn tất 8 bước xử lý kiện hàng!", Toast.LENGTH_SHORT).show();
-
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }).start();
-    }
-
-    public void handleParcelAutomationFullSequence() {
-        String nextTrackingNumber = getNextTrackingNumberFromSavedList();
-
-        if (nextTrackingNumber == null || nextTrackingNumber.isEmpty()) {
-            Toast.makeText(this, "Không tìm thấy mã vận đơn trong danh sách đã lưu!", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        Uri assetImageUri = copyAssetImageToCache("default_parcel_image.jpg");
-        if (assetImageUri != null) {
-            executeFullAutomationSteps(nextTrackingNumber, assetImageUri);
-        } else {
-            Toast.makeText(this, "Không thể lấy ảnh từ assets!", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private boolean clickNodeByIdWithRetry(AccessibilityNodeInfo rootNode, String resourceId, int maxRetries, long delayMs) {
-        for (int i = 0; i < maxRetries; i++) {
-            if (rootNode == null) return false;
-            List<AccessibilityNodeInfo> list = rootNode.findAccessibilityNodeInfosByViewId(resourceId);
-            if (list != null && !list.isEmpty()) {
-                for (AccessibilityNodeInfo node : list) {
-                    if (node.isClickable()) {
-                        node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                        return true;
-                    } else {
-                        AccessibilityNodeInfo parent = node.getParent();
-                        while (parent != null) {
-                            if (parent.isClickable()) {
-                                parent.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                                return true;
-                            }
-                            parent = parent.getParent();
-                        }
-                    }
-                }
-            }
-            try {
-                Thread.sleep(delayMs);
-                if (AutoScrapeService.instance != null) {
-                    rootNode = AutoScrapeService.instance.getRootInActiveWindow();
-                }
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
-        return false;
-    }
-
-    private boolean clickNodeByTextWithRetry(AccessibilityNodeInfo rootNode, String text, int maxRetries, long delayMs) {
-        for (int i = 0; i < maxRetries; i++) {
-            if (rootNode == null) return false;
-            List<AccessibilityNodeInfo> list = rootNode.findAccessibilityNodeInfosByText(text);
-            if (list != null && !list.isEmpty()) {
-                for (AccessibilityNodeInfo node : list) {
-                    if (node.isClickable()) {
-                        node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                        return true;
-                    } else {
-                        AccessibilityNodeInfo parent = node.getParent();
-                        while (parent != null) {
-                            if (parent.isClickable()) {
-                                parent.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                                return true;
-                            }
-                            parent = parent.getParent();
-                        }
-                    }
-                }
-            }
-            try {
-                Thread.sleep(delayMs);
-                if (AutoScrapeService.instance != null) {
-                    rootNode = AutoScrapeService.instance.getRootInActiveWindow();
-                }
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
-        return false;
-    }
-
-    public void updateProgress(int count) {
-        if (tvProgress != null) {
-            tvProgress.post(() -> tvProgress.setText("Tiến độ: " + count + " đơn"));
-        }
-    }
-
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-        instance = null; 
-        if (floatingView != null) {
-            try {
-                windowManager.removeView(floatingView);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-    }
-}
+                // Bước 8: Hoàn tất
+                rootNode = AutoScrapeService
