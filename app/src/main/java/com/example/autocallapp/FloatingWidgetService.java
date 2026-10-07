@@ -55,7 +55,6 @@ public class FloatingWidgetService extends Service {
         instance = this; 
 
         try {
-            // 1. Đưa Service lên Foreground an toàn tuyệt đối
             createNotificationChannel();
             Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
                     .setContentTitle("Bảng điều khiển Auto đang chạy")
@@ -65,7 +64,6 @@ public class FloatingWidgetService extends Service {
                     .build();
             startForeground(NOTIFICATION_ID, notification);
 
-            // 2. Khởi tạo giao diện popup nổi từ XML
             floatingView = LayoutInflater.from(this).inflate(R.layout.layout_floating_popup, null);
             tvProgress = floatingView.findViewById(R.id.tvProgress);
 
@@ -92,7 +90,6 @@ public class FloatingWidgetService extends Service {
                 windowManager.addView(floatingView, params);
             }
 
-            // Cho phép chạm và kéo thả bảng popup đi quanh màn hình
             floatingView.setOnTouchListener(new View.OnTouchListener() {
                 private int initialX, initialY;
                 private float initialTouchX, initialTouchY;
@@ -116,13 +113,11 @@ public class FloatingWidgetService extends Service {
                 }
             });
 
-            // NÚT ĐÓNG (✕)
             Button btnClose = floatingView.findViewById(R.id.btnClose);
             if (btnClose != null) {
                 btnClose.setOnClickListener(v -> stopSelf());
             }
 
-            // NÚT PLAY/PAUSE (▶): Chạy HÀNG LOẠT vòng lặp
             Button btnPlayPause = floatingView.findViewById(R.id.btnPlayPause);
             if (btnPlayPause != null) {
                 btnPlayPause.setOnClickListener(v -> {
@@ -138,7 +133,6 @@ public class FloatingWidgetService extends Service {
                 });
             }
 
-            // NÚT KÍNH LÚP (btnSearch) - Bắt đầu quét mã
             Button btnSearch = floatingView.findViewById(R.id.btnSearch);
             if (btnSearch != null) {
                 btnSearch.setOnClickListener(v -> {
@@ -151,19 +145,16 @@ public class FloatingWidgetService extends Service {
                 });
             }
 
-            // NÚT THÙNG RÁC (btnDelete) - Xóa dữ liệu đã lưu
             Button btnDelete = floatingView.findViewById(R.id.btnDelete);
             if (btnDelete != null) {
                 btnDelete.setOnClickListener(v -> clearSavedDataFile());
             }
 
-            // NÚT GẮN ẢNH (🖼 Gắn Ảnh)
             Button btnAttachImages = floatingView.findViewById(R.id.btnAttachImages);
             if (btnAttachImages != null) {
                 btnAttachImages.setOnClickListener(v -> handleParcelAutomationFullSequence());
             }
 
-            // NÚT CHỌN KIỆN (📦 Chọn Kiện): Chạy ĐƠN LẺ toàn bộ 8 bước
             Button btnSelectParcel = floatingView.findViewById(R.id.btnSelectParcel);
             if (btnSelectParcel != null) {
                 btnSelectParcel.setOnClickListener(v -> handleParcelAutomationFullSequence());
@@ -386,36 +377,29 @@ public class FloatingWidgetService extends Service {
                 AccessibilityNodeInfo rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 if (rootNode == null) return;
 
-                // Bước 1: Dán mã
                 typeTrackingNumberIntoApp(rootNode, trackingNumber);
                 Thread.sleep(1500);
 
-                // Bước 2: Gọi điện
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 triggerCallAction(rootNode);
                 Thread.sleep(2500);
 
-                // Bước 3: Click checkbox chọn mã
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/ivSelect", 3, 1000);
                 Thread.sleep(1000);
 
-                // Bước 4: Click "Kiện vấn đề"
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/tvDeliveryFailed", 3, 1000);
                 Thread.sleep(1000);
 
-                // Bước 5: Chọn lý do
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByTextWithRetry(rootNode, "Người nhận không nhận kiện hàng", 3, 1000);
                 Thread.sleep(1000);
 
-                // Bước 6: Chọn phân loại
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByTextWithRetry(rootNode, "Khách không đặt hàng", 3, 1000);
                 Thread.sleep(1000);
 
-                // Bước 7: Thêm ảnh
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/multiImageAdd", 3, 1000);
                 Thread.sleep(1000);
@@ -431,7 +415,6 @@ public class FloatingWidgetService extends Service {
                 
                 Thread.sleep(2000);
                 
-                // Bước 8: Hoàn tất
                 rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 if (!clickNodeByIdWithRetry(rootNode, "com.best.android.vietcourier:id/vAdd", 3, 1000)) {
                     clickNodeByTextWithRetry(rootNode, "Thêm", 3, 1000);
@@ -517,7 +500,7 @@ public class FloatingWidgetService extends Service {
             }
             try {
                 Thread.sleep(delayMs);
-                if (AutoScrapeService.instance != `null`) {
+                if (AutoScrapeService.instance != null) {
                     rootNode = AutoScrapeService.instance.getRootInActiveWindow();
                 }
             } catch (InterruptedException e) {
