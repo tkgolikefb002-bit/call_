@@ -135,8 +135,6 @@ public class FloatingWidgetService extends Service {
             Button btnSearch = floatingView.findViewById(R.id.btnSearch);
             if (btnSearch != null) {
                 btnSearch.setOnClickListener(v -> {
-                    // Thay AutoScrapeService bằng tên class Accessibility Service thực tế của bạn
-                    // Ví dụ: AutoCallAccessibilityService.instance
                     if (AutoCallAccessibilityService.instance != null) {
                         updateProgress(0);
                     } else {
