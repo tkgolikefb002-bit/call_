@@ -3,7 +3,7 @@ package com.example.autocallapp;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
-import com.example.autocrape.AutoScrapeService;
+import com.example.autocallapp.AutoScrapeService;
 import android.app.Service;
 import android.content.Intent;
 import android.graphics.PixelFormat;
@@ -138,7 +138,6 @@ public class FloatingWidgetService extends Service {
                 btnSearch.setOnClickListener(v -> {
                     if (AutoScrapeService.instance != null) {
                         updateProgress(0);
-                        AutoScrapeService.instance.startScraping();
                     } else {
                         showToastOnMainThread("Vui lòng bật Quyền Trợ năng (Accessibility) trước!");
                     }
@@ -220,11 +219,6 @@ public class FloatingWidgetService extends Service {
     }
 
     private void clearSavedDataFile() {
-        if (AutoScrapeService.instance != null && AutoScrapeService.instance.clearSavedData()) {
-            updateProgress(0);
-            showToastOnMainThread("Đã xóa toàn bộ dữ liệu!");
-            return;
-        }
         try {
             File file = new File(getExternalFilesDir(null), "DanhSachMaDon.txt");
             if (file.exists() && file.delete()) {
@@ -320,11 +314,6 @@ public class FloatingWidgetService extends Service {
             }
         }
 
-        if (AutoScrapeService.instance != null) {
-            AutoScrapeService.instance.startAutoCallingSequence();
-            return true;
-        }
-
         return false;
     }
 
@@ -367,7 +356,7 @@ public class FloatingWidgetService extends Service {
 
     private void executeFullAutomationSteps(String trackingNumber, Uri imageUri) {
         if (AutoScrapeService.instance == null) {
-            showToastOnMainThread("Chưa bật Quyền Trợ năng (Accessibility)!");
+            showToastOnMainThread("Chưa bật Quyền Trợ năng (Accessibility) trước!");
             return;
         }
 
