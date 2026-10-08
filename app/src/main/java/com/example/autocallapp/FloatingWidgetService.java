@@ -330,7 +330,6 @@ public class FloatingWidgetService extends Service {
             if (list != null && !list.isEmpty()) {
                 for (AccessibilityNodeInfo node : list) {
                     if (node.isClickable()) {
-                        node.performAction(AccessibilityNodeInfo.ACTION_ACTION_CLICK_INT_OR_AGAIN); // giữ hành vi click cũ của bạn
                         node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
                         return true;
                     } else {
