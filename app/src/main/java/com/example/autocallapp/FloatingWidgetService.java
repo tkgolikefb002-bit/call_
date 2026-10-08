@@ -271,61 +271,71 @@ public class FloatingWidgetService extends Service {
     private boolean saveTrackingNumberUnique(String trackingCode) {
         try {
             File file = new File(getExternalFilesDir(null), "DanhSachMaDon.txt");
+            android.util.Log.d("DEBUG_FILE", "Đường dẫn file lưu: " + file.getAbsolutePath());
+            
             List<String> lines = new ArrayList<>();
             if (file.exists()) {
                 lines = Files.readAllLines(file.toPath());
                 if (lines.contains(trackingCode)) {
+                    android.util.Log.d("DEBUG_FILE", "Mã đã tồn tại trong file: " + trackingCode);
                     return false;
                 }
             }
             lines.add(trackingCode);
             Files.write(file.toPath(), lines);
+            android.util.Log.d("DEBUG_FILE", "ĐÃ LƯU THÀNH CÔNG MÃ: " + trackingCode);
             return true;
         } catch (Exception e) {
+            android.util.Log.e("DEBUG_FILE", "Lỗi ghi file: " + e.getMessage());
             e.printStackTrace();
         }
         return false;
     }
 
-    // Quét toàn diện: Bắt trực tiếp theo ID tvBillCode và quét đệ quy vét cạn các định dạng mã vận đơn
+    // Quét chuẩn xác mã vận đơn từ cây giao diện ứng dụng BEST
     private List<String> extractTrackingNumbersFromNode(AccessibilityNodeInfo node) {
         List<String> codes = new ArrayList<>();
         if (node == null) return codes;
 
-        // 1. Quét theo ID chính xác tvBillCode
+        // 1. Quét chính xác qua ID tvBillCode của app BEST
         List<AccessibilityNodeInfo> matchedNodes = node.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvBillCode");
+        android.util.Log.d("DEBUG_SCAN", "Số lượng node tìm thấy theo ID tvBillCode: " + (matchedNodes != null ? matchedNodes.size() : 0));
+
         if (matchedNodes != null && !matchedNodes.isEmpty()) {
             for (AccessibilityNodeInfo n : matchedNodes) {
                 CharSequence text = n.getText();
                 if (text != null) {
                     String code = text.toString().trim();
+                    android.util.Log.d("DEBUG_SCAN", "Đọc được text mã vận đơn: " + code);
                     if (!code.isEmpty() && !codes.contains(code)) {
                         codes.add(code);
                     }
                 }
+                n.recycle();
+            }
+        } else {
+            // 2. Dự phòng quét vét cạn nếu cấu trúc thay đổi
+            CharSequence currentText = node.getText();
+            if (currentText != null) {
+                String code = currentText.toString().trim();
+                boolean isValidFormat = code.startsWith("TTVN") || code.startsWith("BEST") || code.startsWith("848") || code.matches("^[0-9A-Z]{10,}$");
+                boolean isExcluded = code.contains("đường") || code.contains("Phường") || code.contains("Q.") || code.contains("Giao lần") || code.contains("Sản phẩm") || code.length() > 30;
+                
+                if (isValidFormat && !isExcluded && !codes.contains(code)) {
+                    android.util.Log.d("DEBUG_SCAN", "Vét cạn bắt được mã: " + code);
+                    codes.add(code);
+                }
+            }
+
+            for (int i = 0; i < node.getChildCount(); i++) {
+                AccessibilityNodeInfo child = node.getChild(i);
+                if (child != null) {
+                    codes.addAll(extractTrackingNumbersFromNode(child));
+                    child.recycle();
+                }
             }
         }
 
-        // 2. Quét vét cạn đệ quy qua các node để bắt linh hoạt mọi định dạng (TTVN, BEST, 848...)
-        CharSequence currentText = node.getText();
-        if (currentText != null) {
-            String code = currentText.toString().trim();
-            boolean isValidFormat = code.startsWith("TTVN") || code.startsWith("BEST") || code.startsWith("848") || (code.matches("^[0-9A-Z]{10,}$"));
-            boolean isExcluded = code.contains("đường") || code.contains("Phường") || code.contains("Q.") || code.contains("Giao lần") || code.contains("Sản phẩm") || code.length() > 30;
-            
-            if (isValidFormat && !isExcluded && !codes.contains(code)) {
-                codes.add(code);
-            }
-        }
-
-        for (int i = 0; i < node.getChildCount(); i++) {
-            AccessibilityNodeInfo child = node.getChild(i);
-            if (child != null) {
-                codes.addAll(extractTrackingNumbersFromNode(child));
-                child.recycle();
-            }
-        }
-        
         return codes;
     }
 
