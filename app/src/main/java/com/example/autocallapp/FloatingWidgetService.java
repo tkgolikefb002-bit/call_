@@ -9,7 +9,6 @@ import android.graphics.PixelFormat;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.IBinder;
 import android.os.Looper;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -128,7 +127,7 @@ public class FloatingWidgetService extends Service {
                 });
             }
 
-            // Nút Kính lúp: Quét mã hàng loạt -> Lưu -> Cuộn xuống cho đến khi hết
+            // Nút Kính lúp: Quét mã liên tục -> Lưu ngay -> Cuộn tức thì
             Button btnSearch = floatingView.findViewById(R.id.btnSearch);
             if (btnSearch != null) {
                 btnSearch.setOnClickListener(v -> {
@@ -137,13 +136,14 @@ public class FloatingWidgetService extends Service {
                         return;
                     }
 
-                    showToastOnMainThread("Bắt đầu quét và cuộn mã đơn...");
+                    showToastOnMainThread("Đang quét & cuộn liên tục...");
 
                     new Thread(() -> {
                         int totalScrapedNew = 0;
                         int noNewDataCount = 0;
 
-                        while (noNewDataCount < 3) {
+                        // Vòng lặp chạy liên tục vừa quét, vừa lưu, vừa cuộn nhanh
+                        while (noNewDataCount < 5) {
                             AccessibilityNodeInfo rootNode = MyAccessibilityService.getRootNodeSafely(MyAccessibilityService.instance);
                             if (rootNode == null) break;
 
@@ -157,21 +157,28 @@ public class FloatingWidgetService extends Service {
                                 }
                             }
 
-                            updateProgress(totalScrapedNew);
+                            // Cập nhật số lượng lên giao diện ngay lập tức
+                            List<String> allLines = getAllTrackingNumbers();
+                            if (allLines != null) {
+                                updateProgress(allLines.size());
+                            } else {
+                                updateProgress(totalScrapedNew);
+                            }
 
                             if (addedCount == 0) {
                                 noNewDataCount++;
                             } else {
-                                noNewDataCount = 0; 
+                                noNewDataCount = 0; // Reset lại nếu vẫn quét ra mã mới
                             }
 
                             boolean scrolled = performScrollDown(rootNode);
                             if (!scrolled) {
-                                break; 
+                                noNewDataCount++;
                             }
 
                             try {
-                                Thread.sleep(1500); 
+                                // Độ trễ ngắn (400ms) để cuộn và vét mã siêu tốc
+                                Thread.sleep(400); 
                             } catch (InterruptedException e) {
                                 e.printStackTrace();
                             }
@@ -279,15 +286,21 @@ public class FloatingWidgetService extends Service {
         return false;
     }
 
+    // Quét trực tiếp theo ID chuẩn tvBillCode của app BEST
     private List<String> extractTrackingNumbersFromNode(AccessibilityNodeInfo node) {
         List<String> codes = new ArrayList<>();
         if (node == null) return codes;
 
-        CharSequence text = node.getText();
-        if (text != null) {
-            String content = text.toString().trim();
-            if (content.length() >= 8 && content.length() <= 30 && !content.contains(" ")) {
-                codes.add(content);
+        List<AccessibilityNodeInfo> matchedNodes = node.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvBillCode");
+        if (matchedNodes != null && !matchedNodes.isEmpty()) {
+            for (AccessibilityNodeInfo n : matchedNodes) {
+                CharSequence text = n.getText();
+                if (text != null) {
+                    String code = text.toString().trim();
+                    if (!code.isEmpty() && !codes.contains(code)) {
+                        codes.add(code);
+                    }
+                }
             }
         }
 
