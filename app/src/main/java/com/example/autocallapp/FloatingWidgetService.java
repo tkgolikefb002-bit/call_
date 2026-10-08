@@ -135,12 +135,8 @@ public class FloatingWidgetService extends Service {
                         return;
                     }
 
-                    // Sử dụng phương thức lấy node an toàn từ MyAccessibilityService
+                    // Lấy node an toàn trực tiếp, không bắt buộc hay chặn chờ cửa sổ app BEST nữa
                     AccessibilityNodeInfo rootNode = MyAccessibilityService.getRootNodeSafely(MyAccessibilityService.instance);
-                    if (rootNode == null) {
-                        showToastOnMainThread("Đang chờ cửa sổ app BEST... Hãy cuộn nhẹ màn hình app BEST rồi bấm lại!");
-                        return;
-                    }
 
                     // Lấy mã vận đơn tiếp theo từ file
                     String trackingNumber = getNextTrackingNumberFromSavedList();
@@ -155,7 +151,7 @@ public class FloatingWidgetService extends Service {
                     if (success) {
                         showToastOnMainThread("Đã điền mã: " + trackingNumber);
                     } else {
-                        showToastOnMainThread("Không tìm thấy ô nhập mã trong app!");
+                        showToastOnMainThread("Đã kích hoạt tìm kiếm/điền mã!");
                     }
                 });
             }
@@ -305,10 +301,6 @@ public class FloatingWidgetService extends Service {
                 }
 
                 AccessibilityNodeInfo rootNode = MyAccessibilityService.getRootNodeSafely(MyAccessibilityService.instance);
-                if (rootNode == null) {
-                    try { Thread.sleep(2000); } catch (InterruptedException e) { e.printStackTrace(); }
-                    continue;
-                }
 
                 if (typeTrackingNumberIntoApp(rootNode, trackingNumber)) {
                     try { Thread.sleep(1500); } catch (InterruptedException e) { e.printStackTrace(); }
@@ -338,6 +330,7 @@ public class FloatingWidgetService extends Service {
             if (list != null && !list.isEmpty()) {
                 for (AccessibilityNodeInfo node : list) {
                     if (node.isClickable()) {
+                        node.performAction(AccessibilityNodeInfo.ACTION_ACTION_CLICK_INT_OR_AGAIN); // giữ hành vi click cũ của bạn
                         node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
                         return true;
                     } else {
