@@ -23,7 +23,21 @@ public class MyAccessibilityService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        if (event.getPackageName() != null && event.getPackageName().toString().contains("best")) {
+        CharSequence packageName = event.getPackageName();
+        if (packageName != null) {
+            String pkgStr = packageName.toString().toLowerCase();
+            // Mở rộng từ khóa nhận diện app BEST hoặc các tiến trình liên quan
+            if (pkgStr.contains("best") || pkgStr.contains("800best") || pkgStr.contains("sea")) {
+                AccessibilityNodeInfo root = getRootInActiveWindow();
+                if (root != null) {
+                    cachedRootNode = root;
+                }
+            }
+        }
+
+        // Bổ sung bắt sự kiện thay đổi cửa sổ để tự động cập nhật node mà không bị kẹt
+        if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED 
+                || event.getEventType() == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
             AccessibilityNodeInfo root = getRootInActiveWindow();
             if (root != null) {
                 cachedRootNode = root;
@@ -31,12 +45,10 @@ public class MyAccessibilityService extends AccessibilityService {
         }
     }
 
-    // Bổ sung phương thức để MyInCallService gọi khi kết thúc cuộc gọi
     public void onCallFinished() {
-        // Thực hiện các hành động tiếp theo sau khi gọi xong nếu cần
+        // Xử lý khi kết thúc cuộc gọi
     }
 
-    // Phương thức lấy root node an toàn
     public static AccessibilityNodeInfo getRootNodeSafely(AccessibilityService service) {
         if (service != null) {
             AccessibilityNodeInfo root = service.getRootInActiveWindow();
@@ -49,5 +61,6 @@ public class MyAccessibilityService extends AccessibilityService {
 
     @Override
     public void onInterrupt() {
+        cachedRootNode = null;
     }
 }
