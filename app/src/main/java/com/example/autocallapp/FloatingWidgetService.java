@@ -112,6 +112,7 @@ public class FloatingWidgetService extends Service {
                 btnClose.setOnClickListener(v -> stopSelf());
             }
 
+            // Nút Play / Pause: Chạy hàng loạt từ danh sách đã lưu
             Button btnPlayPause = floatingView.findViewById(R.id.btnPlayPause);
             if (btnPlayPause != null) {
                 btnPlayPause.setOnClickListener(v -> {
@@ -285,7 +286,6 @@ public class FloatingWidgetService extends Service {
         CharSequence text = node.getText();
         if (text != null) {
             String content = text.toString().trim();
-            // Lọc định dạng chuỗi có độ dài phù hợp làm mã vận đơn (từ 8 đến 30 ký tự, không chứa khoảng trắng)
             if (content.length() >= 8 && content.length() <= 30 && !content.contains(" ")) {
                 codes.add(content);
             }
@@ -340,7 +340,7 @@ public class FloatingWidgetService extends Service {
                     Bundle arguments = new Bundle();
                     arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, trackingNumber);
                     if (node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)) {
-                        return true;
+                        return true; 
                     }
                 }
             }
@@ -391,6 +391,11 @@ public class FloatingWidgetService extends Service {
                     break;
                 }
 
+                List<String> allLines = getAllTrackingNumbers();
+                if (allLines != null) {
+                    updateProgress(allLines.size());
+                }
+
                 AccessibilityNodeInfo rootNode = MyAccessibilityService.getRootNodeSafely(MyAccessibilityService.instance);
 
                 if (typeTrackingNumberIntoApp(rootNode, trackingNumber)) {
@@ -398,19 +403,27 @@ public class FloatingWidgetService extends Service {
                 }
 
                 rootNode = MyAccessibilityService.getRootNodeSafely(MyAccessibilityService.instance);
-                triggerCallAction(rootNode);
+                boolean called = triggerCallAction(rootNode);
+                if (called) {
+                    showToastOnMainThread("Đang gọi đơn: " + trackingNumber);
+                }
+                
                 try { Thread.sleep(2000); } catch (InterruptedException e) { e.printStackTrace(); }
 
                 removeFirstTrackingNumber();
 
                 try {
-                    Thread.sleep(4000);
+                    Thread.sleep(2000); 
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                     break;
                 }
             }
             isRunning = false;
+            mainHandler.post(() -> {
+                Button btnPlayPause = floatingView.findViewById(R.id.btnPlayPause);
+                if (btnPlayPause != null) btnPlayPause.setText("▶");
+            });
         }).start();
     }
 
