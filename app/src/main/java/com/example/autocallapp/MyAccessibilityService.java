@@ -23,25 +23,10 @@ public class MyAccessibilityService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        CharSequence packageName = event.getPackageName();
-        if (packageName != null) {
-            String pkgStr = packageName.toString().toLowerCase();
-            // Mở rộng từ khóa nhận diện app BEST hoặc các tiến trình liên quan
-            if (pkgStr.contains("best") || pkgStr.contains("800best") || pkgStr.contains("sea")) {
-                AccessibilityNodeInfo root = getRootInActiveWindow();
-                if (root != null) {
-                    cachedRootNode = root;
-                }
-            }
-        }
-
-        // Bổ sung bắt sự kiện thay đổi cửa sổ để tự động cập nhật node mà không bị kẹt
-        if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED 
-                || event.getEventType() == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
-            AccessibilityNodeInfo root = getRootInActiveWindow();
-            if (root != null) {
-                cachedRootNode = root;
-            }
+        // Lấy ngay root node của màn hình hiện tại mà không cần lọc tên package
+        AccessibilityNodeInfo root = getRootInActiveWindow();
+        if (root != null) {
+            cachedRootNode = root;
         }
     }
 
