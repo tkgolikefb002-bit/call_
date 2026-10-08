@@ -127,32 +127,57 @@ public class FloatingWidgetService extends Service {
                 });
             }
 
+            // Nút Kính lúp: Quét mã hàng loạt -> Lưu -> Cuộn xuống cho đến khi hết
             Button btnSearch = floatingView.findViewById(R.id.btnSearch);
             if (btnSearch != null) {
                 btnSearch.setOnClickListener(v -> {
                     if (MyAccessibilityService.instance == null) {
-                        showToastOnMainThread("Lỗi: Dịch vụ trợ năng chưa chạy. Hãy tắt và bật lại quyền Trợ năng!");
+                        showToastOnMainThread("Lỗi: Dịch vụ trợ năng chưa chạy. Hãy bật lại quyền Trợ năng!");
                         return;
                     }
 
-                    // Lấy node an toàn trực tiếp, không bắt buộc hay chặn chờ cửa sổ app BEST nữa
-                    AccessibilityNodeInfo rootNode = MyAccessibilityService.getRootNodeSafely(MyAccessibilityService.instance);
+                    showToastOnMainThread("Bắt đầu quét và cuộn mã đơn...");
 
-                    // Lấy mã vận đơn tiếp theo từ file
-                    String trackingNumber = getNextTrackingNumberFromSavedList();
-                    if (trackingNumber == null || trackingNumber.isEmpty()) {
-                        showToastOnMainThread("Danh sách mã đơn đã hết!");
-                        return;
-                    }
+                    new Thread(() -> {
+                        int totalScrapedNew = 0;
+                        int noNewDataCount = 0;
 
-                    // Thực hiện điền mã vào ô tìm kiếm của ứng dụng
-                    boolean success = typeTrackingNumberIntoApp(rootNode, trackingNumber);
-                    
-                    if (success) {
-                        showToastOnMainThread("Đã điền mã: " + trackingNumber);
-                    } else {
-                        showToastOnMainThread("Đã kích hoạt tìm kiếm/điền mã!");
-                    }
+                        while (noNewDataCount < 3) {
+                            AccessibilityNodeInfo rootNode = MyAccessibilityService.getRootNodeSafely(MyAccessibilityService.instance);
+                            if (rootNode == null) break;
+
+                            List<String> foundCodes = extractTrackingNumbersFromNode(rootNode);
+                            int addedCount = 0;
+
+                            for (String code : foundCodes) {
+                                if (saveTrackingNumberUnique(code)) {
+                                    addedCount++;
+                                    totalScrapedNew++;
+                                }
+                            }
+
+                            updateProgress(totalScrapedNew);
+
+                            if (addedCount == 0) {
+                                noNewDataCount++;
+                            } else {
+                                noNewDataCount = 0; 
+                            }
+
+                            boolean scrolled = performScrollDown(rootNode);
+                            if (!scrolled) {
+                                break; 
+                            }
+
+                            try {
+                                Thread.sleep(1500); 
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
+                        }
+
+                        showToastOnMainThread("Quét hoàn tất! Tổng mã mới: " + totalScrapedNew);
+                    }).start();
                 });
             }
 
@@ -232,6 +257,72 @@ public class FloatingWidgetService extends Service {
         } catch (Exception e) {
             showToastOnMainThread("Lỗi khi xóa: " + e.getMessage());
         }
+    }
+
+    private boolean saveTrackingNumberUnique(String trackingCode) {
+        try {
+            File file = new File(getExternalFilesDir(null), "DanhSachMaDon.txt");
+            List<String> lines = new ArrayList<>();
+            if (file.exists()) {
+                lines = Files.readAllLines(file.toPath());
+                if (lines.contains(trackingCode)) {
+                    return false;
+                }
+            }
+            lines.add(trackingCode);
+            Files.write(file.toPath(), lines);
+            return true;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    private List<String> extractTrackingNumbersFromNode(AccessibilityNodeInfo node) {
+        List<String> codes = new ArrayList<>();
+        if (node == null) return codes;
+
+        CharSequence text = node.getText();
+        if (text != null) {
+            String content = text.toString().trim();
+            // Lọc định dạng chuỗi có độ dài phù hợp làm mã vận đơn (từ 8 đến 30 ký tự, không chứa khoảng trắng)
+            if (content.length() >= 8 && content.length() <= 30 && !content.contains(" ")) {
+                codes.add(content);
+            }
+        }
+
+        for (int i = 0; i < node.getChildCount(); i++) {
+            codes.addAll(extractTrackingNumbersFromNode(node.getChild(i)));
+        }
+        return codes;
+    }
+
+    private boolean performScrollDown(AccessibilityNodeInfo rootNode) {
+        if (rootNode == null) return false;
+        AccessibilityNodeInfo scrollableNode = findScrollableNode(rootNode);
+        if (scrollableNode != null) {
+            boolean result = scrollableNode.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD);
+            scrollableNode.recycle();
+            return result;
+        }
+        return false;
+    }
+
+    private AccessibilityNodeInfo findScrollableNode(AccessibilityNodeInfo root) {
+        if (root == null) return null;
+        if (root.isScrollable()) {
+            return root;
+        }
+        for (int i = 0; i < root.getChildCount(); i++) {
+            AccessibilityNodeInfo child = root.getChild(i);
+            AccessibilityNodeInfo result = findScrollableNode(child);
+            if (result != null) {
+                if (child != result) child.recycle();
+                return result;
+            }
+            if (child != null) child.recycle();
+        }
+        return null;
     }
 
     private boolean typeTrackingNumberIntoApp(AccessibilityNodeInfo rootNode, String trackingNumber) {
