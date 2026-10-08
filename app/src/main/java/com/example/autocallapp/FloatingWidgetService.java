@@ -128,7 +128,7 @@ public class FloatingWidgetService extends Service {
                 });
             }
 
-            // Nút Kính lúp: Quét mã liên tục -> Lưu ngay -> Cuộn tức thì
+            // Nút Kính lúp: Quét mã liên tục -> Lưu ngay -> Cuộn tức thì bằng RecyclerView ID
             Button btnSearch = floatingView.findViewById(R.id.btnSearch);
             if (btnSearch != null) {
                 btnSearch.setOnClickListener(v -> {
@@ -143,10 +143,15 @@ public class FloatingWidgetService extends Service {
                         int totalScrapedNew = 0;
                         int noNewDataCount = 0;
 
-                        // Vòng lặp chạy liên tục vừa quét, vừa lưu, vừa cuộn nhanh
+                        // Vòng lặp quét, lưu và cuộn tự động liên tục
                         while (noNewDataCount < 5) {
                             AccessibilityNodeInfo rootNode = MyAccessibilityService.getRootNodeSafely(MyAccessibilityService.instance);
-                            if (rootNode == null) break;
+                            if (rootNode == null) {
+                                android.util.Log.e("DEBUG_SCAN", "LỖI: rootNode bị null! Đang thử lại...");
+                                try { Thread.sleep(1000); } catch (InterruptedException e) {}
+                                noNewDataCount++;
+                                continue;
+                            }
 
                             List<String> foundCodes = extractTrackingNumbersFromNode(rootNode);
                             int addedCount = 0;
@@ -158,7 +163,6 @@ public class FloatingWidgetService extends Service {
                                 }
                             }
 
-                            // Cập nhật số lượng lên giao diện ngay lập tức
                             List<String> allLines = getAllTrackingNumbers();
                             if (allLines != null) {
                                 updateProgress(allLines.size());
@@ -169,17 +173,19 @@ public class FloatingWidgetService extends Service {
                             if (addedCount == 0) {
                                 noNewDataCount++;
                             } else {
-                                noNewDataCount = 0; // Reset lại nếu vẫn quét ra mã mới
+                                noNewDataCount = 0; // Reset lại khi quét ra mã mới
                             }
 
-                            boolean scrolled = performScrollDown(rootNode);
+                            // Ép cuộn trực tiếp qua ID rvTask của app BEST
+                            boolean scrolled = performBestScrollDown(rootNode);
                             if (!scrolled) {
                                 noNewDataCount++;
                             }
 
+                            rootNode.recycle(); // Giải phóng bộ nhớ rootNode
+
                             try {
-                                // Độ trễ ngắn (400ms) để cuộn và vét mã siêu tốc
-                                Thread.sleep(400); 
+                                Thread.sleep(600); // Độ trễ tối ưu để app kịp render khung hình mới
                             } catch (InterruptedException e) {
                                 e.printStackTrace();
                             }
@@ -339,8 +345,23 @@ public class FloatingWidgetService extends Service {
         return codes;
     }
 
-    private boolean performScrollDown(AccessibilityNodeInfo rootNode) {
+    // Ép cuộn trực tiếp vào RecyclerView rvTask của app BEST
+    private boolean performBestScrollDown(AccessibilityNodeInfo rootNode) {
         if (rootNode == null) return false;
+
+        List<AccessibilityNodeInfo> listViews = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/rvTask");
+        if (listViews != null && !listViews.isEmpty()) {
+            for (AccessibilityNodeInfo rv : listViews) {
+                boolean scrolled = rv.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD);
+                rv.recycle();
+                if (scrolled) {
+                    android.util.Log.d("DEBUG_SCAN", "Cuộn thành công qua ID rvTask!");
+                    return true;
+                }
+            }
+        }
+
+        // Dự phòng: Tìm node cuộn bất kỳ nếu không bắt được rvTask
         AccessibilityNodeInfo scrollableNode = findScrollableNode(rootNode);
         if (scrollableNode != null) {
             boolean result = scrollableNode.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD);
