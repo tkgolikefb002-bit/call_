@@ -129,7 +129,7 @@ public class FloatingWidgetService extends Service {
                 });
             }
 
-            // Nút Kính lúp: Quét mã hiện tại tại tab đang hiển thị -> Lưu ngay lập tức -> Cuộn xuống -> Lặp lại
+            // Nút Kính lúp: Quét mã hiện tại tại tab đang hiển thị dựa vào khung chứa đơn -> Lưu ngay -> Cuộn xuống -> Lặp lại
             Button btnSearch = floatingView.findViewById(R.id.btnSearch);
             if (btnSearch != null) {
                 btnSearch.setOnClickListener(v -> {
@@ -154,7 +154,7 @@ public class FloatingWidgetService extends Service {
                                 continue;
                             }
 
-                            // 1. Quét lấy mã vận đơn trong đúng tab đang chọn
+                            // 1. Quét lấy mã vận đơn dựa trên cấu trúc khối đơn hàng (clParent)
                             List<String> foundCodes = extractTrackingNumbersFromNode(rootNode);
                             int addedCount = 0;
 
@@ -298,52 +298,46 @@ public class FloatingWidgetService extends Service {
         return false;
     }
 
-    // QUÉT CHÍNH XÁC: Kiểm tra tab "Đã quét giao hôm nay" đang được chọn (selected=true) rồi mới quét
+    // QUÉT DỰA TRÊN KHUNG CHỨA ĐƠN HÀNG (clParent) VÀ CHỈ LẤY MÃ VẬN ĐƠN (tvBillCode)
     private List<String> extractTrackingNumbersFromNode(AccessibilityNodeInfo node) {
         List<String> codes = new ArrayList<>();
         if (node == null) return codes;
 
-        // 1. Kiểm tra xem tab đúng chuẩn đang active trên giao diện hay không
-        List<AccessibilityNodeInfo> tabNodes = node.findAccessibilityNodeInfosByText("Đã quét giao hôm nay");
-        boolean isCorrectTabActive = false;
-        if (tabNodes != null) {
-            for (AccessibilityNodeInfo tab : tabNodes) {
-                if (tab.isSelected() || (tab.getParent() != null && tab.getParent().isSelected())) {
-                    isCorrectTabActive = true;
-                    tab.recycle();
-                    break;
-                }
-                tab.recycle();
-            }
-        }
+        // Tìm tất cả các khối chứa đơn hàng (clParent) trên màn hình
+        List<AccessibilityNodeInfo> parentNodes = node.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/clParent");
+        if (parentNodes != null && !parentNodes.isEmpty()) {
+            for (AccessibilityNodeInfo parent : parentNodes) {
+                if (parent != null) {
+                    // Kiểm tra xem khối đơn hàng này có nằm trong vùng nhìn thấy thực tế của màn hình không
+                    Rect parentBounds = new Rect();
+                    parent.getBoundsInScreen(parentBounds);
 
-        if (!isCorrectTabActive) {
-            android.util.Log.d("DEBUG_SCAN", "Tab hiện tại không phải 'Đã quét giao hôm nay', bỏ qua.");
-            return codes;
-        }
+                    int screenTopLimit = 450;
+                    int screenBottomLimit = 1700;
 
-        // 2. Tiến hành quét các mã vận đơn trong danh sách của tab hiện tại
-        List<AccessibilityNodeInfo> matchedNodes = node.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvBillCode");
-        if (matchedNodes != null && !matchedNodes.isEmpty()) {
-            for (AccessibilityNodeInfo n : matchedNodes) {
-                CharSequence text = n.getText();
-                if (text != null) {
-                    String code = text.toString().trim();
-                    boolean isValidPrefix = code.startsWith("TT") || code.startsWith("84") || code.startsWith("BE");
-                    boolean isValidLength = code.length() >= 10 && code.length() <= 25;
-
-                    if (isValidPrefix && isValidLength && !code.isEmpty() && !codes.contains(code)) {
-                        Rect bounds = new Rect();
-                        n.getBoundsInScreen(bounds);
+                    if (parentBounds.top > screenTopLimit && parentBounds.bottom < screenBottomLimit) {
                         
-                        // Giới hạn tọa độ Y để lấy chính xác đơn hiển thị trong khung màn hình
-                        if (bounds.top > 450 && bounds.bottom < 1700) {
-                            android.util.Log.d("DEBUG_SCAN", "Lấy đúng mã trong tab: " + code);
-                            codes.add(code);
+                        // Tìm mã vận đơn (tvBillCode) BÊN TRONG khối đơn hàng này (Bất kể vị trí index 0 hay 1 do có checkbox hay không)
+                        List<AccessibilityNodeInfo> billCodes = parent.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvBillCode");
+                        if (billCodes != null && !billCodes.isEmpty()) {
+                            for (AccessibilityNodeInfo billNode : billCodes) {
+                                CharSequence text = billNode.getText();
+                                if (text != null) {
+                                    String code = text.toString().trim();
+                                    boolean isValidPrefix = code.startsWith("TT") || code.startsWith("84") || code.startsWith("BE");
+                                    boolean isValidLength = code.length() >= 10 && code.length() <= 25;
+
+                                    if (isValidPrefix && isValidLength && !code.isEmpty() && !codes.contains(code)) {
+                                        android.util.Log.d("DEBUG_SCAN", "Lấy chuẩn mã vận đơn trong khung: " + code);
+                                        codes.add(code);
+                                    }
+                                }
+                                billNode.recycle();
+                            }
                         }
                     }
+                    parent.recycle();
                 }
-                n.recycle();
             }
         }
         return codes;
@@ -424,6 +418,7 @@ public class FloatingWidgetService extends Service {
         }
 
         String[] fallbackIds = {
+            "com.best.android.vietcourier:id/ivSelect", // Có thể bổ sung fallback nếu cần
             "com.best.android.vietcourier:id/ivCall",
             "com.best.android.vietcourier:id/img_call",
             "com.best.android.vietcourier:id/btnCall"
