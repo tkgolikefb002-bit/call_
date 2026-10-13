@@ -154,7 +154,7 @@ public class FloatingWidgetService extends Service {
                                 continue;
                             }
 
-                            // 1. Quét lấy mã vận đơn trong vùng hiển thị danh sách của tab hiện tại
+                            // 1. Quét lấy mã vận đơn trong RecyclerView của tab hiện tại
                             List<String> foundCodes = extractTrackingNumbersFromNode(rootNode);
                             int addedCount = 0;
 
@@ -298,39 +298,47 @@ public class FloatingWidgetService extends Service {
         return false;
     }
 
-    // CHỈ QUÉT MÃ NẰM TRONG KHUNG NHÌN CHÍNH XÁC (Y TỪ 450 ĐẾN 1700 ĐỂ CHỈ LẤY ĐƠN ĐANG HIỂN THỊ)
+    // CHỈ QUÉT CÁC ĐƠN HÀNG THUỘC ITEM CON ĐANG HIỂN THỊ TRONG RECYCLERVIEW rvTask
     private List<String> extractTrackingNumbersFromNode(AccessibilityNodeInfo node) {
         List<String> codes = new ArrayList<>();
         if (node == null) return codes;
 
-        List<AccessibilityNodeInfo> matchedNodes = node.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvBillCode");
-        if (matchedNodes != null && !matchedNodes.isEmpty()) {
-            for (AccessibilityNodeInfo n : matchedNodes) {
-                CharSequence text = n.getText();
-                if (text != null) {
-                    String code = text.toString().trim();
-                    boolean isValidPrefix = code.startsWith("TT") || code.startsWith("84") || code.startsWith("BE");
-                    boolean isValidLength = code.length() >= 10 && code.length() <= 25;
+        List<AccessibilityNodeInfo> recyclerViews = node.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/rvTask");
+        if (recyclerViews != null && !recyclerViews.isEmpty()) {
+            for (AccessibilityNodeInfo rv : recyclerViews) {
+                if (rv != null) {
+                    int childCount = rv.getChildCount();
+                    for (int i = 0; i < childCount; i++) {
+                        AccessibilityNodeInfo itemChild = rv.getChild(i);
+                        if (itemChild != null) {
+                            List<AccessibilityNodeInfo> billCodes = itemChild.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvBillCode");
+                            if (billCodes != null && !billCodes.isEmpty()) {
+                                for (AccessibilityNodeInfo billNode : billCodes) {
+                                    CharSequence text = billNode.getText();
+                                    if (text != null) {
+                                        String code = text.toString().trim();
+                                        boolean isValidPrefix = code.startsWith("TT") || code.startsWith("84") || code.startsWith("BE");
+                                        boolean isValidLength = code.length() >= 10 && code.length() <= 25;
 
-                    if (isValidPrefix && isValidLength && !code.isEmpty() && !codes.contains(code)) {
-                        
-                        // Lấy tọa độ thực tế trên màn hình
-                        Rect bounds = new Rect();
-                        n.getBoundsInScreen(bounds);
-                        
-                        // Thiết lập giới hạn vùng nhìn thấy chính xác trên màn hình (loại bỏ vùng tab phía trên và dưới)
-                        int screenTopLimit = 450;
-                        int screenBottomLimit = 1700;
-                        
-                        if (bounds.top > screenTopLimit && bounds.bottom < screenBottomLimit) {
-                            android.util.Log.d("DEBUG_SCAN", "Lấy đúng mã đơn ở màn hình: " + code + " tại tọa độ Y: " + bounds.top);
-                            codes.add(code);
-                        } else {
-                            android.util.Log.d("DEBUG_SCAN", "Bỏ qua mã nằm ngoài vùng nhìn thấy: " + code + " tại tọa độ Y: " + bounds.top);
+                                        if (isValidPrefix && isValidLength && !code.isEmpty() && !codes.contains(code)) {
+                                            Rect bounds = new Rect();
+                                            billNode.getBoundsInScreen(bounds);
+                                            
+                                            // Kiểm tra giới hạn tọa độ Y để chắc chắn đơn đang hiển thị trên màn hình
+                                            if (bounds.top > 450 && bounds.bottom < 1700) {
+                                                android.util.Log.d("DEBUG_SCAN", "Lấy đúng mã đơn trong RecyclerView: " + code);
+                                                codes.add(code);
+                                            }
+                                        }
+                                    }
+                                    billNode.recycle();
+                                }
+                            }
+                            itemChild.recycle();
                         }
                     }
+                    rv.recycle();
                 }
-                n.recycle();
             }
         }
 
