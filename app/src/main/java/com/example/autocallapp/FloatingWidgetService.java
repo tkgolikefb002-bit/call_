@@ -128,7 +128,7 @@ public class FloatingWidgetService extends Service {
                 });
             }
 
-            // Nút Kính lúp: Quét mã liên tục -> Lưu ngay -> Cuộn tức thì -> Lặp lại
+            // Nút Kính lúp: Quét mã -> Lưu ngay -> Cuộn tổng quát -> Lặp lại
             Button btnSearch = floatingView.findViewById(R.id.btnSearch);
             if (btnSearch != null) {
                 btnSearch.setOnClickListener(v -> {
@@ -144,7 +144,7 @@ public class FloatingWidgetService extends Service {
                         int noNewDataCount = 0;
 
                         // Vòng lặp quét, lưu và cuộn tự động liên tục
-                        while (noNewDataCount < 8) {
+                        while (noNewDataCount < 10) {
                             AccessibilityNodeInfo rootNode = MyAccessibilityService.getRootNodeSafely(MyAccessibilityService.instance);
                             if (rootNode == null) {
                                 android.util.Log.e("DEBUG_SCAN", "LỖI: rootNode bị null! Đang thử lại...");
@@ -153,7 +153,7 @@ public class FloatingWidgetService extends Service {
                                 continue;
                             }
 
-                            // 1. Quét lấy danh sách mã hiển thị trên màn hình hiện tại và lưu ngay lập tức
+                            // 1. Quét lấy danh sách mã hiện có trên màn hình và lưu ngay lập tức
                             List<String> foundCodes = extractTrackingNumbersFromNode(rootNode);
                             int addedCount = 0;
 
@@ -175,7 +175,7 @@ public class FloatingWidgetService extends Service {
                                 noNewDataCount = 0; // Reset lại khi quét ra mã mới
                             }
 
-                            // 2. Thực hiện cuộn xuống qua RecyclerView rvTask
+                            // 2. Thực hiện cuộn màn hình xuống dưới để nạp dữ liệu tiếp theo
                             boolean scrolled = performBestScrollDown(rootNode);
                             
                             // Giải phóng bộ nhớ rootNode
@@ -184,9 +184,8 @@ public class FloatingWidgetService extends Service {
                             if (!scrolled) {
                                 noNewDataCount++;
                             } else {
-                                // 3. Đợi khung hình load dữ liệu mới sau khi cuộn rồi tiếp tục vòng lặp
                                 try {
-                                    Thread.sleep(850); 
+                                    Thread.sleep(1000); // Đợi app render khung hình mới sau khi cuộn
                                 } catch (InterruptedException e) {
                                     e.printStackTrace();
                                 }
@@ -279,13 +278,10 @@ public class FloatingWidgetService extends Service {
     private boolean saveTrackingNumberUnique(String trackingCode) {
         try {
             File file = new File(getExternalFilesDir(null), "DanhSachMaDon.txt");
-            android.util.Log.d("DEBUG_FILE", "Đường dẫn file lưu: " + file.getAbsolutePath());
-
             List<String> lines = new ArrayList<>();
             if (file.exists()) {
                 lines = Files.readAllLines(file.toPath());
                 if (lines.contains(trackingCode)) {
-                    android.util.Log.d("DEBUG_FILE", "Mã đã tồn tại trong file: " + trackingCode);
                     return false;
                 }
             }
@@ -294,25 +290,23 @@ public class FloatingWidgetService extends Service {
             android.util.Log.d("DEBUG_FILE", "ĐÃ LƯU THÀNH CÔNG MÃ: " + trackingCode);
             return true;
         } catch (Exception e) {
-            android.util.Log.e("DEBUG_FILE", "Lỗi ghi file: " + e.getMessage());
             e.printStackTrace();
         }
         return false;
     }
 
-    // Quét chuẩn xác mã vận đơn từ cây giao diện ứng dụng BEST (ID tvBillCode & Vét cạn TextView)
+    // Quét chuẩn xác mã vận đơn qua ID tvBillCode hoặc vét cạn TextView
     private List<String> extractTrackingNumbersFromNode(AccessibilityNodeInfo node) {
         List<String> codes = new ArrayList<>();
         if (node == null) return codes;
 
-        // 1. Quét chính xác qua ID tvBillCode của app BEST
+        // 1. Quét theo ID tvBillCode
         List<AccessibilityNodeInfo> matchedNodes = node.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvBillCode");
         if (matchedNodes != null && !matchedNodes.isEmpty()) {
             for (AccessibilityNodeInfo n : matchedNodes) {
                 CharSequence text = n.getText();
                 if (text != null) {
                     String code = text.toString().trim();
-                    android.util.Log.d("DEBUG_SCAN", "Đọc được text mã vận đơn theo ID: " + code);
                     if (!code.isEmpty() && !codes.contains(code)) {
                         codes.add(code);
                     }
@@ -321,7 +315,7 @@ public class FloatingWidgetService extends Service {
             }
         }
 
-        // 2. Duyệt đệ quy toàn bộ cây giao diện để vét cạn nếu node là TextView chứa mã
+        // 2. Vét cạn dự phòng qua TextView
         if (node.getClassName() != null && node.getClassName().toString().contains("TextView")) {
             CharSequence currentText = node.getText();
             if (currentText != null) {
@@ -330,13 +324,11 @@ public class FloatingWidgetService extends Service {
                 boolean isExcluded = code.contains("đường") || code.contains("Phường") || code.contains("Q.") || code.contains("Giao lần") || code.contains("Sản phẩm") || code.contains(":");
 
                 if (isValidFormat && !isExcluded && !codes.contains(code)) {
-                    android.util.Log.d("DEBUG_SCAN", "Vét cạn bắt được mã: " + code);
                     codes.add(code);
                 }
             }
         }
 
-        // Duyệt các node con đệ quy
         for (int i = 0; i < node.getChildCount(); i++) {
             AccessibilityNodeInfo child = node.getChild(i);
             if (child != null) {
@@ -348,28 +340,19 @@ public class FloatingWidgetService extends Service {
         return codes;
     }
 
-    // Ép cuộn trực tiếp vào RecyclerView rvTask của app BEST
+    // Cuộn màn hình: Ưu tiên tìm mọi node cuộn được trên màn hình
     private boolean performBestScrollDown(AccessibilityNodeInfo rootNode) {
         if (rootNode == null) return false;
 
-        List<AccessibilityNodeInfo> listViews = rootNode.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/rvTask");
-        if (listViews != null && !listViews.isEmpty()) {
-            for (AccessibilityNodeInfo rv : listViews) {
-                boolean scrolled = rv.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD);
-                rv.recycle();
-                if (scrolled) {
-                    android.util.Log.d("DEBUG_SCAN", "Cuộn thành công qua ID rvTask!");
-                    return true;
-                }
-            }
-        }
-
-        // Dự phòng: Tìm node cuộn bất kỳ nếu không bắt được rvTask
+        // Thử tìm node cuộn bất kỳ trên cây giao diện
         AccessibilityNodeInfo scrollableNode = findScrollableNode(rootNode);
         if (scrollableNode != null) {
             boolean result = scrollableNode.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD);
             scrollableNode.recycle();
-            return result;
+            if (result) {
+                android.util.Log.d("DEBUG_SCAN", "Cuộn thành công qua node cuộn tìm được!");
+                return true;
+            }
         }
         return false;
     }
@@ -453,7 +436,7 @@ public class FloatingWidgetService extends Service {
                 String trackingNumber = getNextTrackingNumberFromSavedList();
                 if (trackingNumber == null || trackingNumber.isEmpty()) {
                     isRunning = false;
-                    showToastOnMainThread("Đã chạy xong toàn bộ danh sách đơn!");
+                    showToastOnMainThread("Đã chạy xong toàn bộ danh sách đơn hàng!");
                     break;
                 }
 
@@ -501,7 +484,7 @@ public class FloatingWidgetService extends Service {
                 for (AccessibilityNodeInfo node : list) {
                     if (node.isClickable()) {
                         node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                        return true;
+                    return true;
                     } else {
                         AccessibilityNodeInfo parent = node.getParent();
                         while (parent != null) {
