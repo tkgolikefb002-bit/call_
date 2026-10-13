@@ -298,7 +298,7 @@ public class FloatingWidgetService extends Service {
         return false;
     }
 
-    // CHỈ QUÉT MÃ NẰM TRONG KHUNG NHÌN DANH SÁCH BÊN DƯỚI (LOẠI BỎ VÙNG TAB VÀ TAB ẨN PHÍA TRÊN)
+    // CHỈ QUÉT MÃ NẰM TRONG KHUNG NHÌN CHÍNH XÁC (Y TỪ 450 ĐẾN 1700 ĐỂ CHỈ LẤY ĐƠN ĐANG HIỂN THỊ)
     private List<String> extractTrackingNumbersFromNode(AccessibilityNodeInfo node) {
         List<String> codes = new ArrayList<>();
         if (node == null) return codes;
@@ -314,18 +314,19 @@ public class FloatingWidgetService extends Service {
 
                     if (isValidPrefix && isValidLength && !code.isEmpty() && !codes.contains(code)) {
                         
-                        // Kiểm tra tọa độ hiển thị thực tế trên màn hình
+                        // Lấy tọa độ thực tế trên màn hình
                         Rect bounds = new Rect();
                         n.getBoundsInScreen(bounds);
                         
-                        // Chỉ lấy các đơn hàng nằm ở vùng danh sách bên dưới (Y > 450 pixel, loại bỏ vùng tab/bộ lọc phía trên)
-                        int screenTopLimit = 450; 
+                        // Thiết lập giới hạn vùng nhìn thấy chính xác trên màn hình (loại bỏ vùng tab phía trên và dưới)
+                        int screenTopLimit = 450;
+                        int screenBottomLimit = 1700;
                         
-                        if (bounds.top > screenTopLimit && bounds.bottom > 0) {
-                            android.util.Log.d("DEBUG_SCAN", "Lấy đúng mã đơn ở danh sách: " + code + " tại tọa độ Y: " + bounds.top);
+                        if (bounds.top > screenTopLimit && bounds.bottom < screenBottomLimit) {
+                            android.util.Log.d("DEBUG_SCAN", "Lấy đúng mã đơn ở màn hình: " + code + " tại tọa độ Y: " + bounds.top);
                             codes.add(code);
                         } else {
-                            android.util.Log.d("DEBUG_SCAN", "Bỏ qua mã ở vùng tab/bộ lọc phía trên: " + code);
+                            android.util.Log.d("DEBUG_SCAN", "Bỏ qua mã nằm ngoài vùng nhìn thấy: " + code + " tại tọa độ Y: " + bounds.top);
                         }
                     }
                 }
