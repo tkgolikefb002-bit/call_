@@ -128,7 +128,7 @@ public class FloatingWidgetService extends Service {
                 });
             }
 
-            // Nút Kính lúp: Quét mã -> Lưu ngay -> Cuộn tổng quát -> Lặp lại
+            // Nút Kính lúp: Quét mã hiện tại -> Lưu ngay lập tức -> Cuộn xuống -> Lặp lại
             Button btnSearch = floatingView.findViewById(R.id.btnSearch);
             if (btnSearch != null) {
                 btnSearch.setOnClickListener(v -> {
@@ -137,14 +137,14 @@ public class FloatingWidgetService extends Service {
                         return;
                     }
 
-                    showToastOnMainThread("Đang quét & cuộn liên tục...");
+                    showToastOnMainThread("Đang tiến hành quét, lưu và cuộn...");
 
                     new Thread(() -> {
                         int totalScrapedNew = 0;
                         int noNewDataCount = 0;
 
-                        // Vòng lặp quét, lưu và cuộn tự động liên tục
-                        while (noNewDataCount < 10) {
+                        // Vòng lặp quét liên tục cho đến khi hết dữ liệu mới (không cuộn được nữa)
+                        while (noNewDataCount < 8) {
                             AccessibilityNodeInfo rootNode = MyAccessibilityService.getRootNodeSafely(MyAccessibilityService.instance);
                             if (rootNode == null) {
                                 android.util.Log.e("DEBUG_SCAN", "LỖI: rootNode bị null! Đang thử lại...");
@@ -153,10 +153,11 @@ public class FloatingWidgetService extends Service {
                                 continue;
                             }
 
-                            // 1. Quét lấy danh sách mã hiện có trên màn hình và lưu ngay lập tức
+                            // 1. Quét lấy mã vận đơn trên màn hình hiện tại
                             List<String> foundCodes = extractTrackingNumbersFromNode(rootNode);
                             int addedCount = 0;
 
+                            // 2. Lưu ngay vào file (chỉ lưu mã chưa có)
                             for (String code : foundCodes) {
                                 if (saveTrackingNumberUnique(code)) {
                                     addedCount++;
@@ -172,27 +173,28 @@ public class FloatingWidgetService extends Service {
                             }
 
                             if (addedCount > 0) {
-                                noNewDataCount = 0; // Reset lại khi quét ra mã mới
+                                noNewDataCount = 0; // Reset lại bộ đếm nếu tìm thấy mã mới
                             }
 
-                            // 2. Thực hiện cuộn màn hình xuống dưới để nạp dữ liệu tiếp theo
+                            // 3. Thực hiện cuộn màn hình xuống dưới để nạp dữ liệu tiếp theo
                             boolean scrolled = performBestScrollDown(rootNode);
                             
-                            // Giải phóng bộ nhớ rootNode
+                            // Giải phóng node gốc sau khi dùng xong
                             rootNode.recycle();
 
                             if (!scrolled) {
                                 noNewDataCount++;
                             } else {
+                                // 4. Đợi app render khung hình mới sau khi cuộn
                                 try {
-                                    Thread.sleep(1000); // Đợi app render khung hình mới sau khi cuộn
+                                    Thread.sleep(900); 
                                 } catch (InterruptedException e) {
                                     e.printStackTrace();
                                 }
                             }
                         }
 
-                        showToastOnMainThread("Quét hoàn tất! Tổng mã mới: " + totalScrapedNew);
+                        showToastOnMainThread("Quét hoàn tất! Tổng mã mới thêm: " + totalScrapedNew);
                     }).start();
                 });
             }
@@ -295,19 +297,20 @@ public class FloatingWidgetService extends Service {
         return false;
     }
 
-    // Quét chuẩn xác mã vận đơn qua ID tvBillCode hoặc vét cạn TextView
+    // Quét chuẩn xác mã vận đơn từ cây giao diện ứng dụng BEST (Bắt đầu bằng TT, 84, BE)
     private List<String> extractTrackingNumbersFromNode(AccessibilityNodeInfo node) {
         List<String> codes = new ArrayList<>();
         if (node == null) return codes;
 
-        // 1. Quét theo ID tvBillCode
+        // 1. Quét trực tiếp qua ID tvBillCode chính xác từ app BEST
         List<AccessibilityNodeInfo> matchedNodes = node.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvBillCode");
         if (matchedNodes != null && !matchedNodes.isEmpty()) {
             for (AccessibilityNodeInfo n : matchedNodes) {
                 CharSequence text = n.getText();
                 if (text != null) {
                     String code = text.toString().trim();
-                    if (!code.isEmpty() && !codes.contains(code)) {
+                    boolean isValidPrefix = code.startsWith("TT") || code.startsWith("84") || code.startsWith("BE");
+                    if (isValidPrefix && !code.isEmpty() && !codes.contains(code)) {
                         codes.add(code);
                     }
                 }
@@ -315,20 +318,23 @@ public class FloatingWidgetService extends Service {
             }
         }
 
-        // 2. Vét cạn dự phòng qua TextView
+        // 2. Quét vét cạn dự phòng qua các TextView với 2 ký tự đầu: TT, 84, BE
         if (node.getClassName() != null && node.getClassName().toString().contains("TextView")) {
             CharSequence currentText = node.getText();
             if (currentText != null) {
                 String code = currentText.toString().trim();
-                boolean isValidFormat = code.startsWith("848") || code.startsWith("TTVN") || code.startsWith("BEST") || code.matches("^[0-9A-Z]{10,20}$");
+                boolean isValidPrefix = code.startsWith("TT") || code.startsWith("84") || code.startsWith("BE");
+                boolean isValidFormat = isValidPrefix && code.matches("^[0-9A-Z]{10,25}$");
                 boolean isExcluded = code.contains("đường") || code.contains("Phường") || code.contains("Q.") || code.contains("Giao lần") || code.contains("Sản phẩm") || code.contains(":");
 
                 if (isValidFormat && !isExcluded && !codes.contains(code)) {
+                    android.util.Log.d("DEBUG_SCAN", "Vét cạn bắt được mã: " + code);
                     codes.add(code);
                 }
             }
         }
 
+        // Duyệt đệ quy tìm kiếm trong các node con
         for (int i = 0; i < node.getChildCount(); i++) {
             AccessibilityNodeInfo child = node.getChild(i);
             if (child != null) {
@@ -340,17 +346,15 @@ public class FloatingWidgetService extends Service {
         return codes;
     }
 
-    // Cuộn màn hình: Ưu tiên tìm mọi node cuộn được trên màn hình
+    // Hàm cuộn màn hình tìm kiếm node có khả năng cuộn
     private boolean performBestScrollDown(AccessibilityNodeInfo rootNode) {
         if (rootNode == null) return false;
 
-        // Thử tìm node cuộn bất kỳ trên cây giao diện
         AccessibilityNodeInfo scrollableNode = findScrollableNode(rootNode);
         if (scrollableNode != null) {
             boolean result = scrollableNode.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD);
             scrollableNode.recycle();
             if (result) {
-                android.util.Log.d("DEBUG_SCAN", "Cuộn thành công qua node cuộn tìm được!");
                 return true;
             }
         }
@@ -484,7 +488,7 @@ public class FloatingWidgetService extends Service {
                 for (AccessibilityNodeInfo node : list) {
                     if (node.isClickable()) {
                         node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-                    return true;
+                        return true;
                     } else {
                         AccessibilityNodeInfo parent = node.getParent();
                         while (parent != null) {
