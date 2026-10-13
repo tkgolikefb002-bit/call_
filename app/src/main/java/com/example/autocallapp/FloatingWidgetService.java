@@ -154,7 +154,7 @@ public class FloatingWidgetService extends Service {
                                 continue;
                             }
 
-                            // 1. Quét lấy mã vận đơn trong RecyclerView của tab hiện tại
+                            // 1. Quét lấy mã vận đơn trong đúng tab đang chọn
                             List<String> foundCodes = extractTrackingNumbersFromNode(rootNode);
                             int addedCount = 0;
 
@@ -298,50 +298,54 @@ public class FloatingWidgetService extends Service {
         return false;
     }
 
-    // CHỈ QUÉT CÁC ĐƠN HÀNG THUỘC ITEM CON ĐANG HIỂN THỊ TRONG RECYCLERVIEW rvTask
+    // QUÉT CHÍNH XÁC: Kiểm tra tab "Đã quét giao hôm nay" đang được chọn (selected=true) rồi mới quét
     private List<String> extractTrackingNumbersFromNode(AccessibilityNodeInfo node) {
         List<String> codes = new ArrayList<>();
         if (node == null) return codes;
 
-        List<AccessibilityNodeInfo> recyclerViews = node.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/rvTask");
-        if (recyclerViews != null && !recyclerViews.isEmpty()) {
-            for (AccessibilityNodeInfo rv : recyclerViews) {
-                if (rv != null) {
-                    int childCount = rv.getChildCount();
-                    for (int i = 0; i < childCount; i++) {
-                        AccessibilityNodeInfo itemChild = rv.getChild(i);
-                        if (itemChild != null) {
-                            List<AccessibilityNodeInfo> billCodes = itemChild.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvBillCode");
-                            if (billCodes != null && !billCodes.isEmpty()) {
-                                for (AccessibilityNodeInfo billNode : billCodes) {
-                                    CharSequence text = billNode.getText();
-                                    if (text != null) {
-                                        String code = text.toString().trim();
-                                        boolean isValidPrefix = code.startsWith("TT") || code.startsWith("84") || code.startsWith("BE");
-                                        boolean isValidLength = code.length() >= 10 && code.length() <= 25;
-
-                                        if (isValidPrefix && isValidLength && !code.isEmpty() && !codes.contains(code)) {
-                                            Rect bounds = new Rect();
-                                            billNode.getBoundsInScreen(bounds);
-                                            
-                                            // Kiểm tra giới hạn tọa độ Y để chắc chắn đơn đang hiển thị trên màn hình
-                                            if (bounds.top > 450 && bounds.bottom < 1700) {
-                                                android.util.Log.d("DEBUG_SCAN", "Lấy đúng mã đơn trong RecyclerView: " + code);
-                                                codes.add(code);
-                                            }
-                                        }
-                                    }
-                                    billNode.recycle();
-                                }
-                            }
-                            itemChild.recycle();
-                        }
-                    }
-                    rv.recycle();
+        // 1. Kiểm tra xem tab đúng chuẩn đang active trên giao diện hay không
+        List<AccessibilityNodeInfo> tabNodes = node.findAccessibilityNodeInfosByText("Đã quét giao hôm nay");
+        boolean isCorrectTabActive = false;
+        if (tabNodes != null) {
+            for (AccessibilityNodeInfo tab : tabNodes) {
+                if (tab.isSelected() || (tab.getParent() != null && tab.getParent().isSelected())) {
+                    isCorrectTabActive = true;
+                    tab.recycle();
+                    break;
                 }
+                tab.recycle();
             }
         }
 
+        if (!isCorrectTabActive) {
+            android.util.Log.d("DEBUG_SCAN", "Tab hiện tại không phải 'Đã quét giao hôm nay', bỏ qua.");
+            return codes;
+        }
+
+        // 2. Tiến hành quét các mã vận đơn trong danh sách của tab hiện tại
+        List<AccessibilityNodeInfo> matchedNodes = node.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvBillCode");
+        if (matchedNodes != null && !matchedNodes.isEmpty()) {
+            for (AccessibilityNodeInfo n : matchedNodes) {
+                CharSequence text = n.getText();
+                if (text != null) {
+                    String code = text.toString().trim();
+                    boolean isValidPrefix = code.startsWith("TT") || code.startsWith("84") || code.startsWith("BE");
+                    boolean isValidLength = code.length() >= 10 && code.length() <= 25;
+
+                    if (isValidPrefix && isValidLength && !code.isEmpty() && !codes.contains(code)) {
+                        Rect bounds = new Rect();
+                        n.getBoundsInScreen(bounds);
+                        
+                        // Giới hạn tọa độ Y để lấy chính xác đơn hiển thị trong khung màn hình
+                        if (bounds.top > 450 && bounds.bottom < 1700) {
+                            android.util.Log.d("DEBUG_SCAN", "Lấy đúng mã trong tab: " + code);
+                            codes.add(code);
+                        }
+                    }
+                }
+                n.recycle();
+            }
+        }
         return codes;
     }
 
