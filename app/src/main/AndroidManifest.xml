@@ -11,11 +11,11 @@
     <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
     <uses-permission android:name="android.permission.CONTROL_INCALL_USER_INTERFACE" />
 
-    <!-- Các quyền bắt buộc cho Foreground Service -->
+    <!-- Quyền cho Foreground Service -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     
-    <!-- Quyền Internet để check key bản quyền -->
+    <!-- Quyền Internet để kiểm tra key bản quyền -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     
@@ -27,7 +27,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.Light.NoActionBar">
 
-        <!-- MÀN HÌNH KIỂM TRA KEY: Mở đầu tiên khi bấm icon ứng dụng -->
+        <!-- MÀN HÌNH KIỂM TRA KEY -->
         <activity
             android:name=".LicenseActivity"
             android:exported="true">
@@ -37,19 +37,17 @@
             </intent-filter>
         </activity>
 
-        <!-- MAIN ACTIVITY: Chứa cấu hình bộ lọc để nhận diện ứng dụng quay số mặc định -->
+        <!-- MAIN ACTIVITY -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop">
             
-            <!-- BỘ LỌC 1: Bắt buộc để RoleManager nhận diện app là ứng dụng quay số (Dialer) -->
             <intent-filter>
                 <action android:name="android.intent.action.DIAL" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
 
-            <!-- BỘ LỌC 2: Xử lý khi có lệnh gọi kèm theo scheme tel: hoặc xem số điện thoại -->
             <intent-filter>
                 <action android:name="android.intent.action.DIAL" />
                 <action android:name="android.intent.action.VIEW" />
@@ -102,6 +100,7 @@
             android:exported="false"
             android:foregroundServiceType="specialUse" />
 
+        <!-- ĐÃ SỬA LỖI TÊN META-DATA CỦA ACCESSIBILITY SERVICE -->
         <service
             android:name=".MyAccessibilityService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
@@ -110,7 +109,7 @@
                 <action android:name="android.accessibilityservice.AccessibilityService" />
             </intent-filter>
             <meta-data
-                android:name="android.accessibilityservice.accessibility_service_config"
+                android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
         </service>
         
