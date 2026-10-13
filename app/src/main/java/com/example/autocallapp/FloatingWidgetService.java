@@ -137,7 +137,7 @@ public class FloatingWidgetService extends Service {
                         return;
                     }
 
-                    showToastOnMainThread("Đang tiến hành quét, lưu và cuộn...");
+                    showToastOnMainThread("Đang tiến hành quét, lưu và cuộn tại tab hiện tại...");
 
                     new Thread(() -> {
                         int totalScrapedNew = 0;
@@ -153,7 +153,7 @@ public class FloatingWidgetService extends Service {
                                 continue;
                             }
 
-                            // 1. Quét lấy mã vận đơn trên màn hình hiện tại
+                            // 1. Quét lấy mã vận đơn trên màn hình hiện tại (chỉ qua ID chuẩn tvBillCode)
                             List<String> foundCodes = extractTrackingNumbersFromNode(rootNode);
                             int addedCount = 0;
 
@@ -297,12 +297,11 @@ public class FloatingWidgetService extends Service {
         return false;
     }
 
-    // Quét chuẩn xác mã vận đơn từ cây giao diện ứng dụng BEST (Bắt đầu bằng TT, 84, BE)
+    // CHỈ QUÉT ĐÚNG QUA ID CHUẨN tvBillCode Ở TAB HIỆN TẠI (ĐÃ BỎ VÉT CẠN)
     private List<String> extractTrackingNumbersFromNode(AccessibilityNodeInfo node) {
         List<String> codes = new ArrayList<>();
         if (node == null) return codes;
 
-        // 1. Quét trực tiếp qua ID tvBillCode chính xác từ app BEST
         List<AccessibilityNodeInfo> matchedNodes = node.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvBillCode");
         if (matchedNodes != null && !matchedNodes.isEmpty()) {
             for (AccessibilityNodeInfo n : matchedNodes) {
@@ -310,36 +309,14 @@ public class FloatingWidgetService extends Service {
                 if (text != null) {
                     String code = text.toString().trim();
                     boolean isValidPrefix = code.startsWith("TT") || code.startsWith("84") || code.startsWith("BE");
-                    if (isValidPrefix && !code.isEmpty() && !codes.contains(code)) {
+                    boolean isValidLength = code.length() >= 10 && code.length() <= 25;
+
+                    if (isValidPrefix && isValidLength && !code.isEmpty() && !codes.contains(code)) {
+                        android.util.Log.d("DEBUG_SCAN", "Bắt chuẩn mã vận đơn: " + code);
                         codes.add(code);
                     }
                 }
                 n.recycle();
-            }
-        }
-
-        // 2. Quét vét cạn dự phòng qua các TextView với 2 ký tự đầu: TT, 84, BE
-        if (node.getClassName() != null && node.getClassName().toString().contains("TextView")) {
-            CharSequence currentText = node.getText();
-            if (currentText != null) {
-                String code = currentText.toString().trim();
-                boolean isValidPrefix = code.startsWith("TT") || code.startsWith("84") || code.startsWith("BE");
-                boolean isValidFormat = isValidPrefix && code.matches("^[0-9A-Z]{10,25}$");
-                boolean isExcluded = code.contains("đường") || code.contains("Phường") || code.contains("Q.") || code.contains("Giao lần") || code.contains("Sản phẩm") || code.contains(":");
-
-                if (isValidFormat && !isExcluded && !codes.contains(code)) {
-                    android.util.Log.d("DEBUG_SCAN", "Vét cạn bắt được mã: " + code);
-                    codes.add(code);
-                }
-            }
-        }
-
-        // Duyệt đệ quy tìm kiếm trong các node con
-        for (int i = 0; i < node.getChildCount(); i++) {
-            AccessibilityNodeInfo child = node.getChild(i);
-            if (child != null) {
-                codes.addAll(extractTrackingNumbersFromNode(child));
-                child.recycle();
             }
         }
 
