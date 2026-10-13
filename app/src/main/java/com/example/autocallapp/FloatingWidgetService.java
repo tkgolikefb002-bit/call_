@@ -128,7 +128,7 @@ public class FloatingWidgetService extends Service {
                 });
             }
 
-            // Nút Kính lúp: Quét mã liên tục -> Lưu ngay -> Cuộn tức thì bằng RecyclerView ID
+            // Nút Kính lúp: Quét mã liên tục -> Lưu ngay -> Cuộn tức thì -> Lặp lại
             Button btnSearch = floatingView.findViewById(R.id.btnSearch);
             if (btnSearch != null) {
                 btnSearch.setOnClickListener(v -> {
@@ -153,6 +153,7 @@ public class FloatingWidgetService extends Service {
                                 continue;
                             }
 
+                            // 1. Quét lấy danh sách mã hiển thị trên màn hình hiện tại và lưu ngay lập tức
                             List<String> foundCodes = extractTrackingNumbersFromNode(rootNode);
                             int addedCount = 0;
 
@@ -174,17 +175,18 @@ public class FloatingWidgetService extends Service {
                                 noNewDataCount = 0; // Reset lại khi quét ra mã mới
                             }
 
-                            // Ép cuộn trực tiếp qua ID rvTask của app BEST
+                            // 2. Thực hiện cuộn xuống qua RecyclerView rvTask
                             boolean scrolled = performBestScrollDown(rootNode);
                             
-                            // Giải phóng bộ nhớ rootNode ngay sau khi dùng xong
+                            // Giải phóng bộ nhớ rootNode
                             rootNode.recycle();
 
                             if (!scrolled) {
                                 noNewDataCount++;
                             } else {
+                                // 3. Đợi khung hình load dữ liệu mới sau khi cuộn rồi tiếp tục vòng lặp
                                 try {
-                                    Thread.sleep(800); // Độ trễ tối ưu để app kịp render khung hình mới sau khi cuộn
+                                    Thread.sleep(850); 
                                 } catch (InterruptedException e) {
                                     e.printStackTrace();
                                 }
@@ -298,47 +300,48 @@ public class FloatingWidgetService extends Service {
         return false;
     }
 
-    // Quét chuẩn xác mã vận đơn từ cây giao diện ứng dụng BEST
+    // Quét chuẩn xác mã vận đơn từ cây giao diện ứng dụng BEST (ID tvBillCode & Vét cạn TextView)
     private List<String> extractTrackingNumbersFromNode(AccessibilityNodeInfo node) {
         List<String> codes = new ArrayList<>();
         if (node == null) return codes;
 
         // 1. Quét chính xác qua ID tvBillCode của app BEST
         List<AccessibilityNodeInfo> matchedNodes = node.findAccessibilityNodeInfosByViewId("com.best.android.vietcourier:id/tvBillCode");
-        android.util.Log.d("DEBUG_SCAN", "Số lượng node tìm thấy theo ID tvBillCode: " + (matchedNodes != null ? matchedNodes.size() : 0));
-
         if (matchedNodes != null && !matchedNodes.isEmpty()) {
             for (AccessibilityNodeInfo n : matchedNodes) {
                 CharSequence text = n.getText();
                 if (text != null) {
                     String code = text.toString().trim();
-                    android.util.Log.d("DEBUG_SCAN", "Đọc được text mã vận đơn: " + code);
+                    android.util.Log.d("DEBUG_SCAN", "Đọc được text mã vận đơn theo ID: " + code);
                     if (!code.isEmpty() && !codes.contains(code)) {
                         codes.add(code);
                     }
                 }
                 n.recycle();
             }
-        } else {
-            // 2. Dự phòng quét vét cạn nếu cấu trúc thay đổi
+        }
+
+        // 2. Duyệt đệ quy toàn bộ cây giao diện để vét cạn nếu node là TextView chứa mã
+        if (node.getClassName() != null && node.getClassName().toString().contains("TextView")) {
             CharSequence currentText = node.getText();
             if (currentText != null) {
                 String code = currentText.toString().trim();
-                boolean isValidFormat = code.startsWith("TTVN") || code.startsWith("BEST") || code.startsWith("848") || code.matches("^[0-9A-Z]{10,}$");
-                boolean isExcluded = code.contains("đường") || code.contains("Phường") || code.contains("Q.") || code.contains("Giao lần") || code.contains("Sản phẩm") || code.length() > 30;
+                boolean isValidFormat = code.startsWith("848") || code.startsWith("TTVN") || code.startsWith("BEST") || code.matches("^[0-9A-Z]{10,20}$");
+                boolean isExcluded = code.contains("đường") || code.contains("Phường") || code.contains("Q.") || code.contains("Giao lần") || code.contains("Sản phẩm") || code.contains(":");
 
                 if (isValidFormat && !isExcluded && !codes.contains(code)) {
                     android.util.Log.d("DEBUG_SCAN", "Vét cạn bắt được mã: " + code);
                     codes.add(code);
                 }
             }
+        }
 
-            for (int i = 0; i < node.getChildCount(); i++) {
-                AccessibilityNodeInfo child = node.getChild(i);
-                if (child != null) {
-                    codes.addAll(extractTrackingNumbersFromNode(child));
-                    child.recycle();
-                }
+        // Duyệt các node con đệ quy
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo child = node.getChild(i);
+            if (child != null) {
+                codes.addAll(extractTrackingNumbersFromNode(child));
+                child.recycle();
             }
         }
 
