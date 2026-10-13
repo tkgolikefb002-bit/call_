@@ -6,6 +6,7 @@ import android.app.NotificationManager;
 import android.app.Service;
 import android.content.Intent;
 import android.graphics.PixelFormat;
+import android.graphics.Rect;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -128,7 +129,7 @@ public class FloatingWidgetService extends Service {
                 });
             }
 
-            // Nút Kính lúp: Quét mã hiện tại -> Lưu ngay lập tức -> Cuộn xuống -> Lặp lại
+            // Nút Kính lúp: Quét mã hiện tại tại tab đang hiển thị -> Lưu ngay lập tức -> Cuộn xuống -> Lặp lại
             Button btnSearch = floatingView.findViewById(R.id.btnSearch);
             if (btnSearch != null) {
                 btnSearch.setOnClickListener(v -> {
@@ -153,7 +154,7 @@ public class FloatingWidgetService extends Service {
                                 continue;
                             }
 
-                            // 1. Quét lấy mã vận đơn trên màn hình hiện tại (chỉ qua ID chuẩn tvBillCode)
+                            // 1. Quét lấy mã vận đơn trong vùng hiển thị danh sách của tab hiện tại
                             List<String> foundCodes = extractTrackingNumbersFromNode(rootNode);
                             int addedCount = 0;
 
@@ -297,7 +298,7 @@ public class FloatingWidgetService extends Service {
         return false;
     }
 
-    // CHỈ QUÉT ĐÚNG QUA ID CHUẨN tvBillCode Ở TAB HIỆN TẠI (ĐÃ BỎ VÉT CẠN)
+    // CHỈ QUÉT MÃ NẰM TRONG KHUNG NHÌN DANH SÁCH BÊN DƯỚI (LOẠI BỎ VÙNG TAB VÀ TAB ẨN PHÍA TRÊN)
     private List<String> extractTrackingNumbersFromNode(AccessibilityNodeInfo node) {
         List<String> codes = new ArrayList<>();
         if (node == null) return codes;
@@ -312,8 +313,20 @@ public class FloatingWidgetService extends Service {
                     boolean isValidLength = code.length() >= 10 && code.length() <= 25;
 
                     if (isValidPrefix && isValidLength && !code.isEmpty() && !codes.contains(code)) {
-                        android.util.Log.d("DEBUG_SCAN", "Bắt chuẩn mã vận đơn: " + code);
-                        codes.add(code);
+                        
+                        // Kiểm tra tọa độ hiển thị thực tế trên màn hình
+                        Rect bounds = new Rect();
+                        n.getBoundsInScreen(bounds);
+                        
+                        // Chỉ lấy các đơn hàng nằm ở vùng danh sách bên dưới (Y > 450 pixel, loại bỏ vùng tab/bộ lọc phía trên)
+                        int screenTopLimit = 450; 
+                        
+                        if (bounds.top > screenTopLimit && bounds.bottom > 0) {
+                            android.util.Log.d("DEBUG_SCAN", "Lấy đúng mã đơn ở danh sách: " + code + " tại tọa độ Y: " + bounds.top);
+                            codes.add(code);
+                        } else {
+                            android.util.Log.d("DEBUG_SCAN", "Bỏ qua mã ở vùng tab/bộ lọc phía trên: " + code);
+                        }
                     }
                 }
                 n.recycle();
