@@ -144,7 +144,7 @@ public class FloatingWidgetService extends Service {
                         int noNewDataCount = 0;
 
                         // Vòng lặp quét, lưu và cuộn tự động liên tục
-                        while (noNewDataCount < 5) {
+                        while (noNewDataCount < 8) {
                             AccessibilityNodeInfo rootNode = MyAccessibilityService.getRootNodeSafely(MyAccessibilityService.instance);
                             if (rootNode == null) {
                                 android.util.Log.e("DEBUG_SCAN", "LỖI: rootNode bị null! Đang thử lại...");
@@ -170,24 +170,24 @@ public class FloatingWidgetService extends Service {
                                 updateProgress(totalScrapedNew);
                             }
 
-                            if (addedCount == 0) {
-                                noNewDataCount++;
-                            } else {
+                            if (addedCount > 0) {
                                 noNewDataCount = 0; // Reset lại khi quét ra mã mới
                             }
 
                             // Ép cuộn trực tiếp qua ID rvTask của app BEST
                             boolean scrolled = performBestScrollDown(rootNode);
+                            
+                            // Giải phóng bộ nhớ rootNode ngay sau khi dùng xong
+                            rootNode.recycle();
+
                             if (!scrolled) {
                                 noNewDataCount++;
-                            }
-
-                            rootNode.recycle(); // Giải phóng bộ nhớ rootNode
-
-                            try {
-                                Thread.sleep(600); // Độ trễ tối ưu để app kịp render khung hình mới
-                            } catch (InterruptedException e) {
-                                e.printStackTrace();
+                            } else {
+                                try {
+                                    Thread.sleep(800); // Độ trễ tối ưu để app kịp render khung hình mới sau khi cuộn
+                                } catch (InterruptedException e) {
+                                    e.printStackTrace();
+                                }
                             }
                         }
 
@@ -278,7 +278,7 @@ public class FloatingWidgetService extends Service {
         try {
             File file = new File(getExternalFilesDir(null), "DanhSachMaDon.txt");
             android.util.Log.d("DEBUG_FILE", "Đường dẫn file lưu: " + file.getAbsolutePath());
-            
+
             List<String> lines = new ArrayList<>();
             if (file.exists()) {
                 lines = Files.readAllLines(file.toPath());
@@ -326,7 +326,7 @@ public class FloatingWidgetService extends Service {
                 String code = currentText.toString().trim();
                 boolean isValidFormat = code.startsWith("TTVN") || code.startsWith("BEST") || code.startsWith("848") || code.matches("^[0-9A-Z]{10,}$");
                 boolean isExcluded = code.contains("đường") || code.contains("Phường") || code.contains("Q.") || code.contains("Giao lần") || code.contains("Sản phẩm") || code.length() > 30;
-                
+
                 if (isValidFormat && !isExcluded && !codes.contains(code)) {
                     android.util.Log.d("DEBUG_SCAN", "Vét cạn bắt được mã: " + code);
                     codes.add(code);
@@ -470,7 +470,7 @@ public class FloatingWidgetService extends Service {
                 if (called) {
                     showToastOnMainThread("Đang gọi đơn: " + trackingNumber);
                 }
-                
+
                 try { Thread.sleep(2000); } catch (InterruptedException e) { e.printStackTrace(); }
 
                 removeFirstTrackingNumber();
